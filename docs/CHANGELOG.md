@@ -1,5 +1,50 @@
 # Changelog — NEXUS-DESKTOP
 
+## 2.2.0 — 2026-10-19
+
+Modo de edição visual de elementos: clicar na página gerada e ajustar na mão.
+
+### Adicionado
+- **Modo edição** (`✎ EDITAR` / `✔ FINALIZAR`) — ao entrar, **congela todas as animações**
+  (CSS + loops `requestAnimationFrame`) de forma **reversível**; ao finalizar, tudo volta
+- **Seleção por clique** — 1 clique só seleciona o elemento (contorno tracejado neon,
+  sem `border`, então nada empurra o layout)
+- **Popover ancorado ao elemento** (228px) — abre por **duplo clique**, nunca sozinho
+- **Controles por tipo de elemento:**
+  - **texto** → conteúdo, fonte, cor
+  - **SVG** → preenchimento (`fill`) e contorno (`stroke`)
+  - **canvas** → nota explicando que o conteúdo é pixel (não DOM) + fundo e tamanho
+  - **objeto** → cor (fundo) e tamanho
+- **Transparência (alpha)** em cada seletor de cor, com o valor real do elemento
+- **Valores reais** no popover (`getComputedStyle` + `getBoundingClientRect`), nunca defaults
+- **Arrastar direto** — elemento selecionado já é arrastável (limiar de 4px para o clique
+  simples não mover)
+- **Redimensionar pelas bordas** — a 10px da borda/canto o cursor vira `*-resize`
+- **Ctrl+Z (desfazer)** com pilha de 200 ações + **contador `↩ N`** no popover; desfaz cor,
+  tamanho, texto, mover, redimensionar e **excluir**
+- **Popover arrastável** pela alça `⠿`, com posição fixada que sobrevive à reconstrução
+- **Drill-down de camadas** — camadas decorativas full-screen (vignette/partículas/sem texto)
+  são ignoradas; clique repetido ou Ctrl+clique desce um nível (jogos)
+- **Ramos SVG e canvas** no popover (era a causa de "alguns elementos não dá para editar")
+- **Diretiva `EDIT_FRIENDLY`** no prompt — a IA passa a gerar código estruturalmente
+  compatível com o editor: cada peça com `id`, canvas só para o fundo, 1 nó de texto por
+  frase, sem `!important`, sem overlay full-screen, layout em flex/grid
+
+### Alterado
+- **FINALIZAR grava o HTML editado como documento oficial** — as edições deixam de se perder
+  ao trocar de tema, gerar de novo ou salvar
+- **Popover não abre no clique simples** — selecionar, arrastar e redimensionar ficaram
+  fluidos; o popover só aparece sob pedido
+- **Durante arrasto/redimensionamento o popover desaparece** para não obstruir a visão
+- **Ctrl+Z funciona com o foco dentro da página** (handler também no shim do iframe)
+- **Ctrl+Z não abre mais o popover** quando ele estava fechado
+
+### Corrigido
+- Indicador de seleção não aparecia (`var()` em `outline` shorthand é rejeitado pelo Chrome)
+- O snapshot do FINALIZAR removia o shim do DOM vivo, matando a ponte de edição
+- Cursor de redimensionamento mudo nos cantos (ordem das letras `"es"` vs `"se"`)
+- `|` perdido vazando no `BASE_PROMPT`
+
 ## 1.5.0 — 2026-10-19
 
 ### Adicionado

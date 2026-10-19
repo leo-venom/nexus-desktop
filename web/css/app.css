@@ -429,6 +429,168 @@ body {
   word-break: break-word;
 }
 
+/* ---------- popover de edição de elemento ---------- */
+
+.nx-pop {
+  position: fixed;
+  z-index: 70;
+  width: 228px;
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-accent-soft);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  animation: nxPopIn 0.14s ease;
+}
+
+@keyframes nxPopIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.nx-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--nx-surface-alt);
+  border-bottom: 1px solid var(--nx-accent-faint);
+  cursor: move;              /* cabeçalho arrasta o popover */
+  user-select: none;
+}
+
+.nx-pop-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+.nx-pop-grip {
+  color: var(--nx-secondary);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -1px;
+  opacity: 0.85;
+}
+
+.nx-pop-head:active { background: var(--nx-accent-faint); }
+
+.nx-pop-tag {
+  font-family: 'Courier New', monospace;
+  font-size: 11.5px;
+  font-weight: bold;
+  color: var(--nx-accent);
+  letter-spacing: 0.06em;
+}
+
+.nx-pop-badge {
+  font-family: 'Courier New', monospace;
+  font-size: 10.5px;
+  color: var(--nx-secondary);
+  background: var(--nx-accent-faint);
+  border: 1px solid var(--nx-accent-faint);
+  border-radius: 999px;
+  padding: 2px 7px;
+  margin-left: auto;
+  margin-right: 6px;
+}
+
+.nx-pop-x {
+  border: 0;
+  background: transparent;
+  color: var(--nx-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.nx-pop-x:hover { color: var(--nx-accent); }
+
+.nx-pop-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.nx-pop-lbl {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--nx-secondary);
+  margin-bottom: 3px;
+}
+
+.nx-pop-text {
+  width: 100%;
+  border: 1px solid var(--nx-surface-alt);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--nx-text);
+  background: var(--nx-surface-alt);
+  outline: none;
+  resize: vertical;
+}
+.nx-pop-text:focus { border-color: var(--nx-accent); }
+
+.nx-pop-range { width: 100%; accent-color: var(--nx-accent); }
+
+.nx-pop-colorline { display: flex; align-items: center; gap: 6px; }
+
+.nx-pop-color {
+  width: 34px;
+  height: 28px;
+  padding: 1px;
+  border: 1px solid var(--nx-surface-alt);
+  border-radius: 8px;
+  background: var(--nx-surface-alt);
+  cursor: pointer;
+}
+
+.nx-pop-hex {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--nx-surface-alt);
+  border-radius: 8px;
+  padding: 5px 7px;
+  font-family: 'Courier New', monospace;
+  font-size: 11.5px;
+  color: var(--nx-text);
+  background: var(--nx-surface-alt);
+  outline: none;
+}
+.nx-pop-hex:focus { border-color: var(--nx-accent); }
+
+.nx-pop-btn {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--nx-surface-alt);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--nx-text);
+  background: var(--nx-surface-alt);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.nx-pop-btn:hover { border-color: var(--nx-accent-soft); background: var(--nx-accent-faint); }
+.nx-pop-btn.on { border-color: var(--nx-accent); color: var(--nx-accent); background: var(--nx-accent-faint); }
+.nx-pop-primary { color: var(--nx-on-accent); background: var(--nx-accent); border-color: var(--nx-accent); font-weight: bold; }
+.nx-pop-danger { color: var(--mx-error); border-color: var(--mx-error); background: transparent; }
+.nx-pop-danger:hover { background: rgba(255, 92, 92, 0.12); }
+
+.nx-pop-sep { height: 1px; background: var(--nx-surface-alt); margin: 2px 0; }
+
+.nx-pop-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--nx-secondary);
+  background: var(--nx-accent-faint);
+  border: 1px solid var(--nx-accent-faint);
+  border-radius: 8px;
+  padding: 7px 8px;
+}
+
+.nx-pop-hint {
+  font-size: 10px;
+  color: var(--nx-secondary);
+  text-align: center;
+  opacity: 0.8;
+}
+
 .mx-toast {
   position: fixed;
   left: 50%;

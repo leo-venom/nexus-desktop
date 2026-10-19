@@ -20,12 +20,23 @@ Rules:
 - Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
 - Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.
 - You may load libraries from public CDNs. For 3D always use three.js via this exact script tag: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use import maps or module builds). This URL is always available in the app, even offline.
-|- Make it spectacular and alive with minimal text: canvas/WebGL animation, CSS 3D, particles, gradients, graphics over words. Motion over static pictures. Keep text to the absolute minimum — titles only, no paragraphs, no descriptions. The page should be a visual experience first.
+- Make it spectacular and alive with minimal text: canvas/WebGL animation, CSS 3D, particles, gradients, graphics over words. Motion over static pictures. Keep text to the absolute minimum — titles only, no paragraphs, no descriptions. The page should be a visual experience first.
 - Fill the whole viewport, be responsive to any screen size, keep content centered, avoid scrollbars.
 - Touch targets at least 44px. Aim for smooth 60fps; cap device pixel ratio at 2.
 - Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.
 - If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).
 - If the message includes a "Current page" HTML document, that is the page currently on screen: treat the command as an edit to it - change only what was asked, keep everything else intact, and output the complete updated document. Only build a page from scratch when no current page is provided.`;
+
+  /* Regras para o código gerado ser totalmente editável pelo editor visual. */
+  var EDIT_FRIENDLY = `
+EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so structure the code for it:
+- Every visible piece (title, text, button, card, panel, shape) must be its OWN element with a meaningful id (e.g. id="titulo", id="btn-jogar", id="painel").
+- Canvas is ONLY for the animated scene/background. HUD, score, titles, buttons and menus must be real HTML elements layered on top — never drawn inside the canvas.
+- Keep each sentence in ONE text node: no <br> and no per-letter <span> inside a text. Animate a word/phrase with CSS on its parent element instead.
+- Never use !important in CSS: live inline edits must win.
+- Do not place a full-screen transparent overlay above the content, and never set pointer-events:none on visible layers.
+- Use px/rem font sizes and explicit colors so they can be tweaked live.
+- Lay out with flex/grid so elements never overlap or clip each other, and everything stays inside the viewport at any screen size.`;
 
   /* Escapa texto para HTML. Equivale ao replace global do Kotlin. */
   function esc(s) {
@@ -60,6 +71,7 @@ Rules:
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
     var out = '';
     out += BASE_PROMPT;
+    out += EDIT_FRIENDLY;
     out += detailDirective(level);
     out += '\n\nCurrent app theme — use these exact colors as the main palette:\n';
     out += '- background: ' + theme.background + '\n';

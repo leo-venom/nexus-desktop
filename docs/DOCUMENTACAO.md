@@ -48,6 +48,7 @@ Port de `Html.kt`. Exporta `window.Html`:
 | função | papel |
 | --- | --- |
 | `BASE_PROMPT` | regras da geração (marca NEXUS-DESKTOP) |
+| `EDIT_FRIENDLY` | diretriz de código compatível com o editor visual (ids por elemento, canvas só pro fundo, texto num único nó, sem `!important`, sem overlay full-screen, layout flex/grid) |
 | `systemPrompt(theme, level)` | prompt + diretriz de detalhe + paleta exata |
 | `detailDirective(level)` | 0 mínimo / 1 padrão / 2 máximo |
 | `userPrompt(cmd, doc)` | anexa a página atual para edição |
