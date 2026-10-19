@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS-DESKTOP
+Comment=Shell + IA que gera HTML (abre no navegador)
+Exec=sh -c "exec /home/leo/Documents/Obsidian\ Vault/01_Projeto/nexus-desktop/abrir.sh >/dev/null 2>&1"
+Icon=applications-internet
+Terminal=false
+Categories=Development;

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS-DESKTOP</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="titlebar">
+    <h1 class="brand" id="brand">NEXUS-DESKTOP</h1>
+    <span class="dot" id="dot"></span>
+    <span class="model" id="model">sem API key</span>
+    <div class="tbar"><div class="tfill" id="tfill"></div></div>
+    <span class="tlabel" id="tlabel">↑0 ↓0 · 0/1M</span>
+    <button class="reset" id="btn-reset" type="button" title="Reiniciar sessão">↺</button>
+    <input id="prompt" class="prompt" type="text" placeholder="Ex: criar cubo html 3d"
+           autocomplete="off" spellcheck="false">
+    <span class="status" id="status"></span>
+    <canvas id="vu" class="vu" width="54" height="20"></canvas>
+    <span class="kblabel" id="kb" hidden>…</span>
+    <button class="hbtn" id="btn-save" type="button">SALVAR</button>
+    <button class="hbtn" id="btn-open" type="button">ABRIR</button>
+    <button id="btn-gear" class="iconbtn gear" type="button" title="Configurações" aria-label="Configurações">⚙</button>
+  </div>
+</header>
+<main class="stage">
+  <iframe id="frame" class="frame" title="Página gerada"
+          allow="fullscreen; pointer-lock; keyboard-lock; autoplay"
+          sandbox="allow-scripts allow-pointer-lock allow-popups"></iframe>
+</main>
+<script src="js/themes.js"></script>
+<script src="js/prefs.js"></script>
+<script src="js/html-builder.js"></script>
+<script src="js/ai-client.js"></script>
+<script src="js/store.js"></script>
+<script src="js/vu-meter.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

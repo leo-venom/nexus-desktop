@@ -1,0 +1,91 @@
+/* ============================================================
+ * themes.js — port de NexusTheme.kt
+ * Agora com paleta multicolorida (colors[]) para resultados ricos.
+ * ============================================================ */
+(function () {
+  'use strict';
+
+  function T(name, background, surface, surfaceAlt, accent, text, secondary, isDark, colors) {
+    return {
+      name: name,
+      background: background,
+      surface: surface,
+      surfaceAlt: surfaceAlt,
+      accent: accent,
+      text: text,
+      secondary: secondary,
+      isDark: isDark,
+      colors: colors || [],       // cores extras pro prompt da IA
+      onAccent: isDark ? '#0A0E12' : '#FFFFFF'
+    };
+  }
+
+  var ALL = [
+    T('NEGRO · RGB neon',     '#000000', '#0B0B0E', '#14141A', '#FF2D95', '#E8E8F0', '#8888A0', true,
+      ['#FF2D95', '#00E5FF', '#FFE600', '#7C4DFF']),
+    T('NEGRO · fire',         '#000000', '#0E0A08', '#1A100C', '#FF6B35', '#F5E8E0', '#A08070', true,
+      ['#FF6B35', '#FF2D2D', '#FFD700', '#FF4500']),
+    T('NEGRO · synthwave',    '#000000', '#0A0812', '#141020', '#FF00FF', '#E8E0F8', '#8870B0', true,
+      ['#FF00FF', '#00FFFF', '#FF6BFF', '#6600FF']),
+    T('NEGRO · cyberpunk',    '#000000', '#0A0E0A', '#121A12', '#00FF88', '#E0F5E8', '#70A880', true,
+      ['#00FF88', '#00CCFF', '#FFE600', '#FF6600']),
+    T('NEGRO · rainbow',      '#000000', '#0E0A0E', '#1A101A', '#FF006E', '#F0E8F0', '#A080A0', true,
+      ['#FF006E', '#FFD700', '#00FF88', '#00BFFF', '#9B59B6']),
+
+    /* ── +5 temas BLACK coloridos ── */
+    T('NEGRO · vaporwave',    '#000000', '#0A0A14', '#121026', '#FF6EFF', '#E8E0F8', '#8870B0', true,
+      ['#FF6EFF', '#00E5FF', '#FFD700', '#FF2D95', '#7C4DFF']),
+    T('NEGRO · toxic',        '#000000', '#0A1008', '#102010', '#39FF14', '#E0F5E0', '#70A870', true,
+      ['#39FF14', '#00FF88', '#FFE600', '#00E5FF', '#FF6600']),
+    T('NEGRO · blood moon',   '#000000', '#100A0A', '#1E1010', '#FF0040', '#F5E0E0', '#A87070', true,
+      ['#FF0040', '#FF6B35', '#FFD700', '#8B0000', '#FF4500']),
+    T('NEGRO · galaxy',       '#000000', '#0A0A18', '#101028', '#7C4DFF', '#E8E0F8', '#8070B0', true,
+      ['#7C4DFF', '#FF00FF', '#00E5FF', '#FFFFFF', '#FFD700']),
+    T('NEGRO · aurora',       '#000000', '#080E0A', '#0E1A10', '#00FFAA', '#E0F5EC', '#70A888', true,
+      ['#00FFAA', '#7C4DFF', '#00E5FF', '#39FF14', '#FFD700']),
+
+    /* ── +10 temas BLACK coloridos ── */
+    T('NEGRO · strawberry',   '#000000', '#0E080A', '#1C0E12', '#FF2D55', '#F5E0E8', '#A87080', true,
+      ['#FF2D55', '#FF6B8A', '#FFD700', '#00E5FF', '#FFB6C1']),
+    T('NEGRO · ocean deep',   '#000000', '#080A12', '#0E1220', '#0066FF', '#E0E8F5', '#7088B0', true,
+      ['#0066FF', '#00E5FF', '#00FFAA', '#7C4DFF', '#FFFFFF']),
+    T('NEGRO · lime blast',   '#000000', '#080E08', '#0E1A0E', '#AAFF00', '#E8F5E0', '#80A870', true,
+      ['#AAFF00', '#39FF14', '#FFE600', '#00E5FF', '#FF6600']),
+    T('NEGRO · ultraviolet',  '#000000', '#08061A', '#0E0C2E', '#B366FF', '#E8E0F8', '#8870B0', true,
+      ['#B366FF', '#FF00FF', '#00E5FF', '#FFD700', '#FF6BFF']),
+    T('NEGRO · candy',        '#000000', '#0E080E', '#1C0E1C', '#FF69B4', '#F5E0F0', '#A870A0', true,
+      ['#FF69B4', '#FFD700', '#00E5FF', '#FF2D95', '#AAFF00']),
+    T('NEGRO · artic ice',    '#000000', '#080A0E', '#0E1220', '#00D4FF', '#E0F0F8', '#7090B0', true,
+      ['#00D4FF', '#0066FF', '#00FFAA', '#FFFFFF', '#B366FF']),
+    T('NEGRO · lava',         '#000000', '#100A08', '#20120E', '#FF2D00', '#F5E8E0', '#B08070', true,
+      ['#FF2D00', '#FFD700', '#FF6B35', '#FF4500', '#FF0040']),
+    T('NEGRO · poison',       '#000000', '#080A08', '#0E1A0E', '#00FF66', '#E0F5E8', '#70A880', true,
+      ['#00FF66', '#39FF14', '#00E5FF', '#AAFF00', '#FF006E']),
+    T('NEGRO · midnight sun', '#000000', '#0A0810', '#120E1C', '#FF6B00', '#F0E8E0', '#A08070', true,
+      ['#FF6B00', '#FFD700', '#FF0040', '#7C4DFF', '#00E5FF']),
+    T('NEGRO · pixel dream',  '#000000', '#0A0A0E', '#12141A', '#00FFFF', '#E8E8F0', '#8088A0', true,
+      ['#00FFFF', '#FF00FF', '#FFD700', '#FF2D95', '#39FF14'])
+  ];
+
+  /** Formato CSS RRGGBBAA (alpha por último). color = '#RRGGBB'. */
+  function hexA(color, alpha) {
+    var a = Math.max(0, Math.min(255, Math.floor(Number(alpha) || 0)));
+    var aa = a.toString(16).toUpperCase();
+    if (aa.length < 2) aa = '0' + aa;
+    return color + aa;
+  }
+
+  /** Equivalente de NexusTheme.of(index): clampa para 0..size-1. */
+  function of(index) {
+    var i = Math.floor(Number(index));
+    if (!isFinite(i)) i = 0;
+    i = Math.max(0, Math.min(ALL.length - 1, i));
+    return ALL[i];
+  }
+
+  window.Themes = {
+    ALL: ALL,
+    of: of,
+    hexA: hexA
+  };
+})();
