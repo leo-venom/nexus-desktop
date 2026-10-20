@@ -128,8 +128,8 @@ Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height
 12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
 
 PACK DE TEXTURAS PRONTO — window.NxTex (USE ESTE, NÃO REESCREVA):
-O documento já carrega js/nx-textures.js, que expõe 24 texturas procedurais bonitas e prontas:
-lava, metal, cromo, ouro, vidro, madeira, pedra, gelo, agua, grama, asfalto, grade, nebulosa, areia, chocolate, neon, tijolo, marmore, couro, plasma, cristal, ferrugem, concreto, holograma.
+O documento já carrega js/nx-textures.js, que expõe 44 texturas procedurais bonitas e prontas:
+lava, metal, cromo, ouro, vidro, madeira, pedra, gelo, agua, grama, asfalto, grade, nebulosa, areia, chocolate, neon, tijolo, marmore, couro, plasma, cristal, ferrugem, concreto, holograma, obsidiana, basalto, ametista, rubi, safira, turquesa, cobre, bronze, titanio, fibra_carbono, camuflagem, zebra, tigre, veludo, pergaminho, circuito, binario, aurora, fogo_azul, pantano.
 
 API (2D):
 - NxTex.bloco(ctx, x, y, w, h, 'lava')  → pinta o bloco JÁ com textura + brilho no topo + sombra na base. Use em cada peça/inimigo/plataforma.
