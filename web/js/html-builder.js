@@ -127,6 +127,23 @@ Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height
 11. GRAMA: gradiente verde com ruído + traços verticais finos (fillRect 1px largura, 4-8px altura, verde claro, espaçados 4px). material: MeshStandardMaterial, roughness:0.9.
 12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
 
+PACK DE TEXTURAS PRONTO — window.NxTex (USE ESTE, NÃO REESCREVA):
+O documento já carrega js/nx-textures.js, que expõe 24 texturas procedurais bonitas e prontas:
+lava, metal, cromo, ouro, vidro, madeira, pedra, gelo, agua, grama, asfalto, grade, nebulosa, areia, chocolate, neon, tijolo, marmore, couro, plasma, cristal, ferrugem, concreto, holograma.
+
+API (2D):
+- NxTex.bloco(ctx, x, y, w, h, 'lava')  → pinta o bloco JÁ com textura + brilho no topo + sombra na base. Use em cada peça/inimigo/plataforma.
+- ctx.fillStyle = NxTex.pattern(ctx, 'metal')  → pattern repetido para preencher áreas.
+- NxTex.canvas('pedra', 64)  → canvas cru (32/64/128/256).
+- NxTex.css('nebulosa')  → 'url(data:...)' para background de elemento.
+- NxTex.mapear('textura de chocolate')  → traduz o pedido do usuário para a textura mais próxima.
+- NxTex.names()  → lista as 24.
+
+API (3D/three.js):
+- material.map = NxTex.three('lava')  → THREE.CanvasTexture com RepeatWrapping (já configurada).
+
+REGRA: se o pedido citar uma textura que existe no pack, CHAME NxTex para ela em vez de escrever a receita. Só crie textura manual quando o material pedido não existir no pack — e nesse caso derive das cores do material (nunca cor lisa).
+
 TEXTURA EM JOGO 2D (canvas puro) — OBRIGATÓRIO:
 Jogo 2D (Tetris, Snake, plataforma, shooter top-down, quebra-cabeça) NÃO pode usar cor chapada nos objetos. Cada objeto/peça/inimigo precisa de textura procedural:
 - Crie UMA vez um canvas pequeno (32x32 ou 64x64) com gradiente + ruído + detalhes (ex.: lava = gradiente amarelo→laranja→vermelho + pontos claros; metal = cinza + listras; pedra = ruído; grama = verde + traços).
@@ -449,6 +466,8 @@ VERIFIQUE ANTES DE ENTREGAR:
       injection += '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">\n';
     }
     injection += STORAGE_SAFE + '\n';
+    /* Pack de texturas procedurais (js/nx-textures.js) — disponível como window.NxTex. */
+    injection += '<script src="js/nx-textures.js"></script>\n';
     injection += '<style id="nx77-base">\n' + varsCss(theme) + '\n' + baseCss() + '\n</style>';
 
     var head = HEAD_REGEX.exec(html);
