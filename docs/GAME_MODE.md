@@ -1,34 +1,43 @@
 # GAME MODE — diretriz oficial do NEXUS GAME
 
-**Gerado do codigo em execucao** (`web/js/html-builder.js`)
+**Gerado do codigo em execucao** (`web/js/html-builder.js`) · versao undefined
 
 ## Numeros reais
 
 | Item | Valor |
 |---|---|
-| `GAME_DIRECTIVE` | 12371 chars (~3093 tok), 114 linhas |
-| Prompt de jogo (system completo) | 13844 chars (~3461 tok) |
-| Prompt de site (SITE_DIRECTIVE) | 6088 chars |
-| Prompt normal | 5200 chars |
+| `GAME_DIRECTIVE` | 13827 chars (~3457 tok), 128 linhas |
+| Prompt de jogo (system completo) | 15842 chars (~3961 tok) |
+| Prompt de site | 6095 chars |
+| Prompt normal | 15842 chars |
 | Texturas processuais | 12 |
 | Sons WebAudio | 13 |
 | Temas | 30 (20 escuros + 10 claros) |
+| Modo | GAME unico (seletor de nivel removido) |
 
 ## Ativacao
 
-`Html.isGameCommand(comando)` — palavras-chave PT/EN. Ativam GAME MODE:
+**GAME e o modo padrao** — qualquer comando vira jogo. SITE so entra quando o comando pede
+site/pagina explicitamente. Refino cirurgico continua usando `EDIT_DIRECTIVE` (JSON find/replace).
 
-`jogo`, `tetris`, `snake`, `nave`, `plataforma`, `cubo 3d`, `textura lava`, `planeta`, `shader`, `webgl`, `voxel`, `pixel art`
+## Escopo exigido do jogo
 
-GAME MODe monta o prompt **do zero**: sem `BASE_PROMPT`, sem `EDIT_FRIENDLY`, sem `detailDirective`.
-SITE tem precedencia sobre GAME. Refino cirurgico usa o prompt normal.
+`ESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.`
 
-## Protecoes que o prompt exige do jogo
+## Protecoes garantidas pelo app (nao dependem do modelo)
 
-1. **Medicao defensiva de viewport** — `innerWidth/innerHeight` podem vir 0 no iframe; medir em `requestAnimationFrame`, remedir no `resize`/`orientationchange` e em `setTimeout(300)`.
-2. **Storage polyfill** — `localStorage`/`sessionStorage` sao substituidos por store em memoria no iframe sandbox (injecao `nx-safe`), entao recorde nunca lanca `SecurityError`.
-3. **HUD nas laterais** (60-80px), canvas cobrindo a tela inteira por tras.
-4. **3D simples exige textura** — cubo/esfera/planeta nunca saem com cor lisa.
+1. **Storage polyfill `nx-safe`** — `localStorage`/`sessionStorage` em memoria no iframe sandbox.
+2. **Loop de continuacao (12x)** — resposta cortada pelo provedor e emendada sem whitespace ate `</html>`.
+3. **Deteccao de truncamento** — `finish_reason == length` ou documento sem `</html>`.
+4. **iframe** `sandbox="allow-scripts allow-pointer-lock allow-popups"` + `allow="fullscreen; pointer-lock; keyboard-lock; autoplay"`.
+
+## Regras de desempenho no prompt
+
+- Um canvas e um loop de rAF; fundo em offscreen + drawImage
+- Particulas com pool (max 40-60), zero alocacao no loop
+- Sem blur/box-shadow/backdrop-filter em elemento animado
+- Gradientes/paths criados uma vez; colisao AABB; DPR cap 2
+- Pausa em `visibilitychange`; `AudioContext` unico
 
 ---
 
@@ -37,6 +46,9 @@ SITE tem precedencia sobre GAME. Refino cirurgico usa o prompt normal.
 ```text
 
 GAME MODE ATIVADO — VOCÊ ESTÁ GERANDO UM JOGO COMPLETO. Siga TODAS as regras abaixo em PORTUGUÊS (pt-BR) para textos visíveis.
+
+REGRA ABSOLUTA — ENTREGA COMPLETA EM UMA RESPOSTA:
+O documento inteiro precisa caber em UMA resposta do modelo. Comece a escrever o <script> do jogo cedo e mantenha o código enxuto: priorize um jogo COMPLETO, jogável e fechado (com </body></html> no final) em vez de volume. Se estiver ficando grande, corte cenário, partículas e comentários — NUNCA corte níveis, inimigos, controles, áudio, HUD ou o fechamento do HTML. Documento cortado no meio = entrega inválida e tela preta.
 
 REGRA ABSOLUTA — TAMANHO:
 Sem mínimo nem teto de tamanho de código. O código que o jogo exigir para ser completo e rodar liso a 60fps. Cortar redundância é obrigatório — mas não corte jogabilidade, níveis, inimigos, power-ups, som ou efeitos.
@@ -135,6 +147,17 @@ function playSom(tipo) {
 11. MENU HOVER/CLICK: OscillatorNode 0.03s, 600-800Hz (sine), attack 0s decay 0.03s. Click: dois OscillatorNode simultâneos (600+800Hz).
 12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
 13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
+
+DESEMPENHO — META 60 FPS CONSTANTES (obrigatório):
+- Um único canvas e um único loop de requestAnimationFrame. Nada de vários loops concorrentes.
+- NÃO redesenhe o fundo a cada frame: pinte-o uma vez em canvas offscreen e use drawImage; parallax só com deslocamento de offset.
+- Partículas: array fixo com pool (máx 40-60), zero alocação de objetos dentro do loop.
+- Sem filter: blur(), box-shadow ou backdrop-filter em elementos animados; sem sombras por frame no canvas (use 1-2 sombras pré-renderizadas se indispensável).
+- Reaproveite gradientes/paths (crie uma vez, reutilize); nada de criar gradiente ou string de cor dentro do loop.
+- Colisões simples (AABB/círculos), sem cálculos por pixel.
+- Cap de devicePixelRatio em 2; se a tela for grande, reduza a resolução interna do canvas em vez de perder frames.
+- Pause o loop quando document.hidden; retome no visibilitychange.
+- Áudio: nós criados por som e descartados (ou pool); nunca criar AudioContext por efeito.
 
 NÃO FAÇA:
 - Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
@@ -168,6 +191,9 @@ Rules:
 
 GAME MODE ATIVADO — VOCÊ ESTÁ GERANDO UM JOGO COMPLETO. Siga TODAS as regras abaixo em PORTUGUÊS (pt-BR) para textos visíveis.
 
+REGRA ABSOLUTA — ENTREGA COMPLETA EM UMA RESPOSTA:
+O documento inteiro precisa caber em UMA resposta do modelo. Comece a escrever o <script> do jogo cedo e mantenha o código enxuto: priorize um jogo COMPLETO, jogável e fechado (com </body></html> no final) em vez de volume. Se estiver ficando grande, corte cenário, partículas e comentários — NUNCA corte níveis, inimigos, controles, áudio, HUD ou o fechamento do HTML. Documento cortado no meio = entrega inválida e tela preta.
+
 REGRA ABSOLUTA — TAMANHO:
 Sem mínimo nem teto de tamanho de código. O código que o jogo exigir para ser completo e rodar liso a 60fps. Cortar redundância é obrigatório — mas não corte jogabilidade, níveis, inimigos, power-ups, som ou efeitos.
 
@@ -266,6 +292,17 @@ function playSom(tipo) {
 12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
 13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
 
+DESEMPENHO — META 60 FPS CONSTANTES (obrigatório):
+- Um único canvas e um único loop de requestAnimationFrame. Nada de vários loops concorrentes.
+- NÃO redesenhe o fundo a cada frame: pinte-o uma vez em canvas offscreen e use drawImage; parallax só com deslocamento de offset.
+- Partículas: array fixo com pool (máx 40-60), zero alocação de objetos dentro do loop.
+- Sem filter: blur(), box-shadow ou backdrop-filter em elementos animados; sem sombras por frame no canvas (use 1-2 sombras pré-renderizadas se indispensável).
+- Reaproveite gradientes/paths (crie uma vez, reutilize); nada de criar gradiente ou string de cor dentro do loop.
+- Colisões simples (AABB/círculos), sem cálculos por pixel.
+- Cap de devicePixelRatio em 2; se a tela for grande, reduza a resolução interna do canvas em vez de perder frames.
+- Pause o loop quando document.hidden; retome no visibilitychange.
+- Áudio: nós criados por som e descartados (ou pool); nunca criar AudioContext por efeito.
+
 NÃO FAÇA:
 - Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
 - 1 tipo de inimigo com cores diferentes chamado de "8 níveis"
@@ -279,6 +316,8 @@ VERIFIQUE ANTES DE ENTREGAR:
 - Menu+pausa+game over com stats? recorde salvo? teclado+toque?
 - Texturas aplicadas conforme material? sons em todas as ações?
 - Cada nível diferente do anterior (não só velocidade)?
+
+ESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.
 The game scene MUST be visibly lit. Add a subtle rim light or glow on characters and interactive elements so they stand out from the dark background.
 
 Current app theme — use these exact colors as the main palette:

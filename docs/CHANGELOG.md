@@ -1,5 +1,57 @@
 # Changelog — NEXUS GAME
 
+## v2.5.1 — 2026-10-20
+
+### Corrigido
+- **Jogo grande parava em ~40 KB.** O provedor corta a saída e um único pedido de continuação era
+  cortado no mesmo ponto. Agora `completarSeTruncado()` roda em **loop até 12x**, emendando sem
+  whitespace, até o documento fechar em `</html>`. Verificado: 4 pedaços de ~29 KB → 71 KB
+  emendados, canvas desenhando.
+
+## v2.5.0 — 2026-10-20
+
+### Removido
+- **Seletor de nível de detalhe** (Simples/Médio/Rico) do modal de configurações. Modo game único.
+
+### Adicionado
+- **Seção DESEMPENHO — META 60 FPS CONSTANTES** no `GAME_DIRECTIVE`: um canvas e um loop,
+  fundo em offscreen + `drawImage`, partículas com pool (40-60), proibição de blur/shadow em
+  elemento animado, gradientes reaproveitados, colisão AABB, DPR cap 2, pausa em
+  `visibilitychange`, `AudioContext` único.
+
+## v2.4.0 — 2026-10-20
+
+### Alterado
+- **Produto 100% focado em jogos**: GAME passa a ser o modo padrão; SITE só quando o comando pede
+  site/página explicitamente.
+- Escopo do jogo derivado do nível escolhido (Simples/Médio/Rico) — depois unificado em v2.5.0.
+- Identidade de "gerador de jogos" na UI (placeholder), `.desktop`, `package.json` e README.
+
+## v2.3.0 — 2026-10-20
+
+### Adicionado
+- **30 temas restaurados** — 20 escuros + **10 claros** (rubi, tangerina, limão, esmeralda,
+  turquesa, céu, lavanda, orquídea, areia, grafite); grupos ESCUROS/CLAROS no modal.
+- **SITE_DIRECTIVE** + `isSiteCommand()` (rolagem, seções, hero, parallax, precedência sobre jogo).
+- **`GAME_DIRECTIVE` completo** — 12 texturas processuais + 13 sons WebAudio + checklist + regras
+  de tela + inferência automática de textura.
+- **Storage polyfill (`nx-safe`)** — `localStorage`/`sessionStorage` em memória no iframe sandbox;
+  sem ele qualquer jogo com recorde quebrava.
+- **Detecção 3D/textura** — `cubo 3d`, `textura lava`, `planeta`, `shader`, `webgl`, `voxel`
+  passam a ativar GAME MODE (antes caíam no prompt normal, sem receita de textura).
+- **Regra de 3D simples** — cubo/esfera/planeta nunca saem com cor lisa.
+- **Medição defensiva de viewport** — `innerWidth/innerHeight` podem vir 0 no iframe; medir em
+  `requestAnimationFrame`, remedir em `resize`/`orientationchange` e em `setTimeout(300)`.
+
+### Corrigido
+- **TELA PRETA em todo jogo**: a emenda da resposta truncada inseria `\n`, quebrando tags partidas
+  (`</scr` + `ipt>`); agora concatena sem separador.
+- **Detecção de truncamento** por `finish_reason === 'length'` ou documento sem `</html>`.
+- `themed()` reinyecta o polyfill em re-render/troca de tema.
+
+### Removido
+- Limite de `MAX_EDITS` (5 → sem limite) e teto de 32 edições (→ 200).
+
 ## Não publicado
 
 ### Adicionado
