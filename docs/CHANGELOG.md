@@ -1,5 +1,11 @@
 # Changelog — NEXUS GAME
 
+## v2.7.0 — 2026-10-20
+
+### Removido
+- **SITE MODE por completo** — `SITE_DIRECTIVE`, `SITE_TERMS`, `isSiteCommand()` e o branch de site
+  no `systemPrompt()`. NEXUS GAME tem um único modo: **jogo**. Qualquer comando gera jogo.
+
 ## v2.5.1 — 2026-10-20
 
 ### Corrigido

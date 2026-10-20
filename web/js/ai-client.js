@@ -428,7 +428,7 @@
   }
 
   window.AiClient = {
-    VERSION: '2.5.1',
+    VERSION: '2.7.0',
     cancel: cancel,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
     CHAT_READ_TIMEOUT_MS: CHAT_READ_TIMEOUT_MS,

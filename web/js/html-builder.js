@@ -227,56 +227,6 @@ VERIFIQUE ANTES DE ENTREGAR:
     return '';
   }
 
-  /* Palavras-chave de site/página (precedência sobre jogo). */
-  var SITE_TERMS = [
-    'site','página','pagina','landing','landpage','portfólio','portfolio','ecommerce',
-    'loja','blog','saas','dashboard','painel','admin','empresa','negócio','negocio',
-    'startup','agência','agencia','restaurante','academia','clínica','clinica',
-    'advogado','consultoria','imobiliária','imobiliaria','cardápio','cardapio',
-    'menu do site','website','web site','homepage','home page','one page','onepage',
-    'curriculum','currículo','resume','institucional','institutional'
-  ];
-
-  function isSiteCommand(cmd) {
-    if (!cmd || typeof cmd !== 'string') return false;
-    var c = cmd.toLowerCase().trim();
-    if (!c) return false;
-    for (var i = 0; i < SITE_TERMS.length; i++) {
-      if (c.indexOf(SITE_TERMS[i]) >= 0) return true;
-    }
-    return false;
-  }
-
-  var SITE_DIRECTIVE = `
-SITE/PAGE MODE — build a complete, scrollable website in ONE self-contained HTML file.
-
-STRUCTURE:
-- Split the page into clear sections (hero, features, gallery, pricing, contact, footer). Each section is its own element with a meaningful id and fills at least one viewport height when it is a hero.
-- The page MUST scroll naturally: do NOT set overflow:hidden on body or html. Only the hero is fixed-height (100dvh); the rest flows.
-- Sticky navigation bar at the top with anchor links to the sections, subtle backdrop blur, and it must not cover the content (use scroll-margin-top on sections).
-
-HERO:
-- The hero is the one place for a strong visual: headline, short subline, primary CTA and a visual. Use a 3D object (three.js) or a simulated 3D/parallax layer only if it directly supports the concept — otherwise a striking typographic hero with a refined gradient is better than a weak 3D scene.
-- The hero must fill 100dvh (use dvh, never vh alone) and be readable on any screen size.
-
-RESPONSIVENESS:
-- Mobile-first. Breakpoints at 900px and 600px. Stack columns, never let text overflow, keep tap targets at least 44px.
-- Use clamp() for hero typography so it scales without media queries.
-
-SCROLL EFFECTS (with restraint):
-- Reveal-on-scroll with IntersectionObserver: elements fade/slide in once, threshold 0.15, no re-animation.
-- Parallax on background layers only (transform: translate3d), never on text. Cap the movement.
-- One subtle ambient accent is enough (a gradient blob, a noise overlay, a grain texture). No stacked blur/glow, no particle storms across sections.
-- Respect prefers-reduced-motion: disable parallax and reveal animations.
-
-VISUAL QUALITY:
-- Consistent 8px spacing rhythm, generous white space between sections, a clear typographic scale, 12-16px radii, fine 1px borders using the accent at low alpha.
-- Real content, not lorem ipsum: write short copy that fits the product/concept in the requested language.
-- Images and icons must be inline SVG or CSS-generated (no external assets that can fail). Gradients and shapes are preferred over placeholder image boxes.
-- Footer with a closing line and unobtrusive links.
-
-DO NOT: build a single static screen with no scrolling, fake sections that lead nowhere, overflow the viewport horizontally, or use !important in CSS.`;
-
   /* Escapa texto para HTML. Equivale ao replace global do Kotlin. */
   function esc(s) {
     return String(s == null ? '' : s)
@@ -305,60 +255,20 @@ DO NOT: build a single static screen with no scrolling, fake sections that lead 
     return '';
   }
 
-  /* System prompt: regras + nível de detalhe + paleta exata do tema. */
+  /* System prompt — NEXUS GAME tem um único modo: jogo. */
   function systemPrompt(theme, detailLevel, command) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
-    /* NEXUS GAME é um gerador de jogos: GAME é o modo padrão.
-       SITE só entra quando o comando pede site/página explicitamente. */
-    var isSite = command && isSiteCommand(command);
-    var isGame = !isSite;
-    if (isSite) {
-      var sout = '';
-      sout += BASE_PROMPT;
-      sout += EDIT_FRIENDLY;
-      sout += SITE_DIRECTIVE;
-      sout += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
-      sout += '- background: ' + theme.background + '\n';
-      sout += '- accent (primary/highlights): ' + theme.accent + '\n';
-      sout += '- text: ' + theme.text + '\n';
-      sout += '- secondary text: ' + theme.secondary + '\n';
-      sout += '- surface (cards/panels): ' + theme.surface + '\n';
-      sout += '- surface alt: ' + theme.surfaceAlt + '\n';
-      if (theme.colors && theme.colors.length) {
-        sout += '- extra palette colors (accents, highlights and one gradient): ' + theme.colors.join(', ') + '\n';
-      }
-      sout += 'Respect the palette: use the extra colors with restraint for accents, highlights and one gradient \u2014 avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
-      return sout;
-    }
-    if (isGame) {
-      var out = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
-      out += 'Rules:\n';
-      out += '- Output ONLY raw HTML. No markdown fences, no explanations.\n';
-      out += '- Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.\n';
-      out += '- For 3D use three.js: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use imports or module builds).\n';
-      out += '- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.\n';
-      out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
-      out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
-      out += GAME_DIRECTIVE;
-      out += gameScopeNote(level);
-      out += gameLightingNote(theme);
-      out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
-      out += '- background: ' + theme.background + '\n';
-      out += '- accent (primary/highlights): ' + theme.accent + '\n';
-      out += '- text: ' + theme.text + '\n';
-      out += '- secondary text: ' + theme.secondary + '\n';
-      out += '- surface (cards/panels): ' + theme.surface + '\n';
-      out += '- surface alt: ' + theme.surfaceAlt + '\n';
-      if (theme.colors && theme.colors.length) {
-        out += '- extra palette colors (use them freely for gradients, particle colors, UI accents and lighting): ' + theme.colors.join(', ') + '\n';
-      }
-      out += 'For a game, ignore the "at most one gradient" and "avoid rainbow noise" rules \u2014 use the palette expansively across gradients, particles, lighting and UI. Respect the dark background, but the game must be vibrant.\n';
-      return out;
-    }
-    var out = '';
-    out += BASE_PROMPT;
-    out += EDIT_FRIENDLY;
-    out += detailDirective(level);
+    var out = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+    out += 'Rules:\n';
+    out += '- Output ONLY raw HTML. No markdown fences, no explanations.\n';
+    out += '- Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.\n';
+    out += '- For 3D use three.js: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use imports or module builds).\n';
+    out += '- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.\n';
+    out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
+    out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
+    out += GAME_DIRECTIVE;
+    out += gameScopeNote(level);
+    out += gameLightingNote(theme);
     out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
     out += '- background: ' + theme.background + '\n';
     out += '- accent (primary/highlights): ' + theme.accent + '\n';
@@ -367,9 +277,9 @@ DO NOT: build a single static screen with no scrolling, fake sections that lead 
     out += '- surface (cards/panels): ' + theme.surface + '\n';
     out += '- surface alt: ' + theme.surfaceAlt + '\n';
     if (theme.colors && theme.colors.length) {
-      out += '- extra palette colors (accents, highlights and at most one gradient): ' + theme.colors.join(', ') + '\n';
+      out += '- extra palette colors (use them freely for gradients, particle colors, UI accents and lighting): ' + theme.colors.join(', ') + '\n';
     }
-    out += 'Respect the palette: dark background means dark design. Use the extra colors with restraint for accents, highlights and one gradient \u2014 avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
+    out += 'For a game, ignore the "at most one gradient" and "avoid rainbow noise" rules \u2014 use the palette expansively across gradients, particles, lighting and UI. Respect the dark background, but the game must be vibrant.\n';
     return out;
   }
 
@@ -774,10 +684,8 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     BASE_PROMPT: BASE_PROMPT,
     EDIT_DIRECTIVE: EDIT_DIRECTIVE,
     GAME_DIRECTIVE: GAME_DIRECTIVE,
-    SITE_DIRECTIVE: SITE_DIRECTIVE,
     STORAGE_SAFE: STORAGE_SAFE,
     isGameCommand: isGameCommand,
-    isSiteCommand: isSiteCommand,
     gameScopeNote: gameScopeNote,
     applyEdits: applyEdits,
     looksLikeDocument: looksLikeDocument,
