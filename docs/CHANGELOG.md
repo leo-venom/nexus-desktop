@@ -4,7 +4,7 @@
 
 ### Adicionado
 - **Shell Electron** — `desktop/main.js` + `desktop/server.js` abrem a interface em janela
-  própria fullscreen (F11 alterna, F12 DevTools), com instância única; o servidor local roda
+  própria em janela normal (F11 alterna tela cheia, F12 DevTools), com instância única; o servidor local roda
   no mesmo processo (8790→8810 se a porta estiver ocupada) e links externos abrem em janela
   interna. `NEXUS-DESKTOP.desktop`/`desktop/start.sh` são o caminho principal;
   `abrir.sh`/`serve.py` continuam como fallback no navegador

@@ -115,7 +115,7 @@ tema e bridge. Ver `MAPA_UI.md` para as âncoras.
 
 ### desktop/main.js
 Shell Electron: instância única (`requestSingleInstanceLock`; a segunda chamada foca a
-janela), janela `fullscreen` sem menu, `contextIsolation`/`sandbox` ligados e
+janela), janela normal sem menu, `contextIsolation`/`sandbox` ligados e
 `nodeIntegration` desligado. F11 alterna tela cheia, F12 abre DevTools. `window.open`
 para `http(s)` é permitido em janela interna 1200×800 com as mesmas proteções; outros
 protocolos são negados. Ao sair, fecha o servidor embutido.
@@ -236,7 +236,7 @@ contornar com HTML/JS (regra de segurança do navegador).
 
 **App Electron (principal):** `NEXUS-DESKTOP.desktop` (ou `./desktop/start.sh`) executa
 `desktop/main.js`, que chama `startServer()` de `desktop/server.js` no próprio processo e
-carrega a URL escolhida na janela fullscreen. A porta preferida é 8790; se estiver ocupada,
+carrega a URL escolhida na janela do app. A porta preferida é 8790; se estiver ocupada,
 o servidor incrementa até 20 vezes (8791→8810) e a janela usa a porta livre. O Chromium
 embutido preserva File System Access, iframe e renderização.
 
@@ -262,4 +262,4 @@ terminal para ver erros.
 A matriz e as evidências estão em `VALIDACAO.md`: 16 itens (2026-10-18) de sintaxe, testes
 unitários, E2E de geração e refino cirúrgico (patch + fallback), proxy/CORS, paths, bridge
 e launcher; e a seção do shell Electron (2026-10-19) com sintaxe, servidor Node, path
-traversal, launcher e janela fullscreen.
+traversal, launcher e janela normal.

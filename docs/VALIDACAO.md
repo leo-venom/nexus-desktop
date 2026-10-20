@@ -32,10 +32,10 @@ REA/Playwright, Node 26.8.1, Python 3.14) e do shell Electron em **2026-10-19**.
 | E2 | Servidor Node | `desktop/server.js`: `/` e CSS 200; `/fontes/` e `/fontes/fonts.css` 200; `/_proxy` 400 sem `url`; proxy local e `https://example.com/` 200 | OK |
 | E3 | Path traversal | `:8899`: `/..%2fserve.py` 403, `/%2e%2e/serve.py` 404, `/%2e%2e%2fserve.py` 403, `/../serve.py` 404; `/` 200 | OK (bloqueado) |
 | E4 | Launcher instalado | `gtk-launch NEXUS-DESKTOP`; `hyprctl clients`; segunda chamada | OK — `class=nexus-desktop`, `title=NEXUS-DESKTOP`; 1 janela (single-instance) |
-| E5 | Fullscreen e porta ocupada | janela aberta pelo launcher; 8790 ocupada por `serve.py` leftover | OK — `fullscreen=2`, 1366×768; app subiu na porta seguinte |
+| E5 | Janela normal e porta ocupada | janela aberta pelo launcher; 8790 ocupada por `serve.py` leftover | OK — `fullscreen=0` (janela normal); app subiu na porta seguinte |
 
 **Evidência E4/E5:** `gtk-launch` saiu com 0; `hyprctl clients` mostrou
-`class: nexus-desktop`, `fullscreen: 2`, `size: 1366,768`. Os 2 processos renderer
+`class: nexus-desktop`, `fullscreen: 0` (janela normal; F11 alterna tela cheia). Os 2 processos renderer
 observados correspondem à página e ao iframe (`sandbox`), comportamento esperado.
 
 ## Evidências principais

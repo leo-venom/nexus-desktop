@@ -3,12 +3,12 @@
 /**
  * NEXUS-DESKTOP — shell desktop.
  *
- * Abre a interface no Chromium embutido (Electron), em tela cheia, servida
- * por um servidor local em 127.0.0.1. Não depende de navegador externo.
+ * Abre a interface no Chromium embutido (Electron), em janela normal,
+ * servida por um servidor local em 127.0.0.1. F11 alterna tela cheia.
  */
 
 const path = require('path');
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, screen } = require('electron');
 const { startServer } = require('./server');
 
 /* Wayland nativo quando disponível; XWayland como fallback. */
@@ -20,10 +20,12 @@ let mainWindow = null;
 let localServer = null;
 
 function createWindow(port) {
+  /* Janela normal, dimensionada para caber na área útil da tela. */
+  const wa = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
-    width: 1600,
-    height: 900,
-    fullscreen: true,
+    width: Math.min(1600, Math.round(wa.width * 0.9)),
+    height: Math.min(900, Math.round(wa.height * 0.9)),
+    center: true,
     show: false,
     backgroundColor: '#0e0f13',
     title: 'NEXUS-DESKTOP',
@@ -42,7 +44,6 @@ function createWindow(port) {
   mainWindow.setMenuBarVisibility(false);
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.setFullScreen(true);
     mainWindow.show();
     mainWindow.focus();
   });
@@ -93,7 +94,6 @@ if (!hasLock) {
   app.on('second-instance', () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.setFullScreen(true);
     mainWindow.show();
     mainWindow.focus();
   });

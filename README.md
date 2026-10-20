@@ -1,13 +1,13 @@
 # NEXUS-DESKTOP
 
 Port desktop do **NEXUS77** (Android/Kotlin): shell + chat de IA que gera HTML vivo.
-A interface roda em um **app Electron próprio, em tela cheia**, sem barra de navegador;
+A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 
 ## Abrir
 
 **Duplo clique em `NEXUS-DESKTOP.desktop`**. O atalho executa `desktop/start.sh`, que sobe
-o servidor local (Node) e abre a janela Electron em tela cheia em
+o servidor local (Node) e abre a janela Electron em
 <http://127.0.0.1:8790/>. Se a porta estiver ocupada, tenta 8791…8810.
 
 Na primeira vez em uma cópia nova do projeto, instale o Electron (uma vez, ~300 MB):
@@ -20,7 +20,7 @@ npm --prefix desktop install
 Pelo terminal:
 
 ```bash
-./desktop/start.sh          # app Electron em tela cheia
+./desktop/start.sh          # app Electron (janela normal)
 ```
 
 Fallback no navegador (sem Electron):
@@ -54,7 +54,7 @@ janela carregou o código atual.
 
 ## Recursos
 
-- app **Electron** em tela cheia (F11 alterna; F12 DevTools), sem barra de navegador;
+- app **Electron** em janela normal (F11 alterna tela cheia; F12 DevTools), sem barra de navegador;
 - comando curto → página HTML completa renderizada no palco;
 - novo comando **refina** a página atual com **edição cirúrgica**: o modelo devolve só os
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
@@ -69,9 +69,9 @@ janela carregou o código atual.
 
 ```text
 nexus-desktop/
-├── NEXUS-DESKTOP.desktop    # atalho: app Electron em tela cheia
+├── NEXUS-DESKTOP.desktop    # atalho: app Electron (janela normal)
 ├── desktop/                 # shell Electron
-│   ├── main.js              # janela fullscreen, single-instance, F11/F12, popups
+│   ├── main.js              # janela normal, single-instance, F11/F12, popups
 │   ├── server.js            # servidor local + proxy /_proxy + /fontes/
 │   ├── start.sh             # sobe o servidor e executa o Electron
 │   ├── package.json         # devDependency electron
@@ -140,4 +140,4 @@ mesmas proteções, e outros protocolos são bloqueados.
 | `Toast` nativo | toast do shell (`Settings.toast`) |
 | Back button fecha lista | `ESC` fecha a lista/modal; link "‹ Voltar" na página |
 | Chamada HTTP direta | proxy local (`serve.py` ou `desktop/server.js`) |
-| Activity em tela cheia | janela Electron `fullscreen` (F11 alterna) |
+| Janela do app | janela Electron normal (F11 alterna tela cheia) |
