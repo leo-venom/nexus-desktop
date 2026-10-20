@@ -8,7 +8,7 @@
   'use strict';
 
   var CONNECT_TIMEOUT_MS = 20000;
-  var CHAT_READ_TIMEOUT_MS = 600000;
+  var CHAT_READ_TIMEOUT_MS = 90000;   /* 90s sem NENHUM byte = stream travado (reset a cada chunk) */
   var MODELS_READ_TIMEOUT_MS = 60000;
 
   /* Erro de comunicação/parse com a API compatível OpenAI. */
@@ -84,8 +84,10 @@
     }
     return attempt(proxied).catch(function (e) {
       if (isMissingProxy(e) || isNetworkFailure(e)) {
+        try { console.warn('[nexus] proxy falhou:', e && (e.stack || e.message || e)); } catch (_) {}
         return attempt(url).catch(function (e2) {
           if (isNetworkFailure(e2)) {
+            try { console.warn('[nexus] direto falhou:', e2 && (e2.stack || e2.message || e2)); } catch (_) {}
             throw new AiException('falha de rede/CORS — rode "python3 serve.py" (proxy local)');
           }
           throw e2;
@@ -144,6 +146,7 @@
   /* POST em streaming: lê o corpo aos poucos e reporta bytes de delta.content. */
   function postStream(url, apiKey, body, readTimeoutMs, onProgress) {
     var ctrl = new AbortController();
+    _activeCtrl = ctrl;
     var timedOut = false;
     var phase = 'connect';
     var timer = setTimeout(function () { timedOut = true; phase = 'connect'; ctrl.abort(); }, CONNECT_TIMEOUT_MS);
@@ -227,9 +230,18 @@
       }
 
       return pump();
+    }).then(function (out) {
+      clearTimeout(timer);
+      if (_activeCtrl === ctrl) _activeCtrl = null;
+      return out;
     }).catch(function (e) {
       clearTimeout(timer);
-      if (timedOut) throw timeoutError(phase);
+      if (_activeCtrl === ctrl) _activeCtrl = null;
+      if (timedOut) {
+        throw new AiException(phase === 'read'
+          ? 'o provedor parou de responder (90s sem dados) — tente de novo'
+          : 'tempo esgotado ao conectar no provedor');
+      }
       throw e;
     });
   }
@@ -267,6 +279,7 @@
     var completion = 0;
     var total = 0;
     var sawSse = false;
+    var finishReason = '';
     var lines = String(raw == null ? '' : raw).split('\n');
     for (var i = 0; i < lines.length; i++) {
       var t = lines[i].trim();
@@ -288,6 +301,7 @@
       var choices = obj.choices;
       if (!choices || !choices.length) continue;
       var c0 = choices[0] || {};
+      if (c0.finish_reason) finishReason = String(c0.finish_reason);
       var piece = '';
       if (c0.delta && typeof c0.delta === 'object' && c0.delta.content != null) {
         piece = String(c0.delta.content);
@@ -326,6 +340,14 @@
   }
 
   /* Envia system+user; devolve Promise<ChatResult>. */
+  var _activeCtrl = null;
+
+  /* Cancela a geração em andamento (ESC ou botão). */
+  function cancel() {
+    if (_activeCtrl) { try { _activeCtrl.abort(); } catch (e) {} _activeCtrl = null; return true; }
+    return false;
+  }
+
   function chat(endpoint, apiKey, model, temperature, maxTokens, system, user, onProgress) {
     var messages = [
       { role: 'system', content: system },
@@ -407,6 +429,7 @@
 
   window.AiClient = {
     VERSION: '2.5.1',
+    cancel: cancel,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
     CHAT_READ_TIMEOUT_MS: CHAT_READ_TIMEOUT_MS,
     MODELS_READ_TIMEOUT_MS: MODELS_READ_TIMEOUT_MS,
