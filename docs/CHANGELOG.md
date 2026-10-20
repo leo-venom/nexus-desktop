@@ -1,5 +1,18 @@
 # Changelog — NEXUS GAME
 
+## v2.9.1 — 2026-10-20
+
+### Corrigido
+- **Botão de gerar travava e não iniciava.** Um erro síncrono antes do `.then` (ex.: exceção em
+  `systemPrompt`, `prefs` ou `status`) deixava `generating = true` permanentemente e a UI parava
+  de responder. Agora o corpo da geração roda em `try/catch` e sempre cai em `failGeneration`.
+  Verificado: erro forçado → status `✗ falha interna simulada` e a geração seguinte funciona.
+
+### Adicionado
+- **Watchdog de geração** — 2,5 min sem progresso cancela e destrava a UI.
+- **ESC cancela** a geração em andamento (não age quando há modal aberto).
+- **↺ reinicia a sessão mesmo durante a geração** (antes só pedia para aguardar).
+
 ## v2.9.0 — 2026-10-20
 
 ### Adicionado

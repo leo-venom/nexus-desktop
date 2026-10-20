@@ -171,6 +171,10 @@ NxTex.names()                              // 44 nomes
 | Log de erro real | `ai-client.js` | `console.warn('[nexus] proxy falhou: <stack>')` — evita mascarar bug como "CORS". |
 | `rewriteLibs` | `html-builder.js` | CDN do three.js → vendor local (funciona offline). |
 | `sanitizeSnapshotHtml` | `app.js` | Remove artefatos do shim/fontes do HTML finalizado. |
+| **Erro síncrono não trava mais** | `app.js` `sendPrompt` | Corpo da geração em `try/catch` → qualquer exceção vira `failGeneration` e libera o botão. Antes, um erro antes do `.then` deixava `generating = true` para sempre. |
+| **Watchdog de geração** | `app.js` `armarWatchdog` | 2,5 min sem progresso → cancela, destrava a UI e avisa. |
+| **ESC cancela** | `app.js` init | `Esc` durante geração chama `AiClient.cancel()` + `finishGeneration()` (não age com modal aberto). |
+| **↺ reinicia mesmo gerando** | `app.js` `resetSession` | Antes só mostrava "aguarde"; agora cancela e reinicia. |
 
 ---
 

@@ -484,11 +484,37 @@
     updateSessionUi();
   }
 
+  /* Watchdog: se a geração ficar "presa" sem progresso, destrava a UI. */
+  var _genStartedAt = 0;
+  var _genWatch = null;
+
+  function armarWatchdog() {
+    _genStartedAt = Date.now();
+    if (_genWatch) clearInterval(_genWatch);
+    _genWatch = setInterval(function () {
+      if (!generating) { clearInterval(_genWatch); _genWatch = null; return; }
+      var parado = Date.now() - Math.max(_genStartedAt, lastProgressAt || 0);
+      if (parado > 150000) {                 /* 2,5 min sem nenhum progresso */
+        clearInterval(_genWatch); _genWatch = null;
+        try { window.AiClient.cancel(); } catch (e) {}
+        finishGeneration();
+        status('✗ geração travada — destravado', 'error', false);
+        toast('Geração travada por inatividade — tente de novo');
+      }
+    }, 5000);
+  }
+
   function sendPrompt() {
-    if (generating) return;
-    var prompt = input.value.trim();
+    if (generating) {
+      toast('Gerando… aguarde (ESC cancela)');
+      return;
+    }
+    var prompt = '';
+    try {
+      prompt = input.value.trim();
+    } catch (e) { prompt = ''; }
     if (!prompt) {
-      toast('Descreva o que você quer ver');
+      toast('Descreva o jogo que você quer');
       return;
     }
     if (!prefs.hasKey()) {
@@ -498,6 +524,15 @@
     }
 
     generating = true;
+    armarWatchdog();
+    try {
+      iniciarGeracao(prompt);
+    } catch (e) {
+      failGeneration(window.AiClient.errorMessage(e));
+    }
+  }
+
+  function iniciarGeracao(prompt) {
     showingList = false;
     lastPrompt = prompt;
     lastOpenName = null;   // nova geração → o nome sugerido volta ao slug do prompt
@@ -602,6 +637,7 @@
 
   function finishGeneration() {
     generating = false;
+    if (_genWatch) { clearInterval(_genWatch); _genWatch = null; }
     saveBtn.disabled = false;
     openBtn.disabled = false;
     liveActive = false;
@@ -619,8 +655,9 @@
 
   function resetSession() {
     if (generating) {
-      toast('Aguarde a geração atual terminar');
-      return;
+      try { window.AiClient.cancel(); } catch (e) {}
+      finishGeneration();
+      toast('Geração cancelada — sessão reiniciada');
     }
     prefs.resetSessionTokens();
     lastRendered = null;
@@ -1355,6 +1392,17 @@
     saveBtn.addEventListener('click', requestSave);
     openBtn.addEventListener('click', openSavedList);
     resetBtn.addEventListener('click', resetSession);
+
+    /* ESC cancela a geração em andamento. */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!generating) return;
+      if (document.querySelector('.mx-modal')) return;   /* modal aberto: ESC fecha o modal */
+      try { window.AiClient.cancel(); } catch (_) {}
+      finishGeneration();
+      status('✗ geração cancelada', 'error', false);
+      toast('Geração cancelada');
+    });
     usageBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       setUsage(usagePanel.hidden);
