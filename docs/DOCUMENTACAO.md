@@ -47,7 +47,7 @@ Port de `Html.kt`. Exporta `window.Html`:
 
 | função | papel |
 | --- | --- |
-| `BASE_PROMPT` | regras da geração (marca NEXUS-DESKTOP) |
+| `BASE_PROMPT` | regras da geração (escopo fiel ao pedido, efeitos contidos, beleza + performance) |
 | `EDIT_FRIENDLY` | diretriz de código compatível com o editor visual (ids por elemento, canvas só pro fundo, texto num único nó, sem `!important`, sem overlay full-screen, layout flex/grid) |
 | `systemPrompt(theme, level)` | prompt + diretriz de detalhe + paleta exata |
 | `detailDirective(level)` | 0 mínimo / 1 padrão / 2 máximo |
@@ -83,7 +83,7 @@ Port de `AiClient.kt` com `fetch`:
 - timeouts: conexão 20 s; leitura ociosa 600 s (reset a cada chunk); `/models` 60 s;
 - erros: `AiException` com `HTTP <code>: <corpo>` ou `resposta vazia do servidor`;
 - `errorMessage(e)` extrai `error.message`/`message` do JSON ou devolve o texto (200 chars);
-- `VERSION` (`1.1.0`) — exibida no rodapé do ⚙ e no console;
+- `VERSION` (`2.2.0`) — exibida no rodapé do ⚙ e no console;
 - em `file://` não há proxy possível: o erro vira uma mensagem explícita sobre CORS.
 
 ### web/js/store.js
@@ -112,6 +112,30 @@ obrigatória para buscar modelos. `Settings.toast(msg)` é o toast global.
 Port de `MainActivity.kt`: estado (`lastRendered`, `lastPrompt`, `generating`,
 `showingList`, contadores ao vivo), UI, fluxo de geração, sessão, salvar/abrir/excluir,
 tema e bridge. Ver `MAPA_UI.md` para as âncoras.
+
+### desktop/main.js
+Shell Electron: instância única (`requestSingleInstanceLock`; a segunda chamada foca a
+janela), janela `fullscreen` sem menu, `contextIsolation`/`sandbox` ligados e
+`nodeIntegration` desligado. F11 alterna tela cheia, F12 abre DevTools. `window.open`
+para `http(s)` é permitido em janela interna 1200×800 com as mesmas proteções; outros
+protocolos são negados. Ao sair, fecha o servidor embutido.
+
+### desktop/server.js
+Réplica do `serve.py` em Node, sem dependências: estático de `web/` com
+`Cache-Control: no-store`, `/fontes/` (JSON, `fonts.css`, arquivos) e `/_proxy`
+(streaming, repassa `Authorization`, `Content-Type`, `Accept`). `startServer(8790)` tenta
+a porta preferida e, em `EADDRINUSE`, incrementa até 20 vezes (8790→8810).
+
+### desktop/start.sh
+Exige `desktop/node_modules/.bin/electron` e dá `exec` nele com o diretório `desktop/`
+como app. Se faltar o binário, imprime a instrução de `npm --prefix desktop install`.
+`ELECTRON_OZONE_PLATFORM_HINT` default é `auto`.
+
+### NEXUS-DESKTOP.desktop
+Atalho de aplicativo (`Exec=sh -c "exec '…/desktop/start.sh' …"`) com
+`Icon=nexus-desktop` e `StartupWMClass=nexus-desktop` (WM_CLASS observado no Hyprland).
+Também está instalado em `~/.local/share/applications/` com o ícone em
+`~/.local/share/icons/hicolor/256x256/apps/`.
 
 ## 3. Fluxo de geração
 
@@ -162,7 +186,7 @@ sem chamar a IA.
 
 ## 6. Salvar / abrir / excluir
 
-- **SALVAR**: exige página; diálogo com nome sugerido (`slug do último prompt + yyyyMMdd-HHmm.html`).
+- **SALVAR**: exige página; diálogo com **nome limpo** (sem carimbo de data e sem `.html`): página aberta sugere o próprio nome; geração nova sugere o slug do último prompt (até 60 chars, fallback `pagina`); o Store anexa `.html` ao gravar.
   No **primeiro** save, se o navegador suportar File System Access e ainda não houver pasta,
   o seletor de pasta é aberto (cancelar cai no fallback). Grava
   `themed(lastRendered)` na pasta escolhida (ou IndexedDB + download).
@@ -178,13 +202,16 @@ O iframe usa `sandbox="allow-scripts"` (sem `allow-same-origin`): a página gera
 origem opaca e **não** alcança o shell. O shim injetado em cada render define
 `window.Nexus77` e envia `{__nx:1, m, a}` por `postMessage`; o shell valida
 `e.source === frame.contentWindow` e uma whitelist antes de executar. Links externos são
-interceptados e abertos em nova aba (`openUrl`).
+interceptados e abertos pelo shell (`openUrl`): no Electron, em janela interna; no
+navegador, em nova aba.
 
 ## 8. Proxy local (CORS)
 
-`serve.py` (raiz do projeto) serve `web/` e expõe `/_proxy?url=<alvo>` (GET/POST):
-repassa `Authorization`, `Content-Type` e o corpo, e devolve a resposta em streaming.
-O navegador fala com `http://127.0.0.1:8790` (mesma origem), então não há preflight/CORS.
+Há dois servidores equivalentes: `desktop/server.js` (Node, embutido no app Electron) e
+`serve.py` (raiz do projeto, fallback no navegador). Ambos servem `web/` e expõem
+`/_proxy?url=<alvo>` (GET/POST): repassam `Authorization`, `Content-Type` (e `Accept` no
+Node) e o corpo, e devolvem a resposta em streaming. A janela fala com
+`http://127.0.0.1:8790` (mesma origem), então não há preflight/CORS.
 
 Motivo: a OpenAI responde ao preflight, mas o `POST /v1/chat/completions` **não** inclui
 `Access-Control-Allow-Origin` — o navegador bloqueia com "Failed to fetch". O proxy
@@ -194,29 +221,45 @@ O `ai-client.js` tenta o proxy primeiro; se `/_proxy` não existir (404/501 — 
 `python3 -m http.server`), cai no fetch direto. Funções: `proxyUrl`, `isMissingProxy`,
 `isNetworkFailure`, `withProxyFallback`.
 
-O `serve.py` envia `Cache-Control: no-store` em todas as respostas (inclusive no proxy):
-um reload sempre pega o HTML/JS atuais (evita rodar um `ai-client.js` antigo do cache).
+Os dois servidores enviam `Cache-Control: no-store` em todas as respostas (inclusive no
+proxy): um reload sempre pega o HTML/JS atuais (evita rodar um `ai-client.js` antigo do
+cache). Ambos também servem `/fontes/`: lista em JSON as fontes de `fontes/`
+(`.ttf/.otf/.woff/.woff2`), gera `/fontes/fonts.css` (`@font-face` por arquivo) e entrega
+os arquivos — usado pelo seletor de fonte do modo edição.
 
-## 9. Abrir por `file://` (limitação) e o atalho
+## 9. Abertura, `file://` (limitação) e atalhos
 
 Abrir `web/index.html` direto do disco **não funciona** para provedores sem CORS:
 a origem é `null`, e a OpenAI não envia `Access-Control-Allow-Origin` no
 `POST /v1/chat/completions` → o navegador bloqueia ("Failed to fetch"). Não há como
 contornar com HTML/JS (regra de segurança do navegador).
 
-Solução: `abrir.sh` (ou `NEXUS-DESKTOP.desktop`) sobe o `serve.py` se necessário e abre
+**App Electron (principal):** `NEXUS-DESKTOP.desktop` (ou `./desktop/start.sh`) executa
+`desktop/main.js`, que chama `startServer()` de `desktop/server.js` no próprio processo e
+carrega a URL escolhida na janela fullscreen. A porta preferida é 8790; se estiver ocupada,
+o servidor incrementa até 20 vezes (8791→8810) e a janela usa a porta livre. O Chromium
+embutido preserva File System Access, iframe e renderização.
+
+**Fallback no navegador:** `abrir.sh` sobe o `serve.py` se necessário e abre
 `http://127.0.0.1:8790/`. O script verifica a porta com `curl`, inicia o servidor
-destacado (`setsid`) e chama `xdg-open`. Log em `/tmp/nexus-desktop.log`.
+destacado (`setsid`) e chama `xdg-open`. Log em `/tmp/nexus-desktop.log` — somente nesse
+fallback; o launcher Electron descarta a saída, então rode `./desktop/start.sh` no
+terminal para ver erros.
 
 ## 10. Requisitos
 
-- Navegador moderno (Chromium, Firefox ou Safari recentes). File System Access é
-  exclusivo do Chromium; nos demais o fallback IndexedDB/download assume.
-- Abrir pelo atalho/`serve.py` (`http://127.0.0.1:8790`). `file://` bloqueia a API
-  (CORS) e mostra uma mensagem explicativa.
+- **Node.js + Electron** para o app desktop. Na primeira vez em uma cópia nova, instale o
+  binário (uma vez, ~300 MB): `npm --prefix desktop install`. O `desktop/start.sh` usa
+  `desktop/node_modules/.bin/electron`.
+- Navegador moderno (Chromium, Firefox ou Safari recentes) para o fallback. File System
+  Access é exclusivo do Chromium; nos demais o fallback IndexedDB/download assume.
+- Abrir pelo atalho/`desktop/start.sh` ou, no fallback, por `abrir.sh`/`serve.py`
+  (`http://127.0.0.1:8790`). `file://` bloqueia a API (CORS) e mostra uma mensagem
+  explicativa.
 
 ## 11. Validação
 
-A matriz de testes (14 itens) e as evidências estão em `VALIDACAO.md`: sintaxe e testes
-unitários; E2E de geração e refino cirúrgico (patch + fallback); proxy/CORS; paths;
-bridge; launcher.
+A matriz e as evidências estão em `VALIDACAO.md`: 16 itens (2026-10-18) de sintaxe, testes
+unitários, E2E de geração e refino cirúrgico (patch + fallback), proxy/CORS, paths, bridge
+e launcher; e a seção do shell Electron (2026-10-19) com sintaxe, servidor Node, path
+traversal, launcher e janela fullscreen.

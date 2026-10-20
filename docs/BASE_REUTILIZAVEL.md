@@ -19,8 +19,10 @@ index.html (shell)
       └── app.js             fluxo principal
 ```
 
-Sem build, sem bundler, sem dependências. Scripts clássicos com globais
-(`Themes`, `Prefs`, `Html`, `AiClient`, `Store`, `VuMeter`, `Settings`).
+O núcleo web não tem build, bundler nem dependências: scripts clássicos com globais
+(`Themes`, `Prefs`, `Html`, `AiClient`, `Store`, `VuMeter`, `Settings`). O shell desktop
+é opcional: Electron é a única dependência de desenvolvimento (`desktop/package.json`),
+instalada com `npm --prefix desktop install`.
 
 ## Render adaptativo (o que faz funcionar)
 

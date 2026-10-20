@@ -1,8 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=NEXUS-DESKTOP
-Comment=Shell + IA que gera HTML (abre no navegador)
-Exec=sh -c "exec /home/leo/Documents/Obsidian\ Vault/01_Projeto/nexus-desktop/abrir.sh >/dev/null 2>&1"
-Icon=applications-internet
+Comment=Shell + IA que gera HTML (Chromium embutido, tela cheia)
+Exec=sh -c "exec '/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-desktop/desktop/start.sh' >/dev/null 2>&1"
+Icon=nexus-desktop
 Terminal=false
 Categories=Development;
+StartupWMClass=nexus-desktop

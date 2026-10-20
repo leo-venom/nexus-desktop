@@ -1,0 +1,17 @@
+{
+  "name": "nexus-desktop",
+  "productName": "NEXUS-DESKTOP",
+  "version": "2.2.0",
+  "private": true,
+  "description": "NEXUS-DESKTOP — shell local com IA que gera HTML, rodando em Chromium embutido",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0"
+  }
+}

@@ -1,18 +1,33 @@
 # NEXUS-DESKTOP
 
-Port desktop do **NEXUS77** (Android/Kotlin): shell + chat de IA que gera HTML vivo —
-100% no navegador, sem build e sem dependências externas.
+Port desktop do **NEXUS77** (Android/Kotlin): shell + chat de IA que gera HTML vivo.
+A interface roda em um **app Electron próprio, em tela cheia**, sem barra de navegador;
+o Chromium embutido preserva File System Access, iframe e renderização.
 
 ## Abrir
 
-**Duplo clique em `NEXUS-DESKTOP.desktop`** (ou em `abrir.sh`). O atalho inicia o
-`serve.py` (proxy local) de forma invisível e abre <http://127.0.0.1:8790/> no navegador.
+**Duplo clique em `NEXUS-DESKTOP.desktop`**. O atalho executa `desktop/start.sh`, que sobe
+o servidor local (Node) e abre a janela Electron em tela cheia em
+<http://127.0.0.1:8790/>. Se a porta estiver ocupada, tenta 8791…8810.
+
+Na primeira vez em uma cópia nova do projeto, instale o Electron (uma vez, ~300 MB):
+
+```bash
+cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-desktop"
+npm --prefix desktop install
+```
 
 Pelo terminal:
 
 ```bash
-cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-desktop"
+./desktop/start.sh          # app Electron em tela cheia
+```
+
+Fallback no navegador (sem Electron):
+
+```bash
 python3 serve.py            # porta 8790 (opcional: python3 serve.py 9000)
+./abrir.sh                  # sobe o serve.py e abre no navegador padrão
 ```
 
 ### Por que não abrir o `index.html` direto?
@@ -21,8 +36,8 @@ Abrir por `file://` **não funciona** para a maioria dos provedores (incluindo a
 a página fica com origem `null` e o navegador bloqueia chamadas cross-origin. A OpenAI
 não envia `Access-Control-Allow-Origin` no `POST /v1/chat/completions` (confirmado com
 `curl`), então o `fetch` falha com "Failed to fetch". É regra de segurança do navegador —
-não há como contornar com HTML/JS. O `serve.py` existe só para isso: o navegador fala com
-`127.0.0.1` (mesma origem) e o servidor fala com a API.
+não há como contornar com HTML/JS. O servidor local (`serve.py` ou `desktop/server.js`)
+existe só para isso: a janela fala com `127.0.0.1` (mesma origem) e o servidor fala com a API.
 
 > Provedores que enviam `Access-Control-Allow-Origin: *` no POST funcionam até por
 > `file://`; a OpenAI não envia.
@@ -34,11 +49,12 @@ não há como contornar com HTML/JS. O `serve.py` existe só para isso: o navega
 3. Informe o **Modelo** (ou use **Buscar modelos**).
 4. **Salvar configurações**.
 
-No rodapé do ⚙ aparece a versão (`ai-client v1.1.0 · origem …`) — útil para conferir se o
-navegador carregou o código atual.
+No rodapé do ⚙ aparece a versão (`ai-client v2.2.0 · origem …`) — útil para conferir se a
+janela carregou o código atual.
 
 ## Recursos
 
+- app **Electron** em tela cheia (F11 alterna; F12 DevTools), sem barra de navegador;
 - comando curto → página HTML completa renderizada no palco;
 - novo comando **refina** a página atual com **edição cirúrgica**: o modelo devolve só os
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
@@ -53,9 +69,16 @@ navegador carregou o código atual.
 
 ```text
 nexus-desktop/
-├── serve.py                 # servidor local + proxy /_proxy (sem CORS)
-├── abrir.sh                 # sobe o serve.py (se preciso) e abre o navegador
-├── NEXUS-DESKTOP.desktop    # atalho de duplo clique
+├── NEXUS-DESKTOP.desktop    # atalho: app Electron em tela cheia
+├── desktop/                 # shell Electron
+│   ├── main.js              # janela fullscreen, single-instance, F11/F12, popups
+│   ├── server.js            # servidor local + proxy /_proxy + /fontes/
+│   ├── start.sh             # sobe o servidor e executa o Electron
+│   ├── package.json         # devDependency electron
+│   └── icon.png             # ícone do atalho
+├── serve.py                 # servidor alternativo (fallback no navegador)
+├── abrir.sh                 # fallback: sobe o serve.py e abre o navegador
+├── fontes/                  # fontes locais servidas em /fontes/ (ttf/otf/woff/woff2)
 ├── web/
 │   ├── index.html           # shell: header, palco (iframe), barra de comando
 │   ├── css/app.css          # tema via var(--nx-*), modais e toast
@@ -73,25 +96,27 @@ nexus-desktop/
     ├── DOCUMENTACAO.md      # arquitetura, APIs e fluxos
     ├── MAPA_UI.md           # elemento de tela → arquivo:linha + âncora
     ├── BASE_REUTILIZAVEL.md # receita para novos projetos desktop
-    ├── VALIDACAO.md         # matriz de testes e evidências (v1.2.0)
+    ├── VALIDACAO.md         # matriz de testes e evidências
     └── CHANGELOG.md
 ```
 
 ## Status
 
-**v1.3.0 — validada** em 2026-10-18. Matriz completa, evidências e como reproduzir em
-[`docs/VALIDACAO.md`](docs/VALIDACAO.md).
+**v2.2.0** — validada em 2026-10-19. O shell Electron e as correções do topo do
+[`CHANGELOG`](docs/CHANGELOG.md) estão no working tree (não publicados); a matriz de
+2026-10-18 está em [`docs/VALIDACAO.md`](docs/VALIDACAO.md).
 
 ## Solução de problemas
 
 | Sintoma | Causa / solução |
 | --- | --- |
-| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho/`serve.py`. Confira a versão no ⚙ (deve ser `v1.3.0`). |
+| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.2.0`). |
+| Electron não abre | Falta o binário: `npm --prefix desktop install`. Rode `./desktop/start.sh` no terminal para ver o erro (o launcher descarta a saída). |
 | `HTTP 401` / `Incorrect API key` | Chave inválida ou endpoint errado. Use **Buscar modelos** no ⚙ para testar. |
-| `HTTP 404`/`501` no `/_proxy` | Servidor não é o `serve.py` (ex.: `python3 -m http.server`). Troque para `python3 serve.py`. |
+| `HTTP 404`/`501` no `/_proxy` | Servidor não é o `serve.py`/`desktop/server.js` (ex.: `python3 -m http.server`). Troque para um deles. |
 | `timeout de conexão/leitura` | Rede/provedor lento ou inacessível. |
 | Lista de salvos vazia | Clique **ABRIR** (pede a pasta na primeira vez) ou salve uma página primeiro. |
-| Porta 8790 ocupada | `python3 serve.py 9000` (e abra a porta indicada). |
+| Porta 8790 ocupada | No Electron, tenta 8791…8810 automaticamente. No fallback, `python3 serve.py 9000` e abra a porta indicada. |
 
 ## Segurança
 
@@ -99,6 +124,10 @@ As páginas geradas pela IA rodam em `<iframe sandbox="allow-scripts">` (origem 
 não acessam o DOM, o `localStorage` nem a API key do shell. A ponte `window.Nexus77`
 usa `postMessage` com whitelist de métodos (`setInput`, `openSaved`, `closeList`,
 `pickFile`, `deleteSaved`, `openUrl`).
+
+A janela Electron carrega apenas `127.0.0.1`, com `contextIsolation`, `sandbox` e sem
+`nodeIntegration`; links externos (`http`/`https`) abrem em uma janela interna com as
+mesmas proteções, e outros protocolos são bloqueados.
 
 ## Diferenças em relação ao app Android
 
@@ -110,4 +139,5 @@ usa `postMessage` com whitelist de métodos (`setInput`, `openSaved`, `closeList
 | `SettingsActivity` | modal (`settings.js`) |
 | `Toast` nativo | toast do shell (`Settings.toast`) |
 | Back button fecha lista | `ESC` fecha a lista/modal; link "‹ Voltar" na página |
-| Chamada HTTP direta | proxy local `serve.py` (CORS) |
+| Chamada HTTP direta | proxy local (`serve.py` ou `desktop/server.js`) |
+| Activity em tela cheia | janela Electron `fullscreen` (F11 alterna) |

@@ -10,6 +10,7 @@ Uso:
     python3 serve.py 9000       # outra porta
 """
 import http.server
+import json
 import os
 import ssl
 import sys
@@ -18,6 +19,9 @@ import urllib.parse
 import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes")
+FONT_EXT = (".ttf", ".otf", ".woff", ".woff2")
+FONT_TYPES = {".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2"}
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8790
 
 
@@ -40,9 +44,85 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         return path.endswith("/_proxy")
 
+    def is_fonts(self):
+        path = urllib.parse.urlparse(self.path).path
+        return path == "/fontes" or path.startswith("/fontes/")
+
+    def serve_fonts(self):
+        """`/fontes/` lista os TTF da pasta do projeto; `/fontes/<arquivo>` entrega o arquivo."""
+        path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
+
+        if path in ("/fontes", "/fontes/"):
+            items = []
+            try:
+                for fn in sorted(os.listdir(FONTS_DIR)):
+                    if fn.startswith(".") or not fn.lower().endswith(FONT_EXT):
+                        continue
+                    items.append({
+                        "file": fn,
+                        "family": os.path.splitext(fn)[0],
+                        "ext": os.path.splitext(fn)[1].lower(),
+                        "url": "/fontes/" + urllib.parse.quote(fn),
+                    })
+            except FileNotFoundError:
+                pass
+            data = json.dumps({"fonts": items}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        if path.endswith("/fonts.css"):
+            """Gera CSS com @font-face para cada fonte da pasta."""
+            lines = []
+            try:
+                for fn in sorted(os.listdir(FONTS_DIR)):
+                    if fn.startswith(".") or not fn.lower().endswith(FONT_EXT):
+                        continue
+                    fam = os.path.splitext(fn)[0].replace('"', '')
+                    ext = "opentype" if fn.lower().endswith(".otf") else "truetype"
+                    lines.append('@font-face{font-family:"%s";src:url("/fontes/%s") format("%s");font-display:swap}' % (fam, urllib.parse.quote(fn), ext))
+            except FileNotFoundError:
+                pass
+            css = "\n".join(lines)
+            data = css.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/css; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        name = os.path.basename(path)
+        full = os.path.join(FONTS_DIR, name)
+        if not name.lower().endswith(FONT_EXT) or not os.path.isfile(full):
+            self.send_error(404, "fonte nao encontrada")
+            return
+        try:
+            with open(full, "rb") as fh:
+                data = fh.read()
+        except OSError as e:  # noqa: BLE001
+            self.send_error(500, "fonte: %s" % e)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", FONT_TYPES.get(os.path.splitext(name)[1].lower(), "application/octet-stream"))
+        self.send_header("Content-Length", str(len(data)))
+        # iframe do app tem origem opaca: precisa de CORS liberado pra carregar a fonte
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         if self.is_proxy():
             self.proxy("GET")
+            return
+        if self.is_fonts():
+            self.serve_fonts()
             return
         super().do_GET()
 

@@ -13,6 +13,7 @@
 
   var lastRendered = null;   // documento canônico (CSS com CDN, sem rewrite)
   var lastPrompt = null;
+  var lastOpenName = null;   // arquivo aberto (lista local) → base do nome sugerido no SALVAR
   var generating = false;
   var showingList = false;
   var editCount = 0;        // patches consecutivos na mesma página
@@ -24,6 +25,7 @@
   var lastProgressAt = 0;
 
   var APP_BASE = new URL('./', location.href).href;
+  var THREE_CDN = 'https://unpkg.com/three@0.160.0/build/';
 
   var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel;
   var dot, modelText, tfill, tlabel, resetBtn, vu;
@@ -108,7 +110,7 @@
     'function call(n,a){try{window.parent.postMessage({__nx:1,m:n,a:a},"*")}catch(e){}}' +
     'function rgb2hex(c){if(!c)return"#000000";var m=c.match(/\\d+/g);if(!m||m.length<3)return c.charAt(0)==="#"?c:"#000000";' +
     'var h=function(n){var s=parseInt(n,10).toString(16);return s.length<2?"0"+s:s};return"#"+h(m[0])+h(m[1])+h(m[2])}' +
-    'function alphaOf(c){if(!c)return 1;var m=c.match(/rgba?\(([^)]+)\)/);if(!m)return 1;var p=m[1].split(",");return p.length>=4?Math.max(0,Math.min(1,parseFloat(p[3]))):1}' +
+    'function alphaOf(c){if(!c)return 1;var m=c.match(/rgba?\\(([^)]+)\\)/);if(!m)return 1;var p=m[1].split(",");return p.length>=4?Math.max(0,Math.min(1,parseFloat(p[3]))):1}' +
     'var _ed={on:false,el:null,drag:false};' +
     'var _accent="#00E5FF";' +
     'var _raf=window.requestAnimationFrame.bind(window),_caf=window.cancelAnimationFrame.bind(window);' +
@@ -138,8 +140,8 @@
     'call("editSel",JSON.stringify({refresh:!!refresh,tag:tg,text:isText,svg:isSvg,canvas:isCanvas,depth:_ed.depth||"",txt:(t.textContent||"").trim().slice(0,300),' +
     'html:t.outerHTML.slice(0,3000),rect:{left:r.left,top:r.top,width:r.width,height:r.height},' +
     'styles:{color:rgb2hex(cs.color),background:rgb2hex(cs.backgroundColor),colorA:alphaOf(cs.color),' +
-    'backgroundA:alphaOf(cs.backgroundColor),fontSize:parseInt(cs.fontSize)||16,' +
-    'fontWeight:cs.fontWeight,width:Math.round(r.width),height:Math.round(r.height),opacity:cs.opacity,' +
+    'backgroundA:alphaOf(cs.backgroundColor),fontSize:parseFloat(cs.fontSize)||16,' +
+    'fontWeight:cs.fontWeight,fontFam:cs.fontFamily,width:Math.round(r.width),height:Math.round(r.height),opacity:cs.opacity,' +
     'fill:rgb2hex(cs.fill),fillA:alphaOf(cs.fill),stroke:rgb2hex(cs.stroke),strokeA:alphaOf(cs.stroke)}}))}' +
     'window.Nexus77={' +
     'setInput:function(t){call("setInput",String(t==null?"":t))},' +
@@ -189,14 +191,16 @@
     'if(!inEl&&!zone)return;' +
     'e.preventDefault();e.stopPropagation();' +
     'var sx=e.clientX,sy=e.clientY,w0=r.width,h0=r.height,l0=r.left,t0=r.top;' +
-    'var moved=false,mode=(zone?"resize":"move");' +
-    'function mm(ev){var dx=ev.clientX-sx,dy=ev.clientY-sy;' +
-    'if(!moved){if(Math.abs(dx)<4&&Math.abs(dy)<4)return;moved=true;pushUndo(el,true);call("editDragging","1");' +
-    'el.style.position="fixed";el.style.margin="0";' +
-    'el.style.left=l0+"px";el.style.top=t0+"px";' +
-    'el.style.width=w0+"px";el.style.height=h0+"px"}' +
-    'if(mode==="move"){el.style.left=(l0+dx)+"px";el.style.top=(t0+dy)+"px";return}' +
-    'var nw=w0,nh=h0,nl=l0,nt=t0;' +
+     'var moved=false,baseL=0,baseT=0,mode=(zone?"resize":"move");' +
+     'function mm(ev){var dx=ev.clientX-sx,dy=ev.clientY-sy;' +
+     'if(!moved){if(Math.abs(dx)<4&&Math.abs(dy)<4)return;moved=true;pushUndo(el,true);call("editDragging","1");' +
+     'el.style.position="fixed";el.style.margin="0";el.style.right="auto";el.style.bottom="auto";el.style.boxSizing="border-box";' +
+     'el.style.left="0px";el.style.top="0px";' +
+     'el.style.width=w0+"px";el.style.height=h0+"px";' +
+     'var r1=el.getBoundingClientRect();baseL=l0-r1.left;baseT=t0-r1.top;' +
+     'el.style.left=baseL+"px";el.style.top=baseT+"px"}' +
+     'if(mode==="move"){el.style.left=(baseL+dx)+"px";el.style.top=(baseT+dy)+"px";return}' +
+     'var nw=w0,nh=h0,nl=baseL,nt=baseT;' +
     'if(zone.indexOf("e")>=0)nw=Math.max(10,w0+dx);' +
     'if(zone.indexOf("s")>=0)nh=Math.max(10,h0+dy);' +
     'if(zone.indexOf("w")>=0){nw=Math.max(10,w0-dx);nl=l0+(w0-nw)}' +
@@ -207,16 +211,23 @@
     'if(moved){_ed.lastPt=null;call("editDragging","0")}}' +
     'document.addEventListener("mousemove",mm);document.addEventListener("mouseup",mu)},true);' +
     'function isOverlay(n){try{var r=n.getBoundingClientRect();' +
+    'if(n.matches&&n.matches("canvas,img,video,iframe,svg"))return false;' +
     'var vw=window.innerWidth,vh=window.innerHeight;' +
     'if(r.width<vw*0.94||r.height<vh*0.94)return false;' +
     'var cs=getComputedStyle(n);if(alphaOf(cs.backgroundColor)>=0.15)return false;' +
     'if((n.textContent||"").trim().length>0)return false;' +
     'if(n.querySelector&&n.querySelector("canvas,img,video,svg,iframe"))return false;' +
     'return true}catch(e){return false}}' +
-    'function pickAt(x,y){var raw=[];try{raw=document.elementsFromPoint(x,y)}catch(ex){}' +
+    'function pickAt(x,y){var ps=null;try{' +
+    /* pe:none tira overlays do hit-test; reativa só durante a coleta e remove em finally */
+    'ps=document.createElement("style");ps.id="nx-pick";' +
+    'ps.textContent="*,*::before,*::after{pointer-events:auto !important}";' +
+    '(document.head||document.documentElement).appendChild(ps);' +
+    'var raw=[];try{raw=document.elementsFromPoint(x,y)}catch(ex){}' +
     'raw=raw.filter(function(n){return n&&n.tagName&&n!==document.body&&n!==document.documentElement&&n.getBoundingClientRect().width>0});' +
     'var st=raw.filter(function(n){return !isOverlay(n)});' +
-    'return st.length?st:raw}' +
+    'return st.length?st:raw' +
+    '}finally{try{var pn=ps&&ps.parentNode;if(pn)pn.removeChild(ps)}catch(e){}}}' +
     'function snapshot(){var had=_ed.el;if(had)desel(had);' +
     'var cl=document.documentElement.cloneNode(true);' +
     'var fz=cl.querySelector("#nx-freeze");if(fz&&fz.parentNode)fz.parentNode.removeChild(fz);' +
@@ -269,6 +280,19 @@
     'var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;' +
     'var h=a.getAttribute("href")||"";if(!h||h.charAt(0)==="#"||h.indexOf("javascript:")===0)return;' +
     'e.preventDefault();call("openUrl",a.href||h)},true);' +
+    /* carrega fontes da pasta fontes/ do projeto e injeta @font-face no documento */
+    'var _ff=document.createElement("link");_ff.rel="stylesheet";' +
+    '_ff.href="/fontes/fonts.css?_t="+Date.now();' +
+    'try{document.head.appendChild(_ff)}catch(e){}' +
+    'var _fx=new XMLHttpRequest();_fx.open("GET","/fontes/?_t="+Date.now(),true);_fx.timeout=4000;' +
+    '_fx.onload=function(){if(_fx.status!==200)return;var _d;try{_d=JSON.parse(_fx.responseText)}catch(e){return}' +
+    'if(!_d||!_d.fonts||!_d.fonts.length)return;var _s=document.createElement("style");_s.id="nx-fonts";' +
+    'var _c="";for(var _i=0;_i<_d.fonts.length;_i++){' +
+    'var _f=_d.fonts[_i];var _fm=String(_f.family||"").replace(/"/g,"");if(!_fm||!_f.url)continue;' +
+    'var _ft=_f.ext===".otf"?"opentype":_f.ext===".woff"?"woff":_f.ext===".woff2"?"woff2":"truetype";' +
+    '_c+="@font-face{font-family:\\""+_fm+"\\";src:url(\\""+_f.url+"\\") format(\\""+_ft+"\\");font-display:swap}"}' +
+    '_s.textContent=_c;try{document.head.appendChild(_s)}catch(e){}};' +
+    'try{_fx.send()}catch(e){}' +
     '})();<\/script>';
 
   function injectShim(html) {
@@ -283,6 +307,48 @@
       return html.slice(0, at2) + '\n' + SHIM + html.slice(at2);
     }
     return SHIM + html;
+  }
+
+  /* ---------- fontes (pasta fontes/ do projeto) ---------- */
+
+  var fontList = [];  // [{file, family, ext, url}] vindo de GET /fontes/
+
+  /* Carrega a lista de fontes da pasta fontes/ do projeto. */
+  function loadFonts(cb) {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/fontes/', true);
+    x.timeout = 4000;
+    x.onload = function () {
+      if (x.status === 200) {
+        try { var d = JSON.parse(x.responseText); fontList = (d && d.fonts) || []; }
+        catch (e) { fontList = []; }
+      } else { fontList = []; }
+      if (cb) cb();
+    };
+    x.onerror = x.ontimeout = function () { fontList = []; if (cb) cb(); };
+    try { x.send(); } catch (e) { fontList = []; if (cb) cb(); }
+  }
+
+  /* Opções do seletor: apenas as fontes da pasta fontes/ do projeto. */
+  function fontOptions() {
+    var o = [['', '— padrão do tema —']];
+    for (var j = 0; j < fontList.length; j++) {
+      o.push(['"' + fontList[j].family + '"', fontList[j].family + '  (minha)']);
+    }
+    return o;
+  }
+
+  /* Descobre qual opção corresponde ao fontFamily computado do elemento. */
+  function matchFont(computed) {
+    if (!computed) return '';
+    var first = String(computed).split(',')[0].replace(/["']/g, '').trim().toLowerCase();
+    if (!first) return '';
+    var opts = fontOptions();
+    for (var i = 0; i < opts.length; i++) {
+      var v = String(opts[i][0]).split(',')[0].replace(/["']/g, '').trim().toLowerCase();
+      if (v && v === first) return opts[i][0];
+    }
+    return '';
   }
 
   function render(html) {
@@ -308,6 +374,27 @@
       }
     }
     return window.Html.decorate(html, theme);
+  }
+
+  /* Deixa o snapshot autônomo: remove os assets locais injetados pelo shim
+     (fonte e CSS) e devolve as libs reescritas pelo rewriteLibs() à CDN. */
+  function sanitizeSnapshotHtml(html) {
+    var out = String(html == null ? '' : html);
+    /* <style id="nx-fonts">…</style> injetado pelo shim (todas as cópias) */
+    out = out.replace(/<style\s+id=["']nx-fonts["'][^>]*>[\s\S]*?<\/style>\s*/gi, '');
+    /* <link … fonts.css …> local, com ou sem query string */
+    out = out.replace(/<link\b[^>]*fonts\.css[^>]*>\s*/gi, '');
+    /* vendor local do three (absoluto/protocol-relative) → CDN pública */
+    out = out.replace(/(?:https?:)?\/\/[^\s"'()<>]*\/vendor\/three\/(three(?:\.module)?(?:\.min)?\.js)/gi,
+      function (m, file) {
+        return THREE_CDN + (file.toLowerCase().indexOf('module') >= 0 ? 'three.module.min.js' : 'three.min.js');
+      });
+    /* vendor relativo citado em JS/CSS → CDN pública */
+    out = out.replace(/(["'])\/vendor\/three\/(three(?:\.module)?(?:\.min)?\.js)\1/gi,
+      function (m, q, file) {
+        return q + THREE_CDN + (file.toLowerCase().indexOf('module') >= 0 ? 'three.module.min.js' : 'three.min.js') + q;
+      });
+    return out;
   }
 
   /* ---------- geração ---------- */
@@ -354,6 +441,7 @@
     generating = true;
     showingList = false;
     lastPrompt = prompt;
+    lastOpenName = null;   // nova geração → o nome sugerido volta ao slug do prompt
     saveBtn.disabled = true;
     openBtn.disabled = true;
     status(lastRendered != null ? 'ajustando…' : 'gerando…', 'accent', false);
@@ -498,16 +586,17 @@
   /* ---------- salvar / abrir / excluir ---------- */
 
   function defaultSaveName() {
+    // Nome limpo no campo: página aberta sugere o próprio nome; geração nova sugere o
+    // slug do último prompt. Sem ".html" — o Store anexa a extensão ao salvar.
+    if (lastOpenName) {
+      var openStem = String(lastOpenName).replace(/\.html$/i, '').trim();
+      if (openStem) return openStem;
+    }
     var slug = String(lastPrompt || '').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+/, '').replace(/-+$/, '')
-      .slice(0, 40);
-    var d = new Date();
-    function p(n) { return n < 10 ? '0' + n : String(n); }
-    var stamp = String(d.getFullYear()) + p(d.getMonth() + 1) + p(d.getDate()) +
-      '-' + p(d.getHours()) + p(d.getMinutes());
-    var stem = slug || 'pagina';
-    return stem + '-' + stamp + '.html';
+      .slice(0, 60);
+    return slug || 'pagina';
   }
 
   function requestSave() {
@@ -572,7 +661,7 @@
   function savePage(rawName) {
     var doc = lastRendered;
     if (!doc) return;
-    var html = themed(doc);
+    var html = themed(sanitizeSnapshotHtml(doc));
     var name = window.Store.fileName(rawName);
     saveBtn.disabled = true;
     window.Store.folderLabel().then(function (folder) {
@@ -620,6 +709,7 @@
         return;
       }
       lastRendered = text;
+      lastOpenName = name;   // SALVAR sugere o próprio nome deste arquivo
       showingList = false;
       render(text);
       status('aberto: ' + name, '', false);
@@ -683,6 +773,7 @@
           return;
         }
         lastRendered = text;
+        lastOpenName = file.name || null;   // SALVAR sugere o próprio nome local
         showingList = false;
         render(text);
         status('arquivo local', '', false);
@@ -794,6 +885,34 @@
       lbl.textContent = label + ' · ' + s.value + unit;
       onInput(Number(s.value));
     });
+    wrap.appendChild(s);
+    return wrap;
+  }
+
+  /* Linha com <select> — usada pelo seletor de modelo de fonte. */
+  function selectRow(label, value, options, onChange) {
+    var wrap = el('div', 'nx-pop-row');
+    wrap.appendChild(el('div', 'nx-pop-lbl', label));
+    var s = document.createElement('select');
+    s.className = 'nx-pop-select';
+    for (var i = 0; i < options.length; i++) {
+      var o = document.createElement('option');
+      o.value = options[i][0];
+      o.textContent = options[i][1];
+      s.appendChild(o);
+    }
+    if (value) {
+      var found = false;
+      for (var j = 0; j < options.length; j++) if (options[j][0] === value) found = true;
+      if (!found) {
+        var oo = document.createElement('option');
+        oo.value = value;
+        oo.textContent = 'atual: ' + String(value).slice(0, 28);
+        s.appendChild(oo);
+      }
+      s.value = value;
+    }
+    s.addEventListener('change', function () { onChange(s.value); });
     wrap.appendChild(s);
     return wrap;
   }
@@ -951,6 +1070,9 @@
       ta.addEventListener('input', function () { tryPostMessage({ setText: ta.value }); });
       body.appendChild(ta);
 
+      body.appendChild(selectRow('Modelo', matchFont(st.fontFam), fontOptions(), function (v) {
+        tryPostMessage({ applyStyle: { fontFamily: v || '' } });
+      }));
       body.appendChild(sliderRow('Fonte', 8, 120, st.fontSize, 'px', function (v) {
         tryPostMessage({ applyStyle: { fontSize: v + 'px' } });
       }));
@@ -1080,13 +1202,14 @@
   /* Recebe o HTML editado do iframe e grava como documento canônico. */
   function applySnapshot(html) {
     if (!html) return;
-    var clean = String(html);
-    /* remove o bloco de tema (é reaplicado no render pelo themed()) */
+    var clean = sanitizeSnapshotHtml(html);
+    /* remove TODOS os blocos de tema (são reaplicados no render pelo themed()) */
     var mk = '<style id="nx77-base">';
-    var i = clean.indexOf(mk);
-    if (i >= 0) {
+    var i;
+    while ((i = clean.indexOf(mk)) >= 0) {
       var j = clean.indexOf('</style>', i);
-      if (j >= 0) clean = clean.slice(0, i) + clean.slice(j + 8);
+      if (j < 0) break;
+      clean = clean.slice(0, i) + clean.slice(j + 8);
     }
     lastRendered = clean;
     editCount = 0;
@@ -1132,6 +1255,7 @@
       popPinned = false;
       popPinPos = null;
       editBtn.style.display = 'none';
+      loadFonts();
       finalizeBtn.style.display = '';
       status('✎ Clique p/ selecionar · duplo clique p/ editar valores · arraste p/ mover', 'accent', false);
       tryPostMessage({ accent: theme.accent, editMode: true });
@@ -1139,6 +1263,9 @@
     finalizeBtn.addEventListener('click', function () {
       editMode = false;
       closeEditPopup();
+      loadFonts(function () {
+        toast('Fontes atualizadas (' + fontList.length + ' disponíveis)');
+      });
       /* captura o HTML editado ANTES de descongelar (vira o documento oficial) */
       tryPostMessage({ snapshot: true });
       finalizeBtn.style.display = 'none';

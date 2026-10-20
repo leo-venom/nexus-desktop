@@ -1,7 +1,7 @@
-# Validação — NEXUS-DESKTOP 1.3.0
+# Validação — NEXUS-DESKTOP
 
 Registro dos testes executados em **2026-10-18** (Linux, Chromium 152 headless via
-REA/Playwright, Node 26.8.1, Python 3.14).
+REA/Playwright, Node 26.8.1, Python 3.14) e do shell Electron em **2026-10-19**.
 
 ## Matriz de testes
 
@@ -23,6 +23,20 @@ REA/Playwright, Node 26.8.1, Python 3.14).
 | 14 | Cache | `Cache-Control: no-store` no HTML/JS | OK |
 | 15 | Barra superior única | render headless: marca/sessão/status/VU/KB/SALVAR/ABRIR na mesma linha | OK |
 | 16 | Prompt no topo (Enter envia) | render headless + Enter sem botão: requisição enviada; ⚙ no canto direito; sem barra inferior | OK |
+
+## Shell Electron (2026-10-19)
+
+| # | Teste | Como | Resultado |
+| --- | --- | --- | --- |
+| E1 | Sintaxe do shell | `bash -n desktop/start.sh`; `node --check desktop/main.js` e `desktop/server.js`; `desktop-file-validate NEXUS-DESKTOP.desktop` | OK |
+| E2 | Servidor Node | `desktop/server.js`: `/` e CSS 200; `/fontes/` e `/fontes/fonts.css` 200; `/_proxy` 400 sem `url`; proxy local e `https://example.com/` 200 | OK |
+| E3 | Path traversal | `:8899`: `/..%2fserve.py` 403, `/%2e%2e/serve.py` 404, `/%2e%2e%2fserve.py` 403, `/../serve.py` 404; `/` 200 | OK (bloqueado) |
+| E4 | Launcher instalado | `gtk-launch NEXUS-DESKTOP`; `hyprctl clients`; segunda chamada | OK — `class=nexus-desktop`, `title=NEXUS-DESKTOP`; 1 janela (single-instance) |
+| E5 | Fullscreen e porta ocupada | janela aberta pelo launcher; 8790 ocupada por `serve.py` leftover | OK — `fullscreen=2`, 1366×768; app subiu na porta seguinte |
+
+**Evidência E4/E5:** `gtk-launch` saiu com 0; `hyprctl clients` mostrou
+`class: nexus-desktop`, `fullscreen: 2`, `size: 1366,768`. Os 2 processos renderer
+observados correspondem à página e ao iframe (`sandbox`), comportamento esperado.
 
 ## Evidências principais
 
@@ -65,16 +79,18 @@ desktop-file-validate NEXUS-DESKTOP.desktop
 # 2) aplicar edições (unit)
 node /tmp/opencode/smoke-edits.js
 
-# 3) subir o app
-python3 serve.py        # ou duplo clique em NEXUS-DESKTOP.desktop
+# 3) subir o app (principal: Electron; fallback: navegador)
+./desktop/start.sh       # ou duplo clique em NEXUS-DESKTOP.desktop
+python3 serve.py         # fallback, abra http://127.0.0.1:8790/
 
-# 4) no navegador: ⚙ → endpoint/chave/modelo → salvar → gerar → editar algo pequeno
+# 4) na janela do app: ⚙ → endpoint/chave/modelo → salvar → gerar → editar algo pequeno
 #    (o status deve mostrar poucos tokens de saída; o resto da página fica igual)
 ```
 
 ## Limitações conhecidas
 
-- Abrir por `file://` não chama a API (CORS do navegador) — use o atalho/`serve.py`.
+- Abrir por `file://` não chama a API (CORS do navegador) — use o app Electron ou
+  `abrir.sh`/`serve.py`.
 - File System Access é exclusivo do Chromium; nos demais, IndexedDB + download.
 - **Criação** devolve o documento completo (por design). **Refino** é cirúrgico; se o
   modelo não devolver um patch aplicável, o app refaz a chamada com o prompt base

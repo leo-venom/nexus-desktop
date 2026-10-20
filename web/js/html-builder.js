@@ -20,9 +20,13 @@ Rules:
 - Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
 - Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.
 - You may load libraries from public CDNs. For 3D always use three.js via this exact script tag: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use import maps or module builds). This URL is always available in the app, even offline.
-- Make it spectacular and alive with minimal text: canvas/WebGL animation, CSS 3D, particles, gradients, graphics over words. Motion over static pictures. Keep text to the absolute minimum — titles only, no paragraphs, no descriptions. The page should be a visual experience first.
+- The command defines the scope: build exactly what was asked, with no extra sections, features or decoration. When vague, choose the closest impressive interpretation - never pad it with unrequested content.
+- Keep text to the absolute minimum: titles and essential labels only, no paragraphs or descriptions unless asked.
+- Beauty comes from composition, typography, spacing, color and ONE strong focal idea - not from stacking effects. Prefer a clean, confident layout over visual noise.
+- Effects are conditional: use motion, 3D or particles ONLY when the concept is inherently animated (game, 3D scene, animation, visualizer). Otherwise a refined static page is the better answer.
+- If you animate, use at most ONE ambient effect system (e.g. a subtle particle field) as a supporting layer, unless the command explicitly asks for more - no overlapping particle layers, no full-screen blur/glow stacks, no constant heavy shadows. Subtle beats busy.
 - Fill the whole viewport, be responsive to any screen size, keep content centered, avoid scrollbars.
-- Touch targets at least 44px. Aim for smooth 60fps; cap device pixel ratio at 2.
+- Touch targets at least 44px. Aim for smooth 60fps: one canvas, one animation loop, transforms/opacity over layout, device pixel ratio capped at 2, pause the loop when the tab is hidden.
 - Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.
 - If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).
 - If the message includes a "Current page" HTML document, that is the page currently on screen: treat the command as an edit to it - change only what was asked, keep everything else intact, and output the complete updated document. Only build a page from scratch when no current page is provided.`;
@@ -56,13 +60,13 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     if (!isFinite(l)) l = 1;
     l = Math.max(0, Math.min(2, l));
     if (l === 0) return '\n\nDetail level: MINIMAL. Keep it small and essential: no external libraries, no heavy effects - just a clean single-file page that answers the command.';
-    if (l === 2) return '\n\nDetail level: MAXIMUM — ENGINEERING QUALITY. Produce a production-grade single-file page applying these standards:\n' +
-          '1. THREE.JS 3D (when applicable): scene → perspective camera → WebGLRenderer({antialias:true}) → shadowMap.enabled=true → directional+ambient lights → animate(t) loop using THREE.Clock.getDelta() for frame-independent motion → handle window resize (camera.aspect, renderer.setSize caps dpr at 2). Dispose materials/geometries on scene rebuild.\n' +
-          '2. CANVAS 2D: use requestAnimationFrame with delta time, devicePixelRatio cap at 2, clearRect before draw.\n' +
-          '3. CSS 3D / PARTICLES: perspective, transform-style:preserve-3d, keyframes with will-change for GPU layers; particle systems use typed arrays (Float32Array) + canvas or minimal DOM nodes.\n' +
-          '4. UI POLISH: subtle backdrop-filter blur on overlays, fine border-radius (12-16px), micro-interactions (hover scale/glow 200ms ease), smooth CSS transitions everywhere.\n' +
-          '5. PERFORMANCE: debounce resize, avoid layout thrash, reuse geometry/material instances, cap pixel ratio at 2.\n' +
-          'Produce spectacular, animated, fully responsive 60fps code — no stubs, no placeholders.';
+    if (l === 2) return '\n\nDetail level: MAXIMUM — ENGINEERING QUALITY (not effect quantity). Produce a production-grade single-file page applying these standards:\n' +
+          '1. THREE.JS 3D (only when the concept needs 3D): scene → perspective camera → WebGLRenderer({antialias:true}) → shadowMap.enabled=true → directional+ambient lights → animate(t) loop using THREE.Clock.getDelta() for frame-independent motion → handle window resize (camera.aspect, renderer.setSize caps dpr at 2). Dispose materials/geometries on scene rebuild.\n' +
+          '2. CANVAS 2D (only when needed): requestAnimationFrame with delta time, devicePixelRatio cap at 2, clearRect before draw.\n' +
+          '3. MOTION & EFFECTS WITH RESTRAINT: one ambient layer max; if particles are truly part of the concept, keep them subtle (hundreds, not thousands) and use Float32Array + canvas; prefer transform/opacity; no stacked blur/glow/shadow on many layers; will-change only on elements that actually animate.\n' +
+          '4. UI POLISH: tasteful typography scale, 8px spacing rhythm, subtle backdrop blur only where it aids legibility, fine border-radius (12-16px), micro-interactions (hover scale/glow 200ms ease) used sparingly.\n' +
+          '5. PERFORMANCE: debounce resize, avoid layout thrash, reuse geometry/material instances, cap pixel ratio at 2, keep the bundle light (no unnecessary libraries).\n' +
+          'Produce polished, purposeful, fully responsive 60fps code — no stubs, no placeholders.';
     return '';
   }
 
@@ -81,9 +85,9 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     out += '- surface (cards/panels): ' + theme.surface + '\n';
     out += '- surface alt: ' + theme.surfaceAlt + '\n';
     if (theme.colors && theme.colors.length) {
-      out += '- extra palette colors (use freely for UI elements, gradients, particles, glows): ' + theme.colors.join(', ') + '\n';
+      out += '- extra palette colors (accents, highlights and at most one gradient): ' + theme.colors.join(', ') + '\n';
     }
-    out += 'Respect the palette: dark background means dark design. Use the extra palette colors to make the page vibrant and alive — gradients, glowing elements, colorful particles. Avoid monochrome.\n';
+    out += 'Respect the palette: dark background means dark design. Use the extra colors with restraint for accents, highlights and one gradient — avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
     return out;
   }
 

@@ -1,0 +1,24 @@
+PASTA DE FONTES — NEXUS-DESKTOP
+===============================
+
+Jogue aqui dentro os arquivos de fonte (.ttf, .otf, .woff, .woff2).
+Elas aparecem automaticamente no seletor "Modelo" do modo edição.
+O seletor mostra APENAS as fontes desta pasta — fontes do sistema não aparecem na lista.
+
+Como usar
+---------
+1. Copie os arquivos de fonte para ESTA pasta
+   (ex.: PressStart2P-Regular.ttf, Orbitron-Bold.otf)
+2. No NEXUS-DESKTOP, clique em "✎ EDITAR"  (a lista é recarregada aqui)
+3. Clique duas vezes no elemento de texto
+4. Em "Modelo", escolha a fonte — ela aparece marcada com "(minha)"
+
+Detalhes
+--------
+- O NOME DA FAMÍLIA é o nome do arquivo, sem a extensão.
+  Ex.: "PressStart2P-Regular.ttf"  ->  família  PressStart2P-Regular
+  (é esse nome que fica gravado no HTML: font-family: "PressStart2P-Regular")
+- Nomes de arquivo com espaço funcionam, mas evite acentos e caracteres estranhos.
+- Para remover uma fonte da lista: apague o arquivo e clique em "✎ EDITAR" de novo.
+- As fontes são servidas pelo serve.py em /fontes/  (não precisa reiniciar o servidor).
+- Esta pasta fica FORA de web/  — os arquivos não vão junto no save da página.

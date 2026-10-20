@@ -1,5 +1,40 @@
 # Changelog — NEXUS-DESKTOP
 
+## Não publicado
+
+### Adicionado
+- **Shell Electron** — `desktop/main.js` + `desktop/server.js` abrem a interface em janela
+  própria fullscreen (F11 alterna, F12 DevTools), com instância única; o servidor local roda
+  no mesmo processo (8790→8810 se a porta estiver ocupada) e links externos abrem em janela
+  interna. `NEXUS-DESKTOP.desktop`/`desktop/start.sh` são o caminho principal;
+  `abrir.sh`/`serve.py` continuam como fallback no navegador
+- **Fontes da pasta `fontes/`** — o seletor de fonte do modo edição lista apenas as fontes
+  do projeto (`fontes/*.ttf|otf|woff|woff2`); `serve.py` serve `/fontes/` (JSON + arquivos)
+- **SALVAR com nome limpo** — o diálogo abre com o nome pré-carregado sem carimbo de data e
+  sem `.html`: página aberta sugere o próprio nome; geração nova sugere o slug do prompt
+  (até 60 chars, fallback `pagina`); o Store anexa `.html` ao gravar
+
+### Alterado
+- **Geração mais contida** — o prompt deixou de mandar "spectacular/particles/motion over
+  static": efeitos agora são condicionais ao pedido, com no máximo um sistema de partículas
+  sutil de apoio. O foco passa a ser composição/beleza, escopo fiel ao comando e orçamento de
+  performance (um canvas, um loop, dpr 2, pausa com aba oculta); o nível "Rico" virou
+  qualidade de engenharia, não quantidade de efeito
+
+### Corrigido
+- **Modo edição (popover)** — leitura de estilos reais do elemento: transparência de cores
+  (`rgba()` com escape correto no shim), tamanho de fonte fracionário (`parseFloat`) e
+  família de fonte computada
+- **Página salva abre fora do app** — a sanitização do snapshot remove o shim e a página de
+  fontes (`nx-fonts`/`fonts.css`) e devolve o three vendorizado à CDN pública (`unpkg`); o
+  arquivo salvo funciona sozinho, sem depender do servidor local
+- **Clique seleciona o elemento certo** — elementos com `pointer-events:none` e mídia
+  full-screen (canvas/img/video/iframe) não são mais confundidos com overlay; a coleta
+  reativa o hit-test só durante o clique e restaura em `finally`
+- **Arrastar sem salto** — o arrasto mede a posição real depois de fixar o elemento (base em
+  `left/top:0` + `getBoundingClientRect`), zera `right/bottom` e usa `box-sizing:border-box`;
+  o deslocamento agora é delta puro (antes o primeiro movimento somava ao valor antigo)
+
 ## 2.2.0 — 2026-10-19
 
 Modo de edição visual de elementos: clicar na página gerada e ajustar na mão.
