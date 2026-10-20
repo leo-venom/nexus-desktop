@@ -1273,32 +1273,45 @@
 
   /* Se o provedor cortar a resposta (finish_reason=length ou HTML sem </html>),
      pede a continuação e emenda — sem isso o jogo chega incompleto e a tela fica preta. */
-  function completarSeTruncado(res, doc) {
+  var MAX_CONTINUACOES = 12;   /* quantas vezes pedimos a continuação de um documento cortado */
+
+  function completarSeTruncado(res, doc, tentativa) {
+    tentativa = tentativa || 0;
     var texto = String(res && res.content ? res.content : doc || '');
+    var corpo = String(doc || '');
     var cortou = (res && res.finishReason === 'length');
-    var fechado = /<\/html>\s*$/i.test(String(doc || '').trim());
-    if (!cortou && fechado) return Promise.resolve(doc);
-    status('⚠️ resposta truncada — completando…', 'accent', false);
-    var cauda = texto.slice(-6000);
+    var fechado = /<\/html>\s*$/i.test(corpo.trim());
+    /* Só para quando o documento está realmente fechado; finish_reason='length'
+       pode chegar com o HTML já completo (o modelo só parou de falar). */
+    if (fechado) return Promise.resolve(corpo);
+    if (tentativa >= MAX_CONTINUACOES) {
+      status('⚠️ documento ainda incompleto após ' + tentativa + ' continuações', 'accent', false);
+      return Promise.resolve(corpo);
+    }
+    status('⚠️ resposta cortada — completando (' + (tentativa + 1) + ')…', 'accent', false);
+    var cauda = corpo.slice(-8000);
+    var pedido = 'You are CONTINUING an HTML document that was cut off mid-way. Output ONLY the remaining raw HTML, starting exactly at the cut point, until the document is properly closed (</body></html>). Never repeat what was already sent, never explain, no markdown fences.';
+    var msg = 'The document was cut here. Continue from the exact next character:\n```html\n' + cauda + '\n```';
     return window.AiClient.chat(
       prefs.endpoint(), prefs.apiKey(), prefs.model(),
-      prefs.temperature(), prefs.maxTokens(),
-      'You are CONTINUING an HTML document that was cut off mid-way. Output ONLY the remaining raw HTML, starting exactly at the cut point, until the document is properly closed (</body></html>). Never repeat what was already sent, never explain, no markdown fences.',
-      'The document was cut here. Continue from the exact next character:\n```html\n' + cauda + '\n```'
+      prefs.temperature(), prefs.maxTokens(), pedido, msg
     ).then(function (r2) {
       var resto = String(r2.content || '');
+      if (!resto.trim()) return corpo;                 /* nada veio: para */
       var low = resto.toLowerCase();
       var j = low.indexOf('<!doctype');
       var k = low.indexOf('<html');
       var cortes = [j, k].filter(function (v) { return v >= 0; });
       if (cortes.length) resto = resto.slice(Math.min.apply(null, cortes));
-      resto = resto.replace(/^\s*```html\s*/i, '').replace(/```\s*$/,'');
+      resto = resto.replace(/^\s*```html\s*/i, '').replace(/```\s*$/, '');
       /* Sem whitespace à esquerda: evita quebrar uma tag partida ao meio. */
       resto = resto.replace(/^\s+/, '');
       /* Concatena SEM inserir nada: o corte pode ter sido no meio de uma tag
          (ex.: "</scr" + "ipt>") e qualquer whitespace extra quebraria o HTML. */
-      return String(doc || '') + resto;
-    }).catch(function () { return doc; });
+      var emendado = corpo + resto;
+      if (emendado === corpo) return corpo;            /* nada novo: evita loop */
+      return completarSeTruncado(r2, emendado, tentativa + 1);
+    }).catch(function () { return corpo; });
   }
 
   function tryPostMessage(data) {
