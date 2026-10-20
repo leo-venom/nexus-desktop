@@ -100,23 +100,6 @@
       tempLabel.textContent = 'Temperatura: ' + (Number(tempBar.value) / 100).toFixed(2);
     });
 
-    card.appendChild(el('div', 'mx-lbl mx-lbl-top', 'Nível de detalhe'));
-    var detailRow = el('div', 'mx-radios');
-    var detailInputs = [];
-    ['Simples', 'Médio', 'Rico'].forEach(function (label, index) {
-      var lab = el('label', 'mx-radio');
-      var r = el('input');
-      r.type = 'radio';
-      r.name = 'mx-detail';
-      r.value = String(index);
-      r.checked = index === prefs.detailLevel();
-      detailInputs.push(r);
-      lab.appendChild(r);
-      lab.appendChild(document.createTextNode(' ' + label));
-      detailRow.appendChild(lab);
-    });
-    card.appendChild(detailRow);
-
     var tokens = field('Max tokens (0 = sem limite)', String(prefs.maxTokens()), '0', 'number');
     tokens.input.min = '0';
     tokens.input.step = '1';
@@ -284,9 +267,6 @@
       prefs.set('temperature', Number(tempBar.value) / 100);
       if (selected >= 0) prefs.set('themeIndex', selected);
 
-      var detail = -1;
-      detailInputs.forEach(function (r, i) { if (r.checked) detail = i; });
-      if (detail >= 0) prefs.set('detailLevel', detail);
 
       toast('Configurações salvas ✓');
       close();

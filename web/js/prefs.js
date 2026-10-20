@@ -73,7 +73,7 @@
     temperature: function () { return clamp(num(state.temperature, 0.7), 0, 2); },
     maxTokens: function () { return Math.max(0, Math.floor(num(state.maxTokens, 0))); },
     themeIndex: function () { return Math.max(0, Math.floor(num(state.themeIndex, 0))); },
-    detailLevel: function () { return clamp(Math.floor(num(state.detailLevel, 1)), 0, 2); },
+    detailLevel: function () { return 2; },   /* modo game único — sem seletor */
 
     sessionTokens: function () { return num(state.sessionTokens, 0); },
     sessionPromptTokens: function () { return num(state.sessionPromptTokens, 0); },

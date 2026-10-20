@@ -174,6 +174,17 @@ function playSom(tipo) {
 12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
 13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
 
+DESEMPENHO — META 60 FPS CONSTANTES (obrigatório):
+- Um único canvas e um único loop de requestAnimationFrame. Nada de vários loops concorrentes.
+- NÃO redesenhe o fundo a cada frame: pinte-o uma vez em canvas offscreen e use drawImage; parallax só com deslocamento de offset.
+- Partículas: array fixo com pool (máx 40-60), zero alocação de objetos dentro do loop.
+- Sem filter: blur(), box-shadow ou backdrop-filter em elementos animados; sem sombras por frame no canvas (use 1-2 sombras pré-renderizadas se indispensável).
+- Reaproveite gradientes/paths (crie uma vez, reutilize); nada de criar gradiente ou string de cor dentro do loop.
+- Colisões simples (AABB/círculos), sem cálculos por pixel.
+- Cap de devicePixelRatio em 2; se a tela for grande, reduza a resolução interna do canvas em vez de perder frames.
+- Pause o loop quando document.hidden; retome no visibilitychange.
+- Áudio: nós criados por som e descartados (ou pool); nunca criar AudioContext por efeito.
+
 NÃO FAÇA:
 - Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
 - 1 tipo de inimigo com cores diferentes chamado de "8 níveis"
@@ -188,14 +199,9 @@ VERIFIQUE ANTES DE ENTREGAR:
 - Texturas aplicadas conforme material? sons em todas as ações?
 - Cada nível diferente do anterior (não só velocidade)?`;
 
-  /* Escopo do jogo por nível escolhido nas configurações. */
+  /* Escopo único — NEXUS GAME é sempre modo completo, otimizado para desempenho. */
   function gameScopeNote(level) {
-    var l = Math.floor(Number(level));
-    if (!isFinite(l)) l = 1;
-    l = Math.max(0, Math.min(2, l));
-    if (l === 0) return '\n\nESCOPO (nível Simples): jogo enxuto e direto — 1 mecânica principal bem feita, 5 níveis, 2 tipos de inimigo, 1 power-up, som básico e HUD. Tem que estar 100% jogável e fechado.';
-    if (l === 2) return '\n\nESCOPO (nível Rico): entregue o checklist INTEIRO — 8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax, partículas com pool, música + SFX completos, screen shake, transições animadas, menu/pausa/game over com estatísticas e recorde salvo.';
-    return '\n\nESCOPO (nível Médio): jogo completo e equilibrado — 6-8 níveis, 2-3 tipos de inimigo, 2 power-ups, som e menu. Priorize caber inteiro na resposta.';
+    return '\n\nESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.';
   }
 
   function gameLightingNote(theme) {
