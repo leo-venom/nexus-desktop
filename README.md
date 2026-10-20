@@ -54,7 +54,8 @@ janela carregou o código atual.
 
 ## Recursos
 
-- app **Electron** em janela normal (F11 alterna tela cheia; F12 DevTools), sem barra de navegador;
+- app **Electron** em janela normal que detecta a resolução e ocupa a área útil da tela
+  (F11 alterna tela cheia; F12 DevTools), sem barra de navegador;
 - comando curto → página HTML completa renderizada no palco;
 - novo comando **refina** a página atual com **edição cirúrgica**: o modelo devolve só os
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
@@ -71,7 +72,7 @@ janela carregou o código atual.
 nexus-desktop/
 ├── NEXUS-DESKTOP.desktop    # atalho: app Electron (janela normal)
 ├── desktop/                 # shell Electron
-│   ├── main.js              # janela normal, single-instance, F11/F12, popups
+│   ├── main.js              # janela na área útil detectada, single-instance, F11/F12, popups
 │   ├── server.js            # servidor local + proxy /_proxy + /fontes/
 │   ├── start.sh             # sobe o servidor e executa o Electron
 │   ├── package.json         # devDependency electron

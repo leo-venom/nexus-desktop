@@ -4,7 +4,8 @@
  * NEXUS-DESKTOP — shell desktop.
  *
  * Abre a interface no Chromium embutido (Electron), em janela normal,
- * servida por um servidor local em 127.0.0.1. F11 alterna tela cheia.
+ * detectando a resolução da tela e ocupando a área útil. Servida por um
+ * servidor local em 127.0.0.1. F11 alterna tela cheia.
  */
 
 const path = require('path');
@@ -19,13 +20,26 @@ app.commandLine.appendSwitch('class', 'NexusDesktop');
 let mainWindow = null;
 let localServer = null;
 
+/* Tela onde a janela está; na abertura, a tela do cursor. */
+function targetDisplay(win) {
+  if (win && !win.isDestroyed()) return screen.getDisplayMatching(win.getBounds());
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+}
+
+/* Ocupa a área útil da tela detectada (resolução/DPI atuais). */
+function fitToDisplay(win) {
+  if (!win || win.isDestroyed() || win.isFullScreen()) return;
+  win.setBounds(targetDisplay(win).workArea);
+}
+
 function createWindow(port) {
-  /* Janela normal, dimensionada para caber na área útil da tela. */
-  const wa = screen.getPrimaryDisplay().workAreaSize;
+  /* Detecta a resolução da tela e ocupa a área útil, sem tamanho fixo. */
+  const { workArea } = targetDisplay(null);
   mainWindow = new BrowserWindow({
-    width: Math.min(1600, Math.round(wa.width * 0.9)),
-    height: Math.min(900, Math.round(wa.height * 0.9)),
-    center: true,
+    x: workArea.x,
+    y: workArea.y,
+    width: workArea.width,
+    height: workArea.height,
     show: false,
     backgroundColor: '#0e0f13',
     title: 'NEXUS-DESKTOP',
@@ -46,6 +60,7 @@ function createWindow(port) {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
+    fitToDisplay(mainWindow);
   });
 
   /* Links abertos por páginas geradas (window.open) ficam dentro do app. */
@@ -79,7 +94,16 @@ function createWindow(port) {
     }
   });
 
+  /* Resolução/DPI/monitores mudaram: reajusta à área útil detectada. */
+  const refit = () => fitToDisplay(mainWindow);
+  screen.on('display-metrics-changed', refit);
+  screen.on('display-added', refit);
+  screen.on('display-removed', refit);
+
   mainWindow.on('closed', () => {
+    screen.removeListener('display-metrics-changed', refit);
+    screen.removeListener('display-added', refit);
+    screen.removeListener('display-removed', refit);
     mainWindow = null;
   });
 

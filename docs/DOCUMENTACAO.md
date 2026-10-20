@@ -115,7 +115,9 @@ tema e bridge. Ver `MAPA_UI.md` para as âncoras.
 
 ### desktop/main.js
 Shell Electron: instância única (`requestSingleInstanceLock`; a segunda chamada foca a
-janela), janela normal sem menu, `contextIsolation`/`sandbox` ligados e
+janela), janela normal sem menu, dimensionada pela **área útil da tela detectada**
+(resolução/DPI atuais; reajusta quando monitores ou métricas mudam), com
+`contextIsolation`/`sandbox` ligados e
 `nodeIntegration` desligado. F11 alterna tela cheia, F12 abre DevTools. `window.open`
 para `http(s)` é permitido em janela interna 1200×800 com as mesmas proteções; outros
 protocolos são negados. Ao sair, fecha o servidor embutido.

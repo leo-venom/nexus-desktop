@@ -15,6 +15,10 @@
   (até 60 chars, fallback `pagina`); o Store anexa `.html` ao gravar
 
 ### Alterado
+- **Janela detecta a resolução** — o shell abandonou o tamanho fixo (90% + teto 1600×900):
+  abre na **área útil da tela detectada** (tela do cursor, ou a que contém a janela) e se
+  reajusta quando a resolução, o DPI ou os monitores mudam (`display-metrics-changed`,
+  `display-added`, `display-removed`)
 - **Geração mais contida** — o prompt deixou de mandar "spectacular/particles/motion over
   static": efeitos agora são condicionais ao pedido, com no máximo um sistema de partículas
   sutil de apoio. O foco passa a ser composição/beleza, escopo fiel ao comando e orçamento de
