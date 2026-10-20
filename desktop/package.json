@@ -3,7 +3,7 @@
   "productName": "NEXUS GAME",
   "version": "2.2.0",
   "private": true,
-  "description": "NEXUS GAME — shell local com IA que gera HTML, rodando em Chromium embutido",
+  "description": "NEXUS GAME — gerador de jogos HTML completos com IA, rodando em Chromium embutido",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

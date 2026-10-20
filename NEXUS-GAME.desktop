@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=NEXUS GAME
-Comment=Shell + IA que gera HTML (Chromium embutido, tela cheia)
+Comment=Gerador de jogos HTML completos com IA (Chromium embutido)
 Exec=sh -c "exec '/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/desktop/start.sh' >/dev/null 2>&1"
 Icon=nexus-game
 Terminal=false

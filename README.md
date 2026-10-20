@@ -1,6 +1,6 @@
 # NEXUS GAME
 
-Port desktop do **NEXUS77** (Android/Kotlin): shell + chat de IA que gera HTML vivo.
+Gerador de **jogos HTML completos** com IA: chat + shell que cria, edita e roda jogos em iframe isolado.
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 

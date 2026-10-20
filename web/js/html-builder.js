@@ -14,7 +14,7 @@
   var HEAD_REGEX = /<head[^>]*>/i;
   var HTML_REGEX = /<html[^>]*>/i;
 
-  var BASE_PROMPT = `You are the page generator of the app NEXUS GAME. From the user's short command, you build ONE complete, self-contained HTML document.
+  var BASE_PROMPT = `You are the GAME generator of NEXUS GAME. From the user's short command, you build ONE complete, self-contained, PLAYABLE HTML game document.
 
 Rules:
 - Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
@@ -188,6 +188,16 @@ VERIFIQUE ANTES DE ENTREGAR:
 - Texturas aplicadas conforme material? sons em todas as ações?
 - Cada nível diferente do anterior (não só velocidade)?`;
 
+  /* Escopo do jogo por nível escolhido nas configurações. */
+  function gameScopeNote(level) {
+    var l = Math.floor(Number(level));
+    if (!isFinite(l)) l = 1;
+    l = Math.max(0, Math.min(2, l));
+    if (l === 0) return '\n\nESCOPO (nível Simples): jogo enxuto e direto — 1 mecânica principal bem feita, 5 níveis, 2 tipos de inimigo, 1 power-up, som básico e HUD. Tem que estar 100% jogável e fechado.';
+    if (l === 2) return '\n\nESCOPO (nível Rico): entregue o checklist INTEIRO — 8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax, partículas com pool, música + SFX completos, screen shake, transições animadas, menu/pausa/game over com estatísticas e recorde salvo.';
+    return '\n\nESCOPO (nível Médio): jogo completo e equilibrado — 6-8 níveis, 2-3 tipos de inimigo, 2 power-ups, som e menu. Priorize caber inteiro na resposta.';
+  }
+
   function gameLightingNote(theme) {
     var lum = 0.2126 * parseInt(theme.background.slice(1,3),16) / 255 +
               0.7152 * parseInt(theme.background.slice(3,5),16) / 255 +
@@ -277,8 +287,10 @@ DO NOT: build a single static screen with no scrolling, fake sections that lead 
   /* System prompt: regras + nível de detalhe + paleta exata do tema. */
   function systemPrompt(theme, detailLevel, command) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
+    /* NEXUS GAME é um gerador de jogos: GAME é o modo padrão.
+       SITE só entra quando o comando pede site/página explicitamente. */
     var isSite = command && isSiteCommand(command);
-    var isGame = command && isGameCommand(command) && !isSite;
+    var isGame = !isSite;
     if (isSite) {
       var sout = '';
       sout += BASE_PROMPT;
@@ -307,6 +319,7 @@ DO NOT: build a single static screen with no scrolling, fake sections that lead 
       out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
       out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
       out += GAME_DIRECTIVE;
+      out += gameScopeNote(level);
       out += gameLightingNote(theme);
       out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
       out += '- background: ' + theme.background + '\n';
@@ -744,6 +757,7 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     STORAGE_SAFE: STORAGE_SAFE,
     isGameCommand: isGameCommand,
     isSiteCommand: isSiteCommand,
+    gameScopeNote: gameScopeNote,
     applyEdits: applyEdits,
     looksLikeDocument: looksLikeDocument,
     VIEWPORT_REGEX: VIEWPORT_REGEX,
