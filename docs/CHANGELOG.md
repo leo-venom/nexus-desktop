@@ -1,10 +1,38 @@
 # Changelog — NEXUS GAME
 
+## v2.9.0 — 2026-10-20
+
+### Adicionado
+- **+20 texturas no pack** (44 no total): obsidiana, basalto, ametista, rubi, safira, turquesa,
+  cobre, bronze, titânio, fibra de carbono, camuflagem, zebra, tigre, veludo, pergaminho,
+  circuito, binário, aurora, fogo azul, pântano.
+- **~40 sinônimos novos** no `NxTex.mapear()` (granada→rubi, pcb→circuito, matrix→binário,
+  aurora boreal→aurora, chama azul→fogo_azul, lodo→pântano…).
+- **`docs/ESTADO_ATUAL.md`** — documento consolidado do estado do projeto.
+
+## v2.8.0 — 2026-10-20
+
+### Adicionado
+- **Pack de texturas `web/js/nx-textures.js`** — 24 texturas procedurais bonitas, injetadas em
+  todo jogo (`window.NxTex`). API: `bloco`, `pattern`, `canvas`, `css`, `three`, `mapear`,
+  `names`, `aleatoria`. Cache por `nome@tamanho`.
+- **Regra no prompt:** usar `NxTex` em vez de reescrever receita de textura.
+
 ## v2.7.0 — 2026-10-20
 
 ### Removido
 - **SITE MODE por completo** — `SITE_DIRECTIVE`, `SITE_TERMS`, `isSiteCommand()` e o branch de site
   no `systemPrompt()`. NEXUS GAME tem um único modo: **jogo**. Qualquer comando gera jogo.
+
+## v2.6.0 — 2026-10-20
+
+### Adicionado
+- **TEXTURA EM JOGO 2D (obrigatório)** no prompt — `createPattern` em cada peça/inimigo;
+  proibido cor chapada; lava deve aparecer em TODAS as peças quando pedida.
+- **PRIMEIRO FRAME (regra absoluta)** — campo, HUD e objeto ativo desenhados no boot, com `draw()`
+  síncrono antes do `requestAnimationFrame`.
+- **Resize nudge no shim** — dispara `resize` em 0/150/500/1200 ms e no `DOMContentLoaded` para
+  jogos que mediram o viewport zerado.
 
 ## v2.5.1 — 2026-10-20
 

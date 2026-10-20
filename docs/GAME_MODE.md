@@ -1,47 +1,47 @@
-# GAME MODE — diretriz oficial do NEXUS GAME
+# GAME_MODE — diretriz oficial do modo jogo
 
-**Gerado do codigo em execucao** (`web/js/html-builder.js`) · versao undefined
+**Gerado do codigo em execucao** (`web/js/html-builder.js`) · NEXUS GAME v2.9.0
 
-## Numeros reais
+Modo unico: todo comando gera jogo. Nao existe SITE MODE.
+
+## Numeros
 
 | Item | Valor |
 |---|---|
-| `GAME_DIRECTIVE` | 13827 chars (~3457 tok), 128 linhas |
-| Prompt de jogo (system completo) | 15842 chars (~3961 tok) |
-| Prompt de site | 6095 chars |
-| Prompt normal | 15842 chars |
-| Texturas processuais | 12 |
+| GAME_DIRECTIVE | 16651 chars (160 linhas) |
+| Prompt de jogo (system) | 18666 chars (~4667 tok) |
+| Texturas no pack NxTex | 44 |
 | Sons WebAudio | 13 |
 | Temas | 30 (20 escuros + 10 claros) |
-| Modo | GAME unico (seletor de nivel removido) |
 
-## Ativacao
+## Escopo exigido
 
-**GAME e o modo padrao** — qualquer comando vira jogo. SITE so entra quando o comando pede
-site/pagina explicitamente. Refino cirurgico continua usando `EDIT_DIRECTIVE` (JSON find/replace).
+ESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.
 
-## Escopo exigido do jogo
+## Blocos do GAME_DIRECTIVE
 
-`ESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.`
-
-## Protecoes garantidas pelo app (nao dependem do modelo)
-
-1. **Storage polyfill `nx-safe`** — `localStorage`/`sessionStorage` em memoria no iframe sandbox.
-2. **Loop de continuacao (12x)** — resposta cortada pelo provedor e emendada sem whitespace ate `</html>`.
-3. **Deteccao de truncamento** — `finish_reason == length` ou documento sem `</html>`.
-4. **iframe** `sandbox="allow-scripts allow-pointer-lock allow-popups"` + `allow="fullscreen; pointer-lock; keyboard-lock; autoplay"`.
-
-## Regras de desempenho no prompt
-
-- Um canvas e um loop de rAF; fundo em offscreen + drawImage
-- Particulas com pool (max 40-60), zero alocacao no loop
-- Sem blur/box-shadow/backdrop-filter em elemento animado
-- Gradientes/paths criados uma vez; colisao AABB; DPR cap 2
-- Pausa em `visibilitychange`; `AudioContext` unico
+- ENTREGA COMPLETA EM UMA RESPOSTA: presente
+- REGRA ABSOLUTA — TAMANHO: presente
+- REGRAS DE TELA: presente
+- MEDIÇÃO DEFENSIVA: presente
+- FOCO NO JOGO: presente
+- O JOGO PRECISA TER: presente
+- COMO ENTREGAR: presente
+- PACK DE TEXTURAS PRONTO: presente
+- 12 TEXTURAS PROCESSUAIS: presente
+- INFERÊNCIA AUTOMÁTICA: presente
+- ANIMAÇÃO DE TEXTURA: presente
+- TEXTURA EM JOGO 2D: presente
+- PRIMEIRO FRAME: presente
+- REGRA DE 3D SIMPLES: presente
+- 13 SONS WEBAUDIO: presente
+- DESEMPENHO: presente
+- NÃO FAÇA: presente
+- VERIFIQUE: presente
 
 ---
 
-## GAME_DIRECTIVE — texto integral em execucao
+## GAME_DIRECTIVE — texto integral
 
 ```text
 
@@ -100,6 +100,38 @@ Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height
 10. ASFALTO: ruído cinza escuro de alta frequência (RGB 40-80) + linhas horizontais claras espaçadas (marcas de pista). material: MeshStandardMaterial, roughness:0.8.
 11. GRAMA: gradiente verde com ruído + traços verticais finos (fillRect 1px largura, 4-8px altura, verde claro, espaçados 4px). material: MeshStandardMaterial, roughness:0.9.
 12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
+
+PACK DE TEXTURAS PRONTO — window.NxTex (USE ESTE, NÃO REESCREVA):
+O documento já carrega js/nx-textures.js, que expõe 44 texturas procedurais bonitas e prontas:
+lava, metal, cromo, ouro, vidro, madeira, pedra, gelo, agua, grama, asfalto, grade, nebulosa, areia, chocolate, neon, tijolo, marmore, couro, plasma, cristal, ferrugem, concreto, holograma, obsidiana, basalto, ametista, rubi, safira, turquesa, cobre, bronze, titanio, fibra_carbono, camuflagem, zebra, tigre, veludo, pergaminho, circuito, binario, aurora, fogo_azul, pantano.
+
+API (2D):
+- NxTex.bloco(ctx, x, y, w, h, 'lava')  → pinta o bloco JÁ com textura + brilho no topo + sombra na base. Use em cada peça/inimigo/plataforma.
+- ctx.fillStyle = NxTex.pattern(ctx, 'metal')  → pattern repetido para preencher áreas.
+- NxTex.canvas('pedra', 64)  → canvas cru (32/64/128/256).
+- NxTex.css('nebulosa')  → 'url(data:...)' para background de elemento.
+- NxTex.mapear('textura de chocolate')  → traduz o pedido do usuário para a textura mais próxima.
+- NxTex.names()  → lista as 24.
+
+API (3D/three.js):
+- material.map = NxTex.three('lava')  → THREE.CanvasTexture com RepeatWrapping (já configurada).
+
+REGRA: se o pedido citar uma textura que existe no pack, CHAME NxTex para ela em vez de escrever a receita. Só crie textura manual quando o material pedido não existir no pack — e nesse caso derive das cores do material (nunca cor lisa).
+
+TEXTURA EM JOGO 2D (canvas puro) — OBRIGATÓRIO:
+Jogo 2D (Tetris, Snake, plataforma, shooter top-down, quebra-cabeça) NÃO pode usar cor chapada nos objetos. Cada objeto/peça/inimigo precisa de textura procedural:
+- Crie UMA vez um canvas pequeno (32x32 ou 64x64) com gradiente + ruído + detalhes (ex.: lava = gradiente amarelo→laranja→vermelho + pontos claros; metal = cinza + listras; pedra = ruído; grama = verde + traços).
+- Transforme em pattern: var pat = ctx.createPattern(canvasTextura, 'repeat');
+- Pinte cada peça com ctx.fillStyle = pat (o pattern repete dentro do bloco), depois adicione brilho no topo e sombra na base com fillRect de rgba.
+- Nunca use só fillStyle = '#FF0000' numa peça/inimigo: peça com cor lisa = entrega incompleta.
+- Se o pedido diz "textura lava", TODAS as peças devem mostrar a lava (gradiente + veios + brilho), não apenas a borda ou o fundo.
+
+PRIMEIRO FRAME — REGRA ABSOLUTA:
+O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
+- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
+- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
+- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
+- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
 
 REGRA DE 3D SIMPLES: se o pedido for um objeto ou cena 3D — cubo, esfera, planeta, torus, cilindro, voxel — você DEVE aplicar uma textura procedural de verdade (CanvasTexture), nunca apenas uma cor lisa em MeshStandardMaterial. Escolha a textura pelo contexto do pedido (lava → LAVA animada; metal → METAL; planeta → TERRA ou CÉU; moeda → OURO). O cubo/cena 3D sem textura é considerado entrega incompleta.
 
@@ -176,7 +208,7 @@ VERIFIQUE ANTES DE ENTREGAR:
 
 ---
 
-## System prompt de jogo renderizado (exemplo real)
+## System prompt renderizado
 
 ```text
 You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
@@ -244,6 +276,38 @@ Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height
 10. ASFALTO: ruído cinza escuro de alta frequência (RGB 40-80) + linhas horizontais claras espaçadas (marcas de pista). material: MeshStandardMaterial, roughness:0.8.
 11. GRAMA: gradiente verde com ruído + traços verticais finos (fillRect 1px largura, 4-8px altura, verde claro, espaçados 4px). material: MeshStandardMaterial, roughness:0.9.
 12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
+
+PACK DE TEXTURAS PRONTO — window.NxTex (USE ESTE, NÃO REESCREVA):
+O documento já carrega js/nx-textures.js, que expõe 44 texturas procedurais bonitas e prontas:
+lava, metal, cromo, ouro, vidro, madeira, pedra, gelo, agua, grama, asfalto, grade, nebulosa, areia, chocolate, neon, tijolo, marmore, couro, plasma, cristal, ferrugem, concreto, holograma, obsidiana, basalto, ametista, rubi, safira, turquesa, cobre, bronze, titanio, fibra_carbono, camuflagem, zebra, tigre, veludo, pergaminho, circuito, binario, aurora, fogo_azul, pantano.
+
+API (2D):
+- NxTex.bloco(ctx, x, y, w, h, 'lava')  → pinta o bloco JÁ com textura + brilho no topo + sombra na base. Use em cada peça/inimigo/plataforma.
+- ctx.fillStyle = NxTex.pattern(ctx, 'metal')  → pattern repetido para preencher áreas.
+- NxTex.canvas('pedra', 64)  → canvas cru (32/64/128/256).
+- NxTex.css('nebulosa')  → 'url(data:...)' para background de elemento.
+- NxTex.mapear('textura de chocolate')  → traduz o pedido do usuário para a textura mais próxima.
+- NxTex.names()  → lista as 24.
+
+API (3D/three.js):
+- material.map = NxTex.three('lava')  → THREE.CanvasTexture com RepeatWrapping (já configurada).
+
+REGRA: se o pedido citar uma textura que existe no pack, CHAME NxTex para ela em vez de escrever a receita. Só crie textura manual quando o material pedido não existir no pack — e nesse caso derive das cores do material (nunca cor lisa).
+
+TEXTURA EM JOGO 2D (canvas puro) — OBRIGATÓRIO:
+Jogo 2D (Tetris, Snake, plataforma, shooter top-down, quebra-cabeça) NÃO pode usar cor chapada nos objetos. Cada objeto/peça/inimigo precisa de textura procedural:
+- Crie UMA vez um canvas pequeno (32x32 ou 64x64) com gradiente + ruído + detalhes (ex.: lava = gradiente amarelo→laranja→vermelho + pontos claros; metal = cinza + listras; pedra = ruído; grama = verde + traços).
+- Transforme em pattern: var pat = ctx.createPattern(canvasTextura, 'repeat');
+- Pinte cada peça com ctx.fillStyle = pat (o pattern repete dentro do bloco), depois adicione brilho no topo e sombra na base com fillRect de rgba.
+- Nunca use só fillStyle = '#FF0000' numa peça/inimigo: peça com cor lisa = entrega incompleta.
+- Se o pedido diz "textura lava", TODAS as peças devem mostrar a lava (gradiente + veios + brilho), não apenas a borda ou o fundo.
+
+PRIMEIRO FRAME — REGRA ABSOLUTA:
+O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
+- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
+- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
+- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
+- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
 
 REGRA DE 3D SIMPLES: se o pedido for um objeto ou cena 3D — cubo, esfera, planeta, torus, cilindro, voxel — você DEVE aplicar uma textura procedural de verdade (CanvasTexture), nunca apenas uma cor lisa em MeshStandardMaterial. Escolha a textura pelo contexto do pedido (lava → LAVA animada; metal → METAL; planeta → TERRA ou CÉU; moeda → OURO). O cubo/cena 3D sem textura é considerado entrega incompleta.
 

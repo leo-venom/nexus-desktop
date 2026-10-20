@@ -4,6 +4,22 @@ Gerador de **jogos HTML completos** com IA: chat + shell que cria, edita e roda 
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 
+**Versão 2.9.0** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
+
+## Recursos
+
+- **Modo jogo único** — todo comando gera jogo (não existe modo site/página)
+- **`GAME_DIRECTIVE` de 16.651 chars** — regras de tela, HUD lateral, 8-12 níveis, 3+ inimigos,
+  power-ups, parallax, partículas com pool, música + SFX, menu/pausa/game over
+- **44 texturas procedurais prontas** (`window.NxTex`) — lava, metal, cristais, circuito, aurora…
+- **13 sons WebAudio** com receitas completas (frequências, envelopes, filtros)
+- **30 temas** — 20 escuros + 10 claros
+- **Desempenho 60 fps** cobrado no prompt (um canvas/um loop, fundo offscreen, pool de partículas)
+- **Proteções no app** — storage polyfill, loop de continuação de resposta cortada, resize nudge,
+  stall detector de 90 s
+- **Modo edição visual** — clique seleciona, duplo clique abre popover, arrasto, redimensionamento
+  por bordas, Ctrl+Z com pilha de 200, FINALIZAR grava as edições
+
 ## Abrir
 
 **Duplo clique em `NEXUS-GAME.desktop`**. O atalho executa `desktop/start.sh`, que sobe
