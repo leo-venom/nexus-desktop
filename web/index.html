@@ -12,12 +12,12 @@
   <div class="titlebar">
     <h1 class="brand" id="brand">NEXUS-DESKTOP</h1>
     <span class="dot" id="dot"></span>
-    <span class="model" id="model">sem API key</span>
-    <div class="tbar"><div class="tfill" id="tfill"></div></div>
-    <span class="tlabel" id="tlabel">↑0 ↓0 · 0/1M</span>
-    <button class="reset" id="btn-reset" type="button" title="Reiniciar sessão">↺</button>
-    <input id="prompt" class="prompt" type="text" placeholder="Ex: criar cubo html 3d"
-           autocomplete="off" spellcheck="false">
+    <div class="promptwrap">
+      <input id="prompt" class="prompt" type="text" placeholder="Ex: criar cubo html 3d"
+             autocomplete="off" spellcheck="false">
+      <button class="reset" id="btn-reset" type="button" title="Reiniciar sessão"
+              aria-label="Reiniciar sessão">↺</button>
+    </div>
     <span class="status" id="status"></span>
     <canvas id="vu" class="vu" width="54" height="20"></canvas>
     <span class="kblabel" id="kb" hidden>…</span>
@@ -25,9 +25,21 @@
     <button class="hbtn" id="btn-finalize" type="button" style="display:none">✔ FINALIZAR</button>
     <button class="hbtn" id="btn-save" type="button">SALVAR</button>
     <button class="hbtn" id="btn-open" type="button">ABRIR</button>
+    <button class="hbtn" id="btn-usage" type="button" aria-expanded="false" aria-controls="usage">CONSUMO</button>
     <button id="btn-gear" class="iconbtn gear" type="button" title="Configurações" aria-label="Configurações">⚙</button>
   </div>
 </header>
+<div class="usage" id="usage" hidden>
+  <div class="usage-head">
+    <span class="usage-title">CONSUMO</span>
+    <button class="mx-x" id="usage-close" type="button" aria-label="Fechar">✕</button>
+  </div>
+  <div class="usage-model" id="usage-model">sem API key</div>
+  <div class="usage-bar"><div class="usage-fill" id="usage-fill"></div></div>
+  <div class="usage-session" id="usage-session">↑0 ↓0 · 0/1M</div>
+  <div class="usage-sec">Histórico</div>
+  <div class="usage-stats" id="usage-stats"></div>
+</div>
 <main class="stage">
   <iframe id="frame" class="frame" title="Página gerada"
           allow="fullscreen; pointer-lock; keyboard-lock; autoplay"

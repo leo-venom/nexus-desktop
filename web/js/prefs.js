@@ -19,7 +19,8 @@
     detailLevel: 1,
     sessionTokens: 0,
     sessionPromptTokens: 0,
-    sessionCompletionTokens: 0
+    sessionCompletionTokens: 0,
+    usageLog: []
   };
 
   function read() {
@@ -90,6 +91,61 @@
       state.sessionTokens = 0;
       state.sessionPromptTokens = 0;
       state.sessionCompletionTokens = 0;
+      persist();
+    },
+
+    /* ---------- histórico de consumo (rolling: 1 h / 24 h / 7 d / 30 d) ---------- */
+
+    usageLog: function () {
+      return Array.isArray(state.usageLog) ? state.usageLog : [];
+    },
+    addUsage: function (prompt, completion, when) {
+      var p = Math.max(0, Math.round(num(prompt, 0)));
+      var c = Math.max(0, Math.round(num(completion, 0)));
+      if (p + c <= 0) return;
+      var t = num(when, Date.now());
+      if (!isFinite(t) || t <= 0) t = Date.now();
+      var log = [];
+      var arr = Array.isArray(state.usageLog) ? state.usageLog : [];
+      arr.forEach(function (e) {
+        if (!e || typeof e.t !== 'number' || !isFinite(e.t)) return;
+        log.push({ t: e.t, p: Math.max(0, num(e.p, 0)), c: Math.max(0, num(e.c, 0)) });
+      });
+      log.push({ t: t, p: p, c: c });
+      var min = Date.now() - 31 * 86400000;
+      log = log.filter(function (e) { return e.t >= min; });
+      if (log.length > 5000) log = log.slice(log.length - 5000);
+      state.usageLog = log;
+      persist();
+    },
+    usageTotals: function (now) {
+      var t = num(now, Date.now());
+      var out = {
+        hour: { prompt: 0, completion: 0, total: 0 },
+        day: { prompt: 0, completion: 0, total: 0 },
+        week: { prompt: 0, completion: 0, total: 0 },
+        month: { prompt: 0, completion: 0, total: 0 }
+      };
+      var spans = { hour: 3600000, day: 86400000, week: 7 * 86400000, month: 30 * 86400000 };
+      var arr = Array.isArray(state.usageLog) ? state.usageLog : [];
+      arr.forEach(function (e) {
+        if (!e || typeof e.t !== 'number' || !isFinite(e.t)) return;
+        var age = t - e.t;
+        if (age < 0 || age > spans.month) return;
+        var p = Math.max(0, num(e.p, 0));
+        var c = Math.max(0, num(e.c, 0));
+        Object.keys(spans).forEach(function (k) {
+          if (age <= spans[k]) {
+            out[k].prompt += p;
+            out[k].completion += c;
+            out[k].total += p + c;
+          }
+        });
+      });
+      return out;
+    },
+    resetUsage: function () {
+      state.usageLog = [];
       persist();
     }
   };

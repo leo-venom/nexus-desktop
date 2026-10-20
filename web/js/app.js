@@ -27,8 +27,16 @@
   var APP_BASE = new URL('./', location.href).href;
   var THREE_CDN = 'https://unpkg.com/three@0.160.0/build/';
 
+  var USAGE_PERIODS = [
+    ['hour', 'Última hora'],
+    ['day', 'Últimas 24 h'],
+    ['week', 'Últimos 7 dias'],
+    ['month', 'Últimos 30 dias']
+  ];
+
   var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel;
-  var dot, modelText, tfill, tlabel, resetBtn, vu;
+  var dot, resetBtn, vu;
+  var usageBtn, usagePanel, usageModel, usageFill, usageSession, usageStats, usageClose;
   var editBtn, finalizeBtn;
   var editMode = false;
 
@@ -79,7 +87,7 @@
   function updateSessionUi() {
     var keySet = prefs.hasKey();
     dot.style.background = keySet ? theme.accent : errorColor();
-    modelText.textContent = keySet ? prefs.model() : 'sem API key';
+    usageModel.textContent = keySet ? prefs.model() : 'sem API key';
 
     var extraIn = liveActive ? liveIn : 0;
     var extraOut = liveActive ? liveOut : 0;
@@ -88,10 +96,36 @@
     var used = prefs.sessionTokens() + extraIn + extraOut;
     var budget = prefs.SESSION_TOKEN_BUDGET;
 
-    tfill.style.width = (Math.min(used, budget) / budget * 100) + '%';
-    tlabel.textContent = (liveActive ? '~' : '') +
+    usageFill.style.width = (Math.min(used, budget) / budget * 100) + '%';
+    usageSession.textContent = (liveActive ? '~' : '') +
       '↑' + formatTokens(inTok) + ' ↓' + formatTokens(outTok) +
       ' · ' + formatTokens(used) + '/' + formatTokens(budget);
+
+    renderUsageStats();
+  }
+
+  function renderUsageStats() {
+    var totals = prefs.usageTotals(Date.now());
+    var html = '';
+    var i;
+    for (i = 0; i < USAGE_PERIODS.length; i++) {
+      var key = USAGE_PERIODS[i][0];
+      var t = totals[key] || { prompt: 0, completion: 0, total: 0 };
+      html += '<div class="usage-stat">' +
+        '<div class="usage-k">' + USAGE_PERIODS[i][1] + '</div>' +
+        '<div class="usage-v">' + formatTokens(t.total) + '</div>' +
+        '<div class="usage-io">↑' + formatTokens(t.prompt) +
+        ' ↓' + formatTokens(t.completion) + '</div>' +
+        '</div>';
+    }
+    usageStats.innerHTML = html;
+  }
+
+  function setUsage(open) {
+    usagePanel.hidden = !open;
+    usageBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    usageBtn.classList.toggle('on', open);
+    if (open) updateSessionUi();
   }
 
   function status(text, kind, end) {
@@ -516,14 +550,12 @@
       render(themed(doc));
       var kb = Math.ceil(encoder.encode(doc).length / 1024);
       liveActive = false;
-      var tokSuffix = '';
       if (result.totalTokens > 0) {
         prefs.addSessionTokens(result.promptTokens, result.completionTokens);
+        prefs.addUsage(result.promptTokens, result.completionTokens);
         updateSessionUi();
-        tokSuffix = ' • ↑' + formatTokens(result.promptTokens) +
-          ' ↓' + formatTokens(result.completionTokens) + ' tok';
       }
-      status('✓ ' + kb + ' KB • ' + elapsed.toFixed(1) + 's • ' + prefs.model() + tokSuffix, '', true);
+      status('✓ ' + kb + ' KB • ' + elapsed.toFixed(1) + 's', '', true);
       input.value = '';
       input.blur();
       finishGeneration();
@@ -553,7 +585,7 @@
   function showWelcome() {
     showingList = false;
     status(prefs.hasKey()
-      ? 'pronto — descreva o que quer ver'
+      ? ''
       : 'configure a API key em ⚙ para começar', '', false);
     render(window.Html.welcomePage(theme, prefs.hasKey()));
   }
@@ -1234,9 +1266,13 @@
     statusEl = $('status');
     kbLabel = $('kb');
     dot = $('dot');
-    modelText = $('model');
-    tfill = $('tfill');
-    tlabel = $('tlabel');
+    usageBtn = $('btn-usage');
+    usagePanel = $('usage');
+    usageModel = $('usage-model');
+    usageFill = $('usage-fill');
+    usageSession = $('usage-session');
+    usageStats = $('usage-stats');
+    usageClose = $('usage-close');
     resetBtn = $('btn-reset');
     editBtn = $('btn-edit');
     finalizeBtn = $('btn-finalize');
@@ -1249,6 +1285,20 @@
     saveBtn.addEventListener('click', requestSave);
     openBtn.addEventListener('click', openSavedList);
     resetBtn.addEventListener('click', resetSession);
+    usageBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setUsage(usagePanel.hidden);
+    });
+    usageClose.addEventListener('click', function () { setUsage(false); });
+    document.addEventListener('click', function (e) {
+      if (usagePanel.hidden) return;
+      var t = e.target;
+      if (usagePanel.contains(t) || usageBtn.contains(t)) return;
+      setUsage(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !usagePanel.hidden) setUsage(false);
+    });
     editBtn.addEventListener('click', function () {
       if (!lastRendered) { toast('Gere uma página primeiro'); return; }
       editMode = true;
