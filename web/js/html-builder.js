@@ -127,6 +127,21 @@ Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height
 11. GRAMA: gradiente verde com ruído + traços verticais finos (fillRect 1px largura, 4-8px altura, verde claro, espaçados 4px). material: MeshStandardMaterial, roughness:0.9.
 12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
 
+TEXTURA EM JOGO 2D (canvas puro) — OBRIGATÓRIO:
+Jogo 2D (Tetris, Snake, plataforma, shooter top-down, quebra-cabeça) NÃO pode usar cor chapada nos objetos. Cada objeto/peça/inimigo precisa de textura procedural:
+- Crie UMA vez um canvas pequeno (32x32 ou 64x64) com gradiente + ruído + detalhes (ex.: lava = gradiente amarelo→laranja→vermelho + pontos claros; metal = cinza + listras; pedra = ruído; grama = verde + traços).
+- Transforme em pattern: var pat = ctx.createPattern(canvasTextura, 'repeat');
+- Pinte cada peça com ctx.fillStyle = pat (o pattern repete dentro do bloco), depois adicione brilho no topo e sombra na base com fillRect de rgba.
+- Nunca use só fillStyle = '#FF0000' numa peça/inimigo: peça com cor lisa = entrega incompleta.
+- Se o pedido diz "textura lava", TODAS as peças devem mostrar a lava (gradiente + veios + brilho), não apenas a borda ou o fundo.
+
+PRIMEIRO FRAME — REGRA ABSOLUTA:
+O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
+- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
+- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
+- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
+- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
+
 REGRA DE 3D SIMPLES: se o pedido for um objeto ou cena 3D — cubo, esfera, planeta, torus, cilindro, voxel — você DEVE aplicar uma textura procedural de verdade (CanvasTexture), nunca apenas uma cor lisa em MeshStandardMaterial. Escolha a textura pelo contexto do pedido (lava → LAVA animada; metal → METAL; planeta → TERRA ou CÉU; moeda → OURO). O cubo/cena 3D sem textura é considerado entrega incompleta.
 
 INFERÊNCIA AUTOMÁTICA DE TEXTURA (aplicar SEMPRE sem o usuário pedir):

@@ -327,6 +327,11 @@
     '_c+="@font-face{font-family:\\""+_fm+"\\";src:url(\\""+_f.url+"\\") format(\\""+_ft+"\\");font-display:swap}"}' +
     '_s.textContent=_c;try{document.head.appendChild(_s)}catch(e){}};' +
     'try{_fx.send()}catch(e){}' +
+    /* Empurrões de resize: jogos que medem o viewport no load pegam 0x0 e ficam
+       com canvas vazio. Disparar resize depois fazem eles recalcular. */
+    'function _nudge(){try{window.dispatchEvent(new Event("resize"));}catch(e){}}' +
+    'try{_nudge();setTimeout(_nudge,150);setTimeout(_nudge,500);setTimeout(_nudge,1200);}catch(e){}' +
+    'try{document.addEventListener("DOMContentLoaded",function(){_nudge();setTimeout(_nudge,250)},false)}catch(e){}' +
     '})();<\/script>';
 
   function injectShim(html) {
