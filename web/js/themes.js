@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  function T(name, background, surface, surfaceAlt, accent, text, secondary, isDark, colors) {
+  function T(name, background, surface, surfaceAlt, accent, text, secondary, isDark, colors, onAccent) {
     return {
       name: name,
       background: background,
@@ -16,7 +16,7 @@
       secondary: secondary,
       isDark: isDark,
       colors: colors || [],       // cores extras pro prompt da IA
-      onAccent: isDark ? '#0A0E12' : '#FFFFFF'
+      onAccent: onAccent || (isDark ? '#0A0E12' : '#FFFFFF')
     };
   }
 
@@ -64,7 +64,29 @@
     T('NEGRO · midnight sun', '#000000', '#0A0810', '#120E1C', '#FF6B00', '#F0E8E0', '#A08070', true,
       ['#FF6B00', '#FFD700', '#FF0040', '#7C4DFF', '#00E5FF']),
     T('NEGRO · pixel dream',  '#000000', '#0A0A0E', '#12141A', '#00FFFF', '#E8E8F0', '#8088A0', true,
-      ['#00FFFF', '#FF00FF', '#FFD700', '#FF2D95', '#39FF14'])
+      ['#00FFFF', '#FF00FF', '#FFD700', '#FF2D95', '#39FF14']),
+
+    /* ── 10 temas CLAROS ── */
+    T('CLARO · rubi',         '#FFF5F7', '#FFFFFF', '#FFE8EE', '#C2185B', '#2A0F18', '#8A6070', false,
+      ['#C2185B', '#E91E63', '#FF4081', '#F50057', '#AD1457']),
+    T('CLARO · tangerina',    '#FFF8F0', '#FFFFFF', '#FFEEDD', '#E65100', '#2A1A08', '#8A7060', false,
+      ['#E65100', '#FF6D00', '#FF9100', '#FFAB40', '#BF360C']),
+    T('CLARO · limão',        '#FDFFF0', '#FFFFFF', '#F6FFD9', '#7CB342', '#1E2A0A', '#708050', false,
+      ['#7CB342', '#9CCC65', '#C6FF00', '#FFEB3B', '#558B2F']),
+    T('CLARO · esmeralda',    '#F2FFF8', '#FFFFFF', '#DDFBEC', '#00897B', '#0A2420', '#5A8078', false,
+      ['#00897B', '#00ACC1', '#26A69A', '#4DB6AC', '#00695C']),
+    T('CLARO · turquesa',     '#F0FBFF', '#FFFFFF', '#DCF4FF', '#0097A7', '#082A30', '#5A8890', false,
+      ['#0097A7', '#00BCD4', '#26C6DA', '#4DD0E1', '#00838F']),
+    T('CLARO · céu',          '#F4F9FF', '#FFFFFF', '#E3EFFF', '#1976D2', '#0A1A2E', '#607A98', false,
+      ['#1976D2', '#42A5F5', '#90CAF9', '#0288D1', '#0D47A1']),
+    T('CLARO · lavanda',      '#F9F6FF', '#FFFFFF', '#EDE5FF', '#7E57C2', '#1C1030', '#7A6A98', false,
+      ['#7E57C2', '#9575CD', '#B39DDB', '#673AB7', '#512DA8']),
+    T('CLARO · orquídea',     '#FFF4FB', '#FFFFFF', '#FFE3F5', '#C026A3', '#2A0A20', '#90708A', false,
+      ['#C026A3', '#E040FB', '#F06292', '#BA68C8', '#8E24AA']),
+    T('CLARO · areia',        '#FDFAF3', '#FFFFFF', '#F5EEDC', '#A47C48', '#2A2010', '#8A7C60', false,
+      ['#A47C48', '#C9A227', '#D4A373', '#E9C46A', '#8D6E63']),
+    T('CLARO · grafite',      '#F5F6F8', '#FFFFFF', '#E8EAEF', '#455A64', '#101820', '#708090', false,
+      ['#455A64', '#607D8B', '#90A4AE', '#37474F', '#B0BEC5'])
   ];
 
   /** Formato CSS RRGGBBAA (alpha por último). color = '#RRGGBB'. */

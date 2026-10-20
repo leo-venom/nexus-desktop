@@ -1,4 +1,4 @@
-# Documentação — NEXUS-DESKTOP
+# Documentação — NEXUS GAME
 
 Port desktop do **NEXUS77** (Android/Kotlin). O app é um shell que conversa com uma API
 estilo OpenAI e renderiza o HTML gerado pela IA em um iframe isolado.
@@ -133,9 +133,9 @@ Exige `desktop/node_modules/.bin/electron` e dá `exec` nele com o diretório `d
 como app. Se faltar o binário, imprime a instrução de `npm --prefix desktop install`.
 `ELECTRON_OZONE_PLATFORM_HINT` default é `auto`.
 
-### NEXUS-DESKTOP.desktop
+### NEXUS-GAME.desktop
 Atalho de aplicativo (`Exec=sh -c "exec '…/desktop/start.sh' …"`) com
-`Icon=nexus-desktop` e `StartupWMClass=nexus-desktop` (WM_CLASS observado no Hyprland).
+`Icon=nexus-game` e `StartupWMClass=nexus-game` (WM_CLASS observado no Hyprland).
 Também está instalado em `~/.local/share/applications/` com o ícone em
 `~/.local/share/icons/hicolor/256x256/apps/`.
 
@@ -236,7 +236,7 @@ a origem é `null`, e a OpenAI não envia `Access-Control-Allow-Origin` no
 `POST /v1/chat/completions` → o navegador bloqueia ("Failed to fetch"). Não há como
 contornar com HTML/JS (regra de segurança do navegador).
 
-**App Electron (principal):** `NEXUS-DESKTOP.desktop` (ou `./desktop/start.sh`) executa
+**App Electron (principal):** `NEXUS-GAME.desktop` (ou `./desktop/start.sh`) executa
 `desktop/main.js`, que chama `startServer()` de `desktop/server.js` no próprio processo e
 carrega a URL escolhida na janela do app. A porta preferida é 8790; se estiver ocupada,
 o servidor incrementa até 20 vezes (8791→8810) e a janela usa a porta livre. O Chromium
@@ -244,7 +244,7 @@ embutido preserva File System Access, iframe e renderização.
 
 **Fallback no navegador:** `abrir.sh` sobe o `serve.py` se necessário e abre
 `http://127.0.0.1:8790/`. O script verifica a porta com `curl`, inicia o servidor
-destacado (`setsid`) e chama `xdg-open`. Log em `/tmp/nexus-desktop.log` — somente nesse
+destacado (`setsid`) e chama `xdg-open`. Log em `/tmp/nexus-game.log` — somente nesse
 fallback; o launcher Electron descarta a saída, então rode `./desktop/start.sh` no
 terminal para ver erros.
 

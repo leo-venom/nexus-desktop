@@ -14,7 +14,7 @@
   var HEAD_REGEX = /<head[^>]*>/i;
   var HTML_REGEX = /<html[^>]*>/i;
 
-  var BASE_PROMPT = `You are the page generator of the app NEXUS-DESKTOP. From the user's short command, you build ONE complete, self-contained HTML document.
+  var BASE_PROMPT = `You are the page generator of the app NEXUS GAME. From the user's short command, you build ONE complete, self-contained HTML document.
 
 Rules:
 - Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
@@ -41,6 +41,210 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
 - Do not place a full-screen transparent overlay above the content, and never set pointer-events:none on visible layers.
 - Use px/rem font sizes and explicit colors so they can be tweaked live.
 - Lay out with flex/grid so elements never overlap or clip each other, and everything stays inside the viewport at any screen size.`;
+
+  /* Palavras-chave que disparam o modo jogo com texturas e áudio. */
+  var GAME_TERMS = [
+    'jogo','jogar','game','joguinho','snake','tetris','flappy','bird','pacman',
+    'mario','pong','breakout','zelda','rpg','platform','shooter','racing',
+    'runner','platformer','roguelike','shmup','fps','beat','fighter','dino',
+    'labirinto','maze','puzzle','chess','xadrez','tower','defense','clicker',
+    'idle','dungeon','ninja','metroidvania','parkour','corrida','tiro',
+    'luta','survival','aventura','adventure','battle','space','invaders',
+    'drift','souls','bullet','rhythm','simulator','simulador','estrategia',
+    'strategy','war','magic','dragon','dragão','fantasy','craft','build',
+    'construction',
+    /* 3D / textura / material — também usam as receitas de textura procedural */
+    '3d','cubo','esfera','planeta','torus','cilindro','poliedro','malha','mesh',
+    'textura','texturas','material','shader','webgl','three','three.js',
+    'objeto 3d','cena 3d','modelo 3d','animação 3d','animacao 3d','iluminação',
+    'iluminacao','partícula','particula','pixel art','voxel','render 3d'
+  ];
+
+  function isGameCommand(cmd) {
+    if (!cmd || typeof cmd !== 'string') return false;
+    var c = cmd.toLowerCase().trim();
+    if (!c) return false;
+    for (var i = 0; i < GAME_TERMS.length; i++) {
+      if (c.indexOf(GAME_TERMS[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  var GAME_DIRECTIVE = `
+GAME MODE ATIVADO — VOCÊ ESTÁ GERANDO UM JOGO COMPLETO. Siga TODAS as regras abaixo em PORTUGUÊS (pt-BR) para textos visíveis.
+
+REGRA ABSOLUTA — ENTREGA COMPLETA EM UMA RESPOSTA:
+O documento inteiro precisa caber em UMA resposta do modelo. Comece a escrever o <script> do jogo cedo e mantenha o código enxuto: priorize um jogo COMPLETO, jogável e fechado (com </body></html> no final) em vez de volume. Se estiver ficando grande, corte cenário, partículas e comentários — NUNCA corte níveis, inimigos, controles, áudio, HUD ou o fechamento do HTML. Documento cortado no meio = entrega inválida e tela preta.
+
+REGRA ABSOLUTA — TAMANHO:
+Sem mínimo nem teto de tamanho de código. O código que o jogo exigir para ser completo e rodar liso a 60fps. Cortar redundância é obrigatório — mas não corte jogabilidade, níveis, inimigos, power-ups, som ou efeitos.
+
+REGRAS DE TELA (OBRIGATÓRIO):
+- 100vw x 100dvh, sem scroll. body { margin:0; padding:0; overflow:hidden; width:100vw; height:100dvh; }
+- MEDIÇÃO DEFENSIVA DO VIEWPORT (obrigatório): o jogo roda dentro de um iframe e window.innerWidth/innerHeight podem retornar 0 no primeiro instante. NUNCA dimensione o canvas uma única vez no carregamento. Sempre: function fit(){var W=window.innerWidth||document.documentElement.clientWidth||0;var H=window.innerHeight||document.documentElement.clientHeight||0;if(W<40||H<40){requestAnimationFrame(fit);return}/* dimensiona canvas e recalcula escala */}. Chame fit() dentro de requestAnimationFrame, registre window.addEventListener('resize', fit) e window.addEventListener('orientationchange', fit), e repita via setTimeout(fit, 300) como rede de segurança. Se a primeira medição vier 0, o jogo DEVE esperar e remedir em vez de desenhar num canvas 0x0.
+- devicePixelRatio cap em Math.min(window.devicePixelRatio||1, 2).
+- Menus, pausa e game over: overlays position:fixed em tela cheia (inset:0) sobre o canvas. O campo de jogo NUNCA é menor que a tela.
+- HUD (score, vidas, nível, power-ups, textos) DEVE ficar nas bordas ESQUERDA e DIREITA como faixas verticais finas (60-80px de largura). O canvas de jogo ocupa a tela INTEIRA por trás. NADA sobre a área central do jogo — nem score, nem texto, nem botão. Em mobile (<500px): semi-transparente mas sempre nas extremidades, nunca no centro.
+
+FOCO NO JOGO, NÃO NO FUNDO — REGRA ABSOLUTA:
+Fundo = cor sólida ou gradiente de 2-3 tons ou no máximo 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage por frame). PROIBIDO: cenário 3D elaborado, layers com textura animada, nebulosa recalculada por frame, blur ou shadow em tela cheia, milhares de partículas ambientes. O fundo não deve consumir mais que ~15% do tempo de frame. A beleza do jogo VEM dos objetos, inimigos, texturas, efeitos, HUD e som — não do fundo. Em dúvida entre fundo bonito e frame estável, escolha o frame.
+
+O JOGO PRECISA TER, NO MÍNIMO:
+- 8-12 níveis com dificuldade progressiva (velocidade, densidade, novos padrões/tipos)
+- 3+ tipos de inimigo com comportamentos DIFERENTES (não só cor ou tamanho — movimentos, ataques, IA distintos)
+- 2-3 power-ups ou itens colecionáveis que realmente funcionam e alteram a jogabilidade
+- Fundo leve com 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage)
+- Partículas de impacto + ambientes COM POOL e teto (~40-60 partículas no máximo, reuso de objetos)
+- Música procedural (osciladores WebAudio) + SFX para TODAS as ações
+- Screen shake + floating score + transições animadas entre telas
+- Menu animado + tela de pausa + tela de game over com estatísticas (score, nível, tempo)
+- Recorde máximo + último nível alcançado salvos em localStorage
+- Controles por TECLADO e TOQUE (touch events) — ambos funcionando
+
+COMO ENTREGAR O JOGO COMPLETO:
+1. Cada nível implementado individualmente com parâmetros próprios (velocidade, spawn rate, cores, padrões de inimigos). Não repita o mesmo código 12 vezes — use um array de configuração de níveis e um gerador.
+2. ÁUDIO: WebAudio com osciladores reais, não placeholder. AudioContext compartilhado criado no primeiro clique/interação (requisito do navegador). Função única playSom(tipo) que faz lookup de parâmetros, cria nós (OscillatorNode, GainNode, BiquadFilterNode), conecta, start + stop automático.
+3. Sistema de partículas COM POOL (array fixo reutilizado) e teto (~40-60 máx). Quando uma partícula morre, ela volta ao pool em vez de ser descartada. Prefira Float32Array + canvas a objetos avulsos.
+4. Fundo leve com 1-2 camadas de parallax desenhadas em offscreen canvas (uma vez) e apenas drawImage por frame — sem redesenhar, sem cálculos por frame.
+5. Transições animadas entre telas (menu→jogando→game over) com fade/deslize de 300-500ms.
+6. Efeitos dedicados por ação: screen shake no impacto, floating score ao matar inimigo, flash na borda ao tomar dano, glow ao pegar power-up.
+7. Tela de game over COM estatísticas: score final, nível alcançado, tempo de jogo, high score. Animação de entrada.
+8. Mecânicas secundárias: combos, multiplicadores de score por kills consecutivas, bônus de velocidade.
+
+12 TEXTURAS PROCESSUAIS (three.js CanvasTexture — aplicar automaticamente conforme o material de cada objeto):
+Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height=128; var x=c.getContext('2d'); /* desenho */ var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; material.map=t;
+
+1. METAL: ruído ImageData (loop em pixels, variar R/G/B entre 140-200) + sobrepor listras horizontais finas (fillRect altura 1-2px, espaçadas 8px, cinza escuro). material: MeshStandardMaterial, metalness:0.8, roughness:0.3.
+2. CROMADO: gradiente linear horizontal dramático (preto → branco → #888 → branco → preto) que simula reflexão de ambiente. material: MeshStandardMaterial, metalness:0.9, roughness:0.1.
+3. OURO: gradiente linear diagonal (marrom #8B6914 → dourado #FFD700 → marrom #8B6914) + ruído leve + emissive #886600 com intensidade 0.15. material: MeshStandardMaterial, metalness:0.7, roughness:0.3.
+4. VIDRO: NUNCA usar transmission ou envMap (quebra em iframe sandbox — material fica preto). Usar MeshStandardMaterial com transparent:true, opacity:0.25-0.4, roughness:0.05, metalness:0, side:THREE.DoubleSide, emissive sutil (cor clara). Alternativa: MeshPhongMaterial com shininess:100, specular:branco. OU dois meshes: externo transparente + interno emissivo.
+5. MADEIRA: linhas senoidais horizontais (variação de tom marrom com Math.sin) + nós aleatórios (círculos escuros fillStyle marrom escuro, radius 3-8px em posições aleatórias). material: MeshStandardMaterial, roughness:0.7.
+6. PEDRA: ruído Perlin/simplex ou noise de alta frequência em tons de cinza (80-160) + veios escuros aleatórios (linhas finas sinuosas). material: MeshStandardMaterial, roughness:0.9.
+7. LAVA: gradiente vertical laranja/vermelho/amarelo + ruído. Animação: redesenhar o canvas a cada frame deslocando o ruído OU texture.offset.x += 0.005; texture.offset.y += 0.005. emissive laranja/vermelho que pulsa. CRÍTICO: texture.needsUpdate = true após redesenhar.
+8. CÉU/NEBULOSA: gradiente radial com múltiplas paradas (azul escuro → roxo → magenta) + estrelas (fillRect 1-2px, brilho variado). Pode ser skybox (mesh grande com material map virado para dentro) ou fundo.
+9. TERRA/BARRO: ruído marrom/avermelhado (RGB 80-160, 40-100, 20-60) + manchas escuras irregulares. material: MeshStandardMaterial, roughness:0.9.
+10. ASFALTO: ruído cinza escuro de alta frequência (RGB 40-80) + linhas horizontais claras espaçadas (marcas de pista). material: MeshStandardMaterial, roughness:0.8.
+11. GRAMA: gradiente verde com ruído + traços verticais finos (fillRect 1px largura, 4-8px altura, verde claro, espaçados 4px). material: MeshStandardMaterial, roughness:0.9.
+12. GRADE/GRID: linhas horizontais e verticais regulares (1-2px, cor clara) sobre fundo escuro. Útil para chão de jogos, UI holográfica, efeito retro.
+
+REGRA DE 3D SIMPLES: se o pedido for um objeto ou cena 3D — cubo, esfera, planeta, torus, cilindro, voxel — você DEVE aplicar uma textura procedural de verdade (CanvasTexture), nunca apenas uma cor lisa em MeshStandardMaterial. Escolha a textura pelo contexto do pedido (lava → LAVA animada; metal → METAL; planeta → TERRA ou CÉU; moeda → OURO). O cubo/cena 3D sem textura é considerado entrega incompleta.
+
+INFERÊNCIA AUTOMÁTICA DE TEXTURA (aplicar SEMPRE sem o usuário pedir):
+- Inimigo robô/mecânico/arma → Metal ou Cromado
+- Inimigo orgânico/monstro/criatura → Pedra, Terra ou Madeira
+- Cenário de fundo/distante → Céu/nebulosa
+- Chão/plataforma → Asfalto, Terra, Grama ou Grade
+- Obstáculo/parede → Pedra, Madeira ou Metal
+- Item colecionável/moeda/power-up → Ouro ou Vidro
+- Efeito especial/portal/lava → Lava (COM animação de fluxo)
+- Elementos de UI/holografia → Vidro ou Grade
+
+ANIMAÇÃO DE TEXTURA:
+- Lava/água/fogo: loop rAF que redesenha o CanvasTexture a cada frame (desloca ruído, muda gradiente). SEMPRE setar texture.needsUpdate = true após redesenhar.
+- Efeito de fluxo mais leve (água, vento): texture.offset.x += 0.005 ou texture.offset.y += 0.005 a cada frame. RepeatWrapping obrigatório.
+- Piscar/brilho: variar material.emissiveIntensity com Math.sin(time * freq) no loop.
+
+13 SONS WEBAUDIO REALISTAS — ARQUITETURA COMPLETA:
+
+AudioContext compartilhado, criado no primeiro clique/interação do usuário. Função única playSom(tipo):
+
+var actx = null;
+function initAudio() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+function playSom(tipo) {
+  initAudio();
+  var p = SOM_PARAMS[tipo]; if (!p) return;
+  // criar OscillatorNode(s) ou AudioBuffer (ruído branco), GainNode(s), BiquadFilterNode
+  // conectar: source → gain → filter → destination (ou cadeias múltiplas)
+  // configurar frequência, tipo de onda, ganho, cutoff conforme o tipo
+  // start(actx.currentTime) + stop(actx.currentTime + duração)
+}
+
+1. MÚSICA DE FUNDO (background): Osciladores em escala pentatônica/blues (notas: 262, 294, 330, 392, 440, 523 Hz) + LFO vibrato modulando frequência ±5 cents + BiquadFilterNode lowpass 800-2000Hz. Música ACELERA com o nível (aumentar frequência do LFO, diminuir cutoff do filtro).
+2. TIRO/LASER: Oscilador 800→100Hz descendente em 0.15s (linearRampToValueAtTime) + GainNode decay rápido (setValueAtTime 0.3, exponentialRampToValueAtTime 0.001 em 0.15s). Variação aleatória ±5% na frequência inicial. Tipo: square ou sawtooth.
+3. EXPLOSÃO: AudioBuffer de ruído branco (Math.random() * 2 - 1, 0.5s sample rate) + GainNode decay 0.5s + BiquadFilterNode lowpass 2000→100Hz descendente. Camada extra: OscillatorNode 40-60Hz (sine) sub grave com decay 0.3s.
+4. IMPACTO/COLISÃO: AudioBuffer ruído curto 0.08s + OscillatorNode grave 80-120Hz (triangle) decay rápido. Impacto metálico: + OscillatorNode 2000-4000Hz (sine) decay 0.02s (ring metálico).
+5. MOTOR/ENGINE: Dois OscillatorNode 100Hz+200Hz (sawtooth) com detune sutil (detune: 5-15 cents) + BiquadFilterNode bandpass (freq 300-800, Q 1-3). Frequência varia com velocidade.
+6. PASSOS: AudioBuffer ruído 0.05s + BiquadFilterNode lowpass 500Hz + OscillatorNode grave 60Hz (sine). Repetir em intervalo pela velocidade. VARIAR a cada passo.
+7. VENTO/AMBIENTE: AudioBuffer ruído contínuo + BiquadFilterNode lowpass 300-800Hz com gain 0.02-0.05. LFO (OscillatorNode 0.1-0.5Hz) modulando cutoff para variação suave.
+8. POWER-UP/COLETA: Dois OscillatorNode ascendentes: 400→800Hz + 600→1200Hz em 0.2s (sine). Attack 0.01s, decay 0.2s. BiquadFilterNode lowpass sweep 500→3000Hz.
+9. GAME OVER: OscillatorNode descendente 400→50Hz em 1.5s (triangle ou sawtooth) + ruído grave decay longo. ESCALA descendente de 3-4 notas (400→300→200→50Hz, cada nota 0.3s).
+10. HIT/DANO: AudioBuffer ruído 0.05s + OscillatorNode 300→80Hz descendente 0.1s. GainNode com spike (attack 0s, decay 0.1s).
+11. MENU HOVER/CLICK: OscillatorNode 0.03s, 600-800Hz (sine), attack 0s decay 0.03s. Click: dois OscillatorNode simultâneos (600+800Hz).
+12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
+13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
+
+NÃO FAÇA:
+- Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
+- 1 tipo de inimigo com cores diferentes chamado de "8 níveis"
+- Jogo sem som, sem música, sem game over, sem menu, sem tela de pausa
+- Arrays de configuração de nível vazios ou com só 1 entrada
+
+VERIFIQUE ANTES DE ENTREGAR:
+- 60fps? fundo leve? tela inteira? HUD nas laterais?
+- 8-12 níveis? 3+ inimigos com comportamentos diferentes? 2-3 power-ups?
+- Parallax? partículas com pool (~40-60)? música+SFX? screen shake?
+- Menu+pausa+game over com stats? recorde salvo? teclado+toque?
+- Texturas aplicadas conforme material? sons em todas as ações?
+- Cada nível diferente do anterior (não só velocidade)?`;
+
+  function gameLightingNote(theme) {
+    var lum = 0.2126 * parseInt(theme.background.slice(1,3),16) / 255 +
+              0.7152 * parseInt(theme.background.slice(3,5),16) / 255 +
+              0.0722 * parseInt(theme.background.slice(5,7),16) / 255;
+    if (lum < 0.2) return '\nThe game scene MUST be visibly lit. Add a subtle rim light or glow on characters and interactive elements so they stand out from the dark background.';
+    return '';
+  }
+
+  /* Palavras-chave de site/página (precedência sobre jogo). */
+  var SITE_TERMS = [
+    'site','página','pagina','landing','landpage','portfólio','portfolio','ecommerce',
+    'loja','blog','saas','dashboard','painel','admin','empresa','negócio','negocio',
+    'startup','agência','agencia','restaurante','academia','clínica','clinica',
+    'advogado','consultoria','imobiliária','imobiliaria','cardápio','cardapio',
+    'menu do site','website','web site','homepage','home page','one page','onepage',
+    'curriculum','currículo','resume','institucional','institutional'
+  ];
+
+  function isSiteCommand(cmd) {
+    if (!cmd || typeof cmd !== 'string') return false;
+    var c = cmd.toLowerCase().trim();
+    if (!c) return false;
+    for (var i = 0; i < SITE_TERMS.length; i++) {
+      if (c.indexOf(SITE_TERMS[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  var SITE_DIRECTIVE = `
+SITE/PAGE MODE — build a complete, scrollable website in ONE self-contained HTML file.
+
+STRUCTURE:
+- Split the page into clear sections (hero, features, gallery, pricing, contact, footer). Each section is its own element with a meaningful id and fills at least one viewport height when it is a hero.
+- The page MUST scroll naturally: do NOT set overflow:hidden on body or html. Only the hero is fixed-height (100dvh); the rest flows.
+- Sticky navigation bar at the top with anchor links to the sections, subtle backdrop blur, and it must not cover the content (use scroll-margin-top on sections).
+
+HERO:
+- The hero is the one place for a strong visual: headline, short subline, primary CTA and a visual. Use a 3D object (three.js) or a simulated 3D/parallax layer only if it directly supports the concept — otherwise a striking typographic hero with a refined gradient is better than a weak 3D scene.
+- The hero must fill 100dvh (use dvh, never vh alone) and be readable on any screen size.
+
+RESPONSIVENESS:
+- Mobile-first. Breakpoints at 900px and 600px. Stack columns, never let text overflow, keep tap targets at least 44px.
+- Use clamp() for hero typography so it scales without media queries.
+
+SCROLL EFFECTS (with restraint):
+- Reveal-on-scroll with IntersectionObserver: elements fade/slide in once, threshold 0.15, no re-animation.
+- Parallax on background layers only (transform: translate3d), never on text. Cap the movement.
+- One subtle ambient accent is enough (a gradient blob, a noise overlay, a grain texture). No stacked blur/glow, no particle storms across sections.
+- Respect prefers-reduced-motion: disable parallax and reveal animations.
+
+VISUAL QUALITY:
+- Consistent 8px spacing rhythm, generous white space between sections, a clear typographic scale, 12-16px radii, fine 1px borders using the accent at low alpha.
+- Real content, not lorem ipsum: write short copy that fits the product/concept in the requested language.
+- Images and icons must be inline SVG or CSS-generated (no external assets that can fail). Gradients and shapes are preferred over placeholder image boxes.
+- Footer with a closing line and unobtrusive links.
+
+DO NOT: build a single static screen with no scrolling, fake sections that lead nowhere, overflow the viewport horizontally, or use !important in CSS.`;
 
   /* Escapa texto para HTML. Equivale ao replace global do Kotlin. */
   function esc(s) {
@@ -71,13 +275,57 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
   }
 
   /* System prompt: regras + nível de detalhe + paleta exata do tema. */
-  function systemPrompt(theme, detailLevel) {
+  function systemPrompt(theme, detailLevel, command) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
+    var isSite = command && isSiteCommand(command);
+    var isGame = command && isGameCommand(command) && !isSite;
+    if (isSite) {
+      var sout = '';
+      sout += BASE_PROMPT;
+      sout += EDIT_FRIENDLY;
+      sout += SITE_DIRECTIVE;
+      sout += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
+      sout += '- background: ' + theme.background + '\n';
+      sout += '- accent (primary/highlights): ' + theme.accent + '\n';
+      sout += '- text: ' + theme.text + '\n';
+      sout += '- secondary text: ' + theme.secondary + '\n';
+      sout += '- surface (cards/panels): ' + theme.surface + '\n';
+      sout += '- surface alt: ' + theme.surfaceAlt + '\n';
+      if (theme.colors && theme.colors.length) {
+        sout += '- extra palette colors (accents, highlights and one gradient): ' + theme.colors.join(', ') + '\n';
+      }
+      sout += 'Respect the palette: use the extra colors with restraint for accents, highlights and one gradient \u2014 avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
+      return sout;
+    }
+    if (isGame) {
+      var out = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+      out += 'Rules:\n';
+      out += '- Output ONLY raw HTML. No markdown fences, no explanations.\n';
+      out += '- Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.\n';
+      out += '- For 3D use three.js: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use imports or module builds).\n';
+      out += '- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.\n';
+      out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
+      out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
+      out += GAME_DIRECTIVE;
+      out += gameLightingNote(theme);
+      out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
+      out += '- background: ' + theme.background + '\n';
+      out += '- accent (primary/highlights): ' + theme.accent + '\n';
+      out += '- text: ' + theme.text + '\n';
+      out += '- secondary text: ' + theme.secondary + '\n';
+      out += '- surface (cards/panels): ' + theme.surface + '\n';
+      out += '- surface alt: ' + theme.surfaceAlt + '\n';
+      if (theme.colors && theme.colors.length) {
+        out += '- extra palette colors (use them freely for gradients, particle colors, UI accents and lighting): ' + theme.colors.join(', ') + '\n';
+      }
+      out += 'For a game, ignore the "at most one gradient" and "avoid rainbow noise" rules \u2014 use the palette expansively across gradients, particles, lighting and UI. Respect the dark background, but the game must be vibrant.\n';
+      return out;
+    }
     var out = '';
     out += BASE_PROMPT;
     out += EDIT_FRIENDLY;
     out += detailDirective(level);
-    out += '\n\nCurrent app theme — use these exact colors as the main palette:\n';
+    out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
     out += '- background: ' + theme.background + '\n';
     out += '- accent (primary/highlights): ' + theme.accent + '\n';
     out += '- text: ' + theme.text + '\n';
@@ -87,7 +335,7 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     if (theme.colors && theme.colors.length) {
       out += '- extra palette colors (accents, highlights and at most one gradient): ' + theme.colors.join(', ') + '\n';
     }
-    out += 'Respect the palette: dark background means dark design. Use the extra colors with restraint for accents, highlights and one gradient — avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
+    out += 'Respect the palette: dark background means dark design. Use the extra colors with restraint for accents, highlights and one gradient \u2014 avoid monochrome, but also avoid rainbow noise and effect stacking.\n';
     return out;
   }
 
@@ -124,7 +372,7 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     'Rules:\n' +
     '- "find" must be copied EXACTLY (same whitespace and case) and must be unique in the document.\n' +
     '- Never return the whole document.\n' +
-    '- Up to 8 edits, only when necessary.\n' +
+    '- As many edits as needed to express the change precisely (never return the whole document).\n' +
     '- Only if the change truly cannot be expressed as find/replace, return the complete HTML document instead.\n' +
     '- Output raw JSON (or raw HTML in that fallback). No markdown fences, no explanations.';
 
@@ -186,7 +434,7 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     try { parsed = JSON.parse(chunk); } catch (e) { return { ok: false }; }
     var edits = Array.isArray(parsed) ? parsed
       : (parsed && Array.isArray(parsed.edits) ? parsed.edits : null);
-    if (!edits || !edits.length || edits.length > 32) return { ok: false };
+    if (!edits || !edits.length || edits.length > 200) return { ok: false };
 
     var out = String(doc);
     for (var i = 0; i < edits.length; i++) {
@@ -232,12 +480,31 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
       'a{color:var(--nx-accent)}';
   }
 
+  /* Polyfill de storage: no iframe sandbox (origem opaca) localStorage/sessionStorage
+     lançam SecurityError — sem isso, jogos que salvam recorde quebram na largada. */
+  var STORAGE_SAFE = '<script id="nx-safe">(function(){' +
+    'function probe(){try{window.localStorage.getItem("__nx_t");return true}catch(e){return false}}' +
+    'if(probe())return;' +
+    'function mk(){var d={};return{' +
+      'getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},' +
+      'setItem:function(k,v){d[k]=String(v)},' +
+      'removeItem:function(k){delete d[k]},' +
+      'clear:function(){d={}},' +
+      'key:function(i){return Object.keys(d)[i]||null},' +
+      'get length(){return Object.keys(d).length}' +
+    '}}' +
+    'var L=mk(),S=mk();' +
+    'try{Object.defineProperty(window,"localStorage",{value:L,configurable:true,writable:true})}catch(e){try{window.localStorage=L}catch(_){}}' +
+    'try{Object.defineProperty(window,"sessionStorage",{value:S,configurable:true,writable:true})}catch(e){try{window.sessionStorage=S}catch(_){}}' +
+    '})();<\/script>';
+
   /* Injeta viewport (se faltar) + estilo base depois de <head>. */
   function decorate(html, theme) {
     var injection = '';
     if (!VIEWPORT_REGEX.test(html)) {
       injection += '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">\n';
     }
+    injection += STORAGE_SAFE + '\n';
     injection += '<style id="nx77-base">\n' + varsCss(theme) + '\n' + baseCss() + '\n</style>';
 
     var head = HEAD_REGEX.exec(html);
@@ -260,7 +527,7 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     var accentSoft = window.Themes.hexA(theme.accent, 140);
     var accentFaint = window.Themes.hexA(theme.accent, 20);
 
-    var word = 'NEXUS-DESKTOP';
+    var word = 'NEXUS GAME';
     var letters = word.split('').map(function (ch, i) {
       return '<span style="--i:' + i + '" aria-hidden="true">' + esc(ch) + '</span>';
     }).join('');
@@ -270,7 +537,7 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>NEXUS-DESKTOP</title>
+<title>NEXUS GAME</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -307,7 +574,7 @@ body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;dis
 <body>
 <div class="stage">
   <div class="halo"></div>
-  <h1 class="title" aria-label="NEXUS-DESKTOP">${letters}</h1>
+  <h1 class="title" aria-label="NEXUS GAME">${letters}</h1>
   <div class="line"></div>
   <canvas id="pixel" class="pixel"></canvas>
 </div>
@@ -349,7 +616,7 @@ for(var i=0;i<20;i++)spawn();draw();
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NEXUS-DESKTOP</title>
+<title>NEXUS GAME</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -397,7 +664,7 @@ p{color:${secondary};font-size:13.5px;line-height:1.6;word-break:break-word}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Salvos — NEXUS-DESKTOP</title>
+<title>Salvos — NEXUS GAME</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -472,6 +739,11 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     BASE: BASE,
     BASE_PROMPT: BASE_PROMPT,
     EDIT_DIRECTIVE: EDIT_DIRECTIVE,
+    GAME_DIRECTIVE: GAME_DIRECTIVE,
+    SITE_DIRECTIVE: SITE_DIRECTIVE,
+    STORAGE_SAFE: STORAGE_SAFE,
+    isGameCommand: isGameCommand,
+    isSiteCommand: isSiteCommand,
     applyEdits: applyEdits,
     looksLikeDocument: looksLikeDocument,
     VIEWPORT_REGEX: VIEWPORT_REGEX,

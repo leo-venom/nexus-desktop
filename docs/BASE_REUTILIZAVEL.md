@@ -1,6 +1,6 @@
 # Base reutilizável — app WebView/shell + HTML gerado por IA (desktop)
 
-Receita validada no **NEXUS-DESKTOP** (port do NEXUS77). Serve para novos projetos em que
+Receita validada no **NEXUS GAME** (port do NEXUS77). Serve para novos projetos em que
 uma IA gera HTML e o app apenas exibe o resultado.
 
 ## Arquitetura

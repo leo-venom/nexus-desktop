@@ -1,4 +1,4 @@
-# Validação — NEXUS-DESKTOP
+# Validação — NEXUS GAME
 
 Registro dos testes executados em **2026-10-18** (Linux, Chromium 152 headless via
 REA/Playwright, Node 26.8.1, Python 3.14) e do shell Electron em **2026-10-19**.
@@ -28,14 +28,14 @@ REA/Playwright, Node 26.8.1, Python 3.14) e do shell Electron em **2026-10-19**.
 
 | # | Teste | Como | Resultado |
 | --- | --- | --- | --- |
-| E1 | Sintaxe do shell | `bash -n desktop/start.sh`; `node --check desktop/main.js` e `desktop/server.js`; `desktop-file-validate NEXUS-DESKTOP.desktop` | OK |
+| E1 | Sintaxe do shell | `bash -n desktop/start.sh`; `node --check desktop/main.js` e `desktop/server.js`; `desktop-file-validate NEXUS-GAME.desktop` | OK |
 | E2 | Servidor Node | `desktop/server.js`: `/` e CSS 200; `/fontes/` e `/fontes/fonts.css` 200; `/_proxy` 400 sem `url`; proxy local e `https://example.com/` 200 | OK |
 | E3 | Path traversal | `:8899`: `/..%2fserve.py` 403, `/%2e%2e/serve.py` 404, `/%2e%2e%2fserve.py` 403, `/../serve.py` 404; `/` 200 | OK (bloqueado) |
-| E4 | Launcher instalado | `gtk-launch NEXUS-DESKTOP`; `hyprctl clients`; segunda chamada | OK — `class=nexus-desktop`, `title=NEXUS-DESKTOP`; 1 janela (single-instance) |
+| E4 | Launcher instalado | `gtk-launch NEXUS GAME`; `hyprctl clients`; segunda chamada | OK — `class=nexus-game`, `title=NEXUS GAME`; 1 janela (single-instance) |
 | E5 | Janela normal e porta ocupada | janela aberta pelo launcher; 8790 ocupada por `serve.py` leftover | OK — `fullscreen=0` (janela normal); app subiu na porta seguinte |
 
 **Evidência E4/E5:** `gtk-launch` saiu com 0; `hyprctl clients` mostrou
-`class: nexus-desktop`, `fullscreen: 0` (janela normal; F11 alterna tela cheia). Os 2 processos renderer
+`class: nexus-game`, `fullscreen: 0` (janela normal; F11 alterna tela cheia). Os 2 processos renderer
 observados correspondem à página e ao iframe (`sandbox`), comportamento esperado.
 
 ## Evidências principais
@@ -68,19 +68,19 @@ mensagem real da API.
 ## Como reproduzir
 
 ```bash
-cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-desktop"
+cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game"
 
 # 1) sintaxe + utilitários
 for f in web/js/*.js; do node --check "$f"; done
 python3 -m py_compile serve.py
 bash -n abrir.sh
-desktop-file-validate NEXUS-DESKTOP.desktop
+desktop-file-validate NEXUS-GAME.desktop
 
 # 2) aplicar edições (unit)
 node /tmp/opencode/smoke-edits.js
 
 # 3) subir o app (principal: Electron; fallback: navegador)
-./desktop/start.sh       # ou duplo clique em NEXUS-DESKTOP.desktop
+./desktop/start.sh       # ou duplo clique em NEXUS-GAME.desktop
 python3 serve.py         # fallback, abra http://127.0.0.1:8790/
 
 # 4) na janela do app: ⚙ → endpoint/chave/modelo → salvar → gerar → editar algo pequeno

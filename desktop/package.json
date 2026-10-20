@@ -1,9 +1,9 @@
 {
-  "name": "nexus-desktop",
-  "productName": "NEXUS-DESKTOP",
+  "name": "nexus-game",
+  "productName": "NEXUS GAME",
   "version": "2.2.0",
   "private": true,
-  "description": "NEXUS-DESKTOP — shell local com IA que gera HTML, rodando em Chromium embutido",
+  "description": "NEXUS GAME — shell local com IA que gera HTML, rodando em Chromium embutido",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

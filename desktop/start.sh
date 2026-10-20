@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NEXUS-DESKTOP — abre o app com o Chromium embutido (Electron).
+# NEXUS GAME — abre o app com o Chromium embutido (Electron).
 set -u
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -12,4 +12,4 @@ if [ ! -x "$ELECTRON" ]; then
 fi
 
 export ELECTRON_OZONE_PLATFORM_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
-exec "$ELECTRON" "$DIR" "$@"
+exec "$ELECTRON" --disable-gpu "$DIR" "$@"

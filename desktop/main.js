@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * NEXUS-DESKTOP — shell desktop.
+ * NEXUS GAME — shell desktop.
  *
  * Abre a interface no Chromium embutido (Electron), em janela normal,
  * detectando a resolução da tela e ocupando a área útil. Servida por um
@@ -15,7 +15,7 @@ const { startServer } = require('./server');
 /* Wayland nativo quando disponível; XWayland como fallback. */
 app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 /* WM_CLASS estável para o .desktop (StartupWMClass). */
-app.commandLine.appendSwitch('class', 'NexusDesktop');
+app.commandLine.appendSwitch('class', 'NexusGame');
 
 let mainWindow = null;
 let localServer = null;
@@ -42,7 +42,7 @@ function createWindow(port) {
     height: workArea.height,
     show: false,
     backgroundColor: '#0e0f13',
-    title: 'NEXUS-DESKTOP',
+    title: 'NEXUS GAME',
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
@@ -125,7 +125,7 @@ if (!hasLock) {
   app.whenReady().then(async () => {
     try {
       localServer = await startServer(8790);
-      console.log('NEXUS-DESKTOP: http://127.0.0.1:' + localServer.port + '/');
+      console.log('NEXUS GAME: http://127.0.0.1:' + localServer.port + '/');
       createWindow(localServer.port);
     } catch (err) {
       console.error('Falha ao iniciar o servidor local:', err);

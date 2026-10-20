@@ -1,4 +1,4 @@
-# Changelog — NEXUS-DESKTOP
+# Changelog — NEXUS GAME
 
 ## Não publicado
 
@@ -6,7 +6,7 @@
 - **Shell Electron** — `desktop/main.js` + `desktop/server.js` abrem a interface em janela
   própria em janela normal (F11 alterna tela cheia, F12 DevTools), com instância única; o servidor local roda
   no mesmo processo (8790→8810 se a porta estiver ocupada) e links externos abrem em janela
-  interna. `NEXUS-DESKTOP.desktop`/`desktop/start.sh` são o caminho principal;
+  interna. `NEXUS-GAME.desktop`/`desktop/start.sh` são o caminho principal;
   `abrir.sh`/`serve.py` continuam como fallback no navegador
 - **Fontes da pasta `fontes/`** — o seletor de fonte do modo edição lista apenas as fontes
   do projeto (`fontes/*.ttf|otf|woff|woff2`); `serve.py` serve `/fontes/` (JSON + arquivos)
@@ -92,7 +92,7 @@ Modo de edição visual de elementos: clicar na página gerada e ajustar na mão
 - **Preview de tema por hover**: passar o mouse no ⚙ troca o shell ao vivo, mouseleave restaura
 - **Auto-focus no iframe**: teclado funciona sem precisar clicar na página (WASD, setas, espaço)
 - **Auto-redirect file:// → http**: abre automaticamente pelo servidor local se estiver rodando
-- **Atalho Super+N**: tecla de atalho no Hyprland para abrir o NEXUS-DESKTOP
+- **Atalho Super+N**: tecla de atalho no Hyprland para abrir o NEXUS GAME
 - **Sandbox do iframe**: `allow-pointer-lock`, `allow-popups`, `keyboard-lock`, `autoplay` — jogos 3D funcionam
 
 ### Alterado
@@ -101,7 +101,7 @@ Modo de edição visual de elementos: clicar na página gerada e ajustar na mão
 - **Texto mínimo no prompt**: "titles only, no paragraphs, graphics over words"
 - **VU meter**: 10 barras/2 ondas → 5 barras largas/5 ondas senoidais sobrepostas, degradê 3 stops, brilho extra
 - **Botões (reset, gear, SALVAR/ABRIR)**: borda, hover scale, transição suave
-- **Pasta renomeada**: `mexus-desktop/` → `nexus-desktop/`
+- **Pasta renomeada**: `mexus-desktop/` → `nexus-game/`
 
 ### Corrigido
 - **Travamento em edição**: `editCount` não declarada → `ReferenceError` → "gerando…" infinito
@@ -114,7 +114,7 @@ Modo de edição visual de elementos: clicar na página gerada e ajustar na mão
 
 - **Tela de apresentação redesenhada**: removidos o cubo 3D girando, o texto de apoio,
   o aviso de chave e os chips de sugestão.
-- Título **NEXUS-DESKTOP** grande com animação elaborada: entrada letra a letra
+- Título **NEXUS GAME** grande com animação elaborada: entrada letra a letra
   (elevação + desfoque), gradiente com brilho em movimento (shimmer), halo pulsante e
   linha expansível; respeita `prefers-reduced-motion`.
 - O aviso de API key continua no status da barra superior.
@@ -124,11 +124,11 @@ Modo de edição visual de elementos: clicar na página gerada e ajustar na mão
 
 ### Alterado (textos)
 
-- Marca exibida trocada de **MEXUS-DESKTOP** para **NEXUS-DESKTOP**: título da janela,
+- Marca exibida trocada de **MEXUS-DESKTOP** para **NEXUS GAME**: título da janela,
   header, welcome, títulos das páginas (erro/lista), `BASE_PROMPT`, banner do `serve.py`,
   mensagens de erro e log do console.
-- Atalho renomeado para `NEXUS-DESKTOP.desktop` (a pasta do projeto continua
-  `nexus-desktop/`).
+- Atalho renomeado para `NEXUS-GAME.desktop` (a pasta do projeto continua
+  `nexus-game/`).
 - `AiClient.VERSION` → `1.2.4`.
 
 ## 1.2.3 — 2026-10-18
@@ -196,11 +196,11 @@ Modo de edição visual de elementos: clicar na página gerada e ajustar na mão
 - **Cache de JS**: `serve.py` envia `Cache-Control: no-store`; um reload sempre pega o
   código atualizado (antes o navegador reutilizava o `ai-client.js` antigo).
 - **`file://`**: mensagem explícita ("file:// bloqueia chamadas à API (CORS) — abra pelo
-  atalho NEXUS-DESKTOP") em vez do genérico "Failed to fetch".
+  atalho NEXUS GAME") em vez do genérico "Failed to fetch".
 
 ### Adicionado
 
-- `abrir.sh` + `NEXUS-DESKTOP.desktop`: atalho de duplo clique que sobe o proxy
+- `abrir.sh` + `NEXUS-GAME.desktop`: atalho de duplo clique que sobe o proxy
   invisivelmente e abre o navegador.
 - `AiClient.VERSION` (`1.1.0`), exibida no rodapé do ⚙ e no console — confirma qual
   código o navegador carregou.

@@ -17,7 +17,7 @@
   var generating = false;
   var showingList = false;
   var editCount = 0;        // patches consecutivos na mesma página
-  var MAX_EDITS = 5;        // força regeneração completa após N patches
+  var MAX_EDITS = 0;        // 0 = sem limite (nunca força regeneração por contagem)
 
   var liveActive = false;
   var liveIn = 0;
@@ -395,8 +395,28 @@
   }
 
   /* Decora com o tema atual; se a página já tem o bloco base, só troca. */
+  /* Injeta o polyfill de storage se o documento ainda não o tem. */
+  function ensureSafeStorage(html) {
+    if (!html || html.indexOf('id="nx-safe"') >= 0) return html;
+    var safe = window.Html.STORAGE_SAFE || '';
+    if (!safe) return html;
+    var head = /<head[^>]*>/i.exec(html);
+    if (head) {
+      var at = head.index + head[0].length;
+      return html.slice(0, at) + '\n' + safe + html.slice(at);
+    }
+    var tag = /<html[^>]*>/i.exec(html);
+    if (tag) {
+      var at2 = tag.index + tag[0].length;
+      return html.slice(0, at2) + '\n<head>\n' + safe + '\n</head>' + html.slice(at2);
+    }
+    return html;
+  }
+
   function themed(html) {
     if (!html) return html;
+    /* Garante o polyfill de storage mesmo em HTML antigo/re-renderizado. */
+    html = ensureSafeStorage(html);
     var marker = '<style id="nx77-base">';
     var idx = html.indexOf(marker);
     if (idx >= 0) {
@@ -483,7 +503,7 @@
     input.blur();
 
     var editing = lastRendered != null;
-    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel());
+    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt);
     var elementHint = '';
     if (editSelHtml) {
       elementHint = '\n\nTarget element (user clicked this to edit):\n```html\n' + editSelHtml + '\n```\nFocus ONLY on this element. Change what was asked, keep the rest intact.';
@@ -494,7 +514,7 @@
     var userFresh = userBase;  // fallback: só o comando, sem página atual
 
     /* Força regeneração completa a cada MAX_EDITS patches para evitar degradação */
-    var editOverLimit = editing && editCount >= MAX_EDITS;
+    var editOverLimit = MAX_EDITS > 0 && editing && editCount >= MAX_EDITS;
     if (editOverLimit) {
       toast('Regenerando página completa — ' + editCount + ' patches atingido');
       editCount = 0;
@@ -538,6 +558,8 @@
       }
       editCount = 0;
       return { result: result, doc: window.Html.extractDocument(result.content) };
+    }).then(function (out) {
+      return completarSeTruncado(out.result, out.doc).then(function (d) { out.doc = d; return out; });
     }).then(function (out) {
       var result = out.result;
       var doc = out.doc;
@@ -1249,6 +1271,36 @@
     status('✔ Edições salvas na página', 'accent', true);
   }
 
+  /* Se o provedor cortar a resposta (finish_reason=length ou HTML sem </html>),
+     pede a continuação e emenda — sem isso o jogo chega incompleto e a tela fica preta. */
+  function completarSeTruncado(res, doc) {
+    var texto = String(res && res.content ? res.content : doc || '');
+    var cortou = (res && res.finishReason === 'length');
+    var fechado = /<\/html>\s*$/i.test(String(doc || '').trim());
+    if (!cortou && fechado) return Promise.resolve(doc);
+    status('⚠️ resposta truncada — completando…', 'accent', false);
+    var cauda = texto.slice(-6000);
+    return window.AiClient.chat(
+      prefs.endpoint(), prefs.apiKey(), prefs.model(),
+      prefs.temperature(), prefs.maxTokens(),
+      'You are CONTINUING an HTML document that was cut off mid-way. Output ONLY the remaining raw HTML, starting exactly at the cut point, until the document is properly closed (</body></html>). Never repeat what was already sent, never explain, no markdown fences.',
+      'The document was cut here. Continue from the exact next character:\n```html\n' + cauda + '\n```'
+    ).then(function (r2) {
+      var resto = String(r2.content || '');
+      var low = resto.toLowerCase();
+      var j = low.indexOf('<!doctype');
+      var k = low.indexOf('<html');
+      var cortes = [j, k].filter(function (v) { return v >= 0; });
+      if (cortes.length) resto = resto.slice(Math.min.apply(null, cortes));
+      resto = resto.replace(/^\s*```html\s*/i, '').replace(/```\s*$/,'');
+      /* Sem whitespace à esquerda: evita quebrar uma tag partida ao meio. */
+      resto = resto.replace(/^\s+/, '');
+      /* Concatena SEM inserir nada: o corte pode ter sido no meio de uma tag
+         (ex.: "</scr" + "ipt>") e qualquer whitespace extra quebraria o HTML. */
+      return String(doc || '') + resto;
+    }).catch(function () { return doc; });
+  }
+
   function tryPostMessage(data) {
     try {
       if (frame && frame.contentWindow) {
@@ -1408,7 +1460,7 @@
     showWelcome();
 
     if (window.console) {
-      console.log('NEXUS-DESKTOP · ai-client v' + (window.AiClient ? window.AiClient.VERSION : '?') +
+      console.log('NEXUS GAME · ai-client v' + (window.AiClient ? window.AiClient.VERSION : '?') +
         ' · origem ' + location.origin);
     }
 
@@ -1424,7 +1476,7 @@
         }
       };
       x.onerror = x.ontimeout = function () {
-        toast('Sirva por http://127.0.0.1:8790 — abra pelo atalho NEXUS-DESKTOP');
+        toast('Sirva por http://127.0.0.1:8790 — abra pelo atalho NEXUS GAME');
       };
       try { x.send(); } catch (e) { /* ignora */ }
     }

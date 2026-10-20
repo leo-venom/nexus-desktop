@@ -77,7 +77,7 @@
     if (!proxied) {
       return attempt(url).catch(function (e) {
         if (isNetworkFailure(e)) {
-          throw new AiException('file:// bloqueia chamadas à API (CORS) — abra pelo atalho NEXUS-DESKTOP (abrir.sh)');
+          throw new AiException('file:// bloqueia chamadas à API (CORS) — abra pelo atalho NEXUS GAME (abrir.sh)');
         }
         throw e;
       });
@@ -185,6 +185,7 @@
       var pending = '';
       var contentBytes = 0;
       var sawSse = false;
+      var finishReason = '';
 
       function handleLine(line) {
         raw += line + '\n';
@@ -198,6 +199,11 @@
           contentBytes += byteLen(piece);
           if (onProgress) onProgress(contentBytes);
         }
+        try {
+          var pj = JSON.parse(payload);
+          var ch0 = pj && pj.choices && pj.choices[0];
+          if (ch0 && ch0.finish_reason) finishReason = String(ch0.finish_reason);
+        } catch (e) {}
       }
 
       function pump() {
@@ -293,7 +299,8 @@
     if (!sawSse) return parseNonStream(raw);
     if (total <= 0) total = prompt + completion;
     if (!content.trim()) throw new AiException('resposta vazia do modelo');
-    return { content: content, promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    return { content: content, promptTokens: prompt, completionTokens: completion, totalTokens: total,
+             finishReason: finishReason || '' };
   }
 
   /* Resposta não-streaming (um único JSON). */
@@ -313,7 +320,9 @@
     var completion = optInt(usage, 'completion_tokens', 0);
     var total = optInt(usage, 'total_tokens', 0);
     if (total <= 0) total = prompt + completion;
-    return { content: content, promptTokens: prompt, completionTokens: completion, totalTokens: total };
+    var fr = (choices[0] && choices[0].finish_reason) ? String(choices[0].finish_reason) : '';
+    return { content: content, promptTokens: prompt, completionTokens: completion, totalTokens: total,
+             finishReason: fr };
   }
 
   /* Envia system+user; devolve Promise<ChatResult>. */

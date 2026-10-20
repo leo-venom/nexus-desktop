@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * NEXUS-DESKTOP — servidor local embutido no app desktop.
+ * NEXUS GAME — servidor local embutido no app desktop.
  *
  * Replica o comportamento do serve.py:
  *   - estático em web/ (sem cache)
@@ -300,7 +300,7 @@ module.exports = { startServer };
 if (require.main === module) {
   const port = Number(process.argv[2]) || 8790;
   startServer(port).then(({ port: actual }) => {
-    console.log('NEXUS-DESKTOP server: http://127.0.0.1:' + actual + '/');
+    console.log('NEXUS GAME server: http://127.0.0.1:' + actual + '/');
   }).catch((err) => {
     console.error(err);
     process.exit(1);

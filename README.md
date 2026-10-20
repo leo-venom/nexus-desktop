@@ -1,4 +1,4 @@
-# NEXUS-DESKTOP
+# NEXUS GAME
 
 Port desktop do **NEXUS77** (Android/Kotlin): shell + chat de IA que gera HTML vivo.
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
@@ -6,14 +6,14 @@ o Chromium embutido preserva File System Access, iframe e renderização.
 
 ## Abrir
 
-**Duplo clique em `NEXUS-DESKTOP.desktop`**. O atalho executa `desktop/start.sh`, que sobe
+**Duplo clique em `NEXUS-GAME.desktop`**. O atalho executa `desktop/start.sh`, que sobe
 o servidor local (Node) e abre a janela Electron em
 <http://127.0.0.1:8790/>. Se a porta estiver ocupada, tenta 8791…8810.
 
 Na primeira vez em uma cópia nova do projeto, instale o Electron (uma vez, ~300 MB):
 
 ```bash
-cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-desktop"
+cd "/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game"
 npm --prefix desktop install
 ```
 
@@ -69,8 +69,8 @@ janela carregou o código atual.
 ## Estrutura
 
 ```text
-nexus-desktop/
-├── NEXUS-DESKTOP.desktop    # atalho: app Electron (janela normal)
+nexus-game/
+├── NEXUS-GAME.desktop    # atalho: app Electron (janela normal)
 ├── desktop/                 # shell Electron
 │   ├── main.js              # janela na área útil detectada, single-instance, F11/F12, popups
 │   ├── server.js            # servidor local + proxy /_proxy + /fontes/

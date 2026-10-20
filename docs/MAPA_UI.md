@@ -1,4 +1,4 @@
-# Mapa da UI — NEXUS-DESKTOP
+# Mapa da UI — NEXUS GAME
 
 Todo elemento de tela com `arquivo:linha` + âncora e o código que o controla.
 Consulte antes de mexer em qualquer UI. Linhas conferidas no working tree pós-2.2.0 (out/2026).
@@ -7,7 +7,7 @@ Consulte antes de mexer em qualquer UI. Linhas conferidas no working tree pós-2
 
 | Elemento | Local | Âncora | Comportamento |
 | --- | --- | --- | --- |
-| Marca "NEXUS-DESKTOP" | `web/index.html:13` | `#brand` | cor via `--nx-accent` (`app.js:54 applyTheme`) |
+| Marca "NEXUS GAME" | `web/index.html:13` | `#brand` | cor via `--nx-accent` (`app.js:54 applyTheme`) |
 | Dot da sessão | `web/index.html:14` | `#dot` | `app.js:79 updateSessionUi` (accent/erro) |
 | Modelo em uso | `web/index.html:15` | `#model` | `app.js:79 updateSessionUi` ("sem API key" sem chave) |
 | Barra de tokens | `web/index.html:16` | `#tfill` | `app.js:79 updateSessionUi` (usado/1M) |

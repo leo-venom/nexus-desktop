@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NEXUS-DESKTOP — servidor local.
+NEXUS GAME — servidor local.
 
 Serve `web/` e faz proxy de APIs compatíveis com OpenAI em `/_proxy?url=...`
 (o navegador fala com 127.0.0.1:8790, então não há CORS).
@@ -178,7 +178,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print("NEXUS-DESKTOP em http://127.0.0.1:%d/  (proxy: /_proxy)" % PORT)
+    print("NEXUS GAME em http://127.0.0.1:%d/  (proxy: /_proxy)" % PORT)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
