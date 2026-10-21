@@ -1,8 +1,8 @@
 # ESTADO ATUAL — NEXUS GAME
 
-**Versão:** 2.9.2 · **HEAD:** `981f5b4` · **Atualizado:** 2026-10-20
+**Versão:** 2.9.2 · **HEAD:** `7937076` · **Atualizado:** 2026-10-20
 **Local:** `/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/`
-**Repositório:** `github.com/leo-venom/nexus-game`
+**Repositório:** `github.com/leo-venom/nexus-desktop`
 
 ---
 

@@ -36,7 +36,7 @@
 ### Documentação
 - `README.md` — versão 2.9.2, 30 temas (20 escuros + 10 claros), `## Recursos` duplicado
   renomeado para `## Interface e sessão`, nota de segurança do proxy, status atualizado.
-- `docs/ESTADO_ATUAL.md` — HEAD `981f5b4`, `app.js` 1601 linhas, `ai-client.js` 464 linhas,
+- `docs/ESTADO_ATUAL.md` — HEAD `7937076`, `app.js` 1610 linhas, `ai-client.js` 464 linhas,
   tabela de proteções com as três falhas acima e o proxy.
 
 ## v2.9.1 — 2026-10-20
