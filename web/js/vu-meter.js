@@ -24,6 +24,7 @@
     var ctx = canvas.getContext('2d');
     var strong = '#00E5FF';
     var dim = '#00E5FF33';
+    var mid = '';
     var trackColor = '#FFFFFF1A';
     var raf = null;
     var startedAt = 0;
@@ -77,11 +78,16 @@
         var barH = h * level;
         var top = h - barH;
 
-        // degradê mais dramático: base translúcida → meio brilho → topo puro
+        // degradê em 3 tons do tema: base → meio (rosa) → topo (azul)
         var grad = ctx.createLinearGradient(left, h, left, top);
         grad.addColorStop(0, dim);
-        grad.addColorStop(0.5, window.Themes.hexA(strong.slice(0, 7), 140));
-        grad.addColorStop(1, strong);
+        if (mid) {
+          grad.addColorStop(0.55, window.Themes.hexA(mid.slice(0, 7), 200));
+          grad.addColorStop(1, strong);
+        } else {
+          grad.addColorStop(0.5, window.Themes.hexA(strong.slice(0, 7), 140));
+          grad.addColorStop(1, strong);
+        }
         ctx.fillStyle = grad;
         roundRect(ctx, left, top, barW, barH, radius);
         ctx.fill();
@@ -126,15 +132,19 @@
       canvas.hidden = true;
     }
 
-    function setColors(strongColor, dimColor, trackCol) {
+    function setColors(strongColor, dimColor, trackCol, midColor) {
       strong = strongColor;
       dim = dimColor;
+      mid = midColor || '';
       trackColor = trackCol;
       if (!running) { resize(); draw(0); }
     }
 
+    /* Tema único BLACK CYBER: base esmeralda → meio rosa → topo azul. */
     function setTheme(theme) {
-      setColors(theme.accent, window.Themes.hexA(theme.accent, 51), '#FFFFFF1A');
+      var c = (theme && theme.colors && theme.colors.length >= 3) ? theme.colors : null;
+      if (c) setColors(c[2], window.Themes.hexA(theme.accent, 51), '#FFFFFF1A', c[1]);
+      else setColors(theme.accent, window.Themes.hexA(theme.accent, 51), '#FFFFFF1A');
     }
 
     if (typeof ResizeObserver !== 'undefined') {

@@ -1,5 +1,172 @@
 # Changelog — NEXUS GAME
 
+## v2.13.0 — 2026-10-21
+
+### Corrigido (Electron — desempenho)
+- **`--disable-gpu` no `desktop/start.sh` matava o WebGL.** Medido com um probe no
+  próprio Electron: com `--disable-gpu` o `getContext('webgl')` devolve **null**
+  ("sem webgl") — qualquer cena three.js/jogo 3D do app desktop não renderiza.
+  Com a GPU ligada (mesmo hardware, iGPU Intel HD 2500 / Ivy Bridge):
+  `ANGLE (Intel, Mesa Intel HD Graphics 2500 (IVB GT1), OpenGL ES 3.0)`,
+  800×600 a **60,8 fps**.
+- **Flags novas em `desktop/start.sh`:** `--enable-gpu-rasterization`,
+  `--enable-zero-copy`, `--ignore-gpu-blocklist`, `--use-angle=gl`,
+  `--disable-vulkan`, `--disable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan`,
+  `--disable-renderer-backgrounding`, `--disable-background-timer-throttling`.
+  Vulkan sai porque este hardware é Ivy Bridge ("Vulkan support is incomplete",
+  "'--ozone-platform=wayland' is not compatible with Vulkan"); VAAPI/iHD também
+  falha aqui (`libva iHD_drv_video.so init failed`) e foi removido.
+- **`desktop/main.js`:** mesmas flags de GPU via `app.commandLine`; janela criada
+  **sem bounds** + `maximize()` no `ready-to-show` (no Wayland `setBounds` é
+  ignorado). Removidos `targetDisplay()`/`fitToDisplay()` e os listeners de `screen`.
+
+### Corrigido (three.js)
+- **`THREE.OrbitControls`, `GLTFLoader` e `EffectComposer` NÃO existem no build
+  local** (`vendor/three/three.min.js`, UMD r160 — verificado: `THREE.REVISION`
+  = "160", `typeof THREE.OrbitControls === 'undefined'`). O prompt mandava usar
+  OrbitControls em vários lugares → cena 3D quebrava. Agora o prompt usa o caminho
+  local `vendor/three/three.min.js`, avisa que não há addons e exige órbita manual
+  por drag. Probe dentro de um iframe `sandbox="allow-scripts"`: WebGL 2.0 ativo e
+  pixel central do cubo renderizado `[10,159,94,255]`.
+
+### Adicionado
+- **FPS AUTO (regra no prompt):** o jogo mede fps em janelas de 1 s e, abaixo de
+  50 fps por 2 janelas, reduz sozinho (pixelRatio 1, metade das partículas, sem
+  sombras/glow); volta ao normal acima de 58 fps. Silencioso, sem UI.
+
+### Alterado
+- **HUD de jogo em BOLHAS nas laterais:** cada informação em pílula arredondada,
+  vidro semi-transparente, borda na cor de destaque, **largura máx. 100px**, 10px de
+  margem, coluna à esquerda/direita. Nada no centro; proibida faixa/painel largo.
+- **SEM BORDAS:** canvas de borda a borda (100vw×100dvh), proibida moldura, card,
+  vinheta, cabeçalho ou margem em volta do jogo.
+- **SÓ O QUE FOI PEDIDO (jogo e desenho):** proibido inventar seções, telas, cards,
+  créditos, títulos, rótulos, HUD decorativo ou camadas extras; enriquecer DENTRO do
+  objeto/jogo, nunca ao redor.
+
+## v2.12.0 — 2026-10-21
+
+### Corrigido
+- **"O objeto não aparece" (cubo 3D, peça do Tetris) — causa raiz: documento
+  fechado com JS pela metade.** Quando o provedor cortava a resposta, a continuação
+  devolvia só `</script></body></html>`; o teste de fim olhava apenas `</html>` e dava
+  a página por completa. O `<script>` ficava sem fechar → `SyntaxError: Unexpected end
+  of input` → **nada executa** e a tela fica sem objeto. Verificado com um Tetris real
+  (25,6 KB, `finish=stop`, `</html>` presente, JS inválido).
+  - `completarSeTruncado()` só considera o documento fechado se `<script>` e
+    `</script>` estiverem balanceados.
+  - Novo `Html.jsSyntaxErrors(html)`: compila cada `<script>` inline com
+    `new Function()` (não executa) e devolve os erros; ignora `src` e `type=module`.
+  - Novo passo `repararJsQuebrado()` no `sendPrompt()`: com erro de sintaxe, reenvia o
+    documento + a mensagem do erro e pede o HTML completo corrigido (máx. 2 rodadas).
+- **Erro dentro do `requestAnimationFrame` era engolido pelo shim** (`try{cb(t)}catch(e){}`).
+  Agora é reportado como `raf` e entra no próximo prompt — antes o loop morria em silêncio.
+- **Watchdog de canvas no shim:** aos 4 s verifica canvas 0x0 e canvas 2D totalmente
+  transparente, reportando `blank` (o objeto não apareceu).
+- **Polyfill `nx-safe` era injetado duas vezes** (`ensureSafeStorage()` + `decorate()`);
+  agora `decorate()` só injeta se ainda não existir.
+
+### Alterado
+- **Jogos sem tela de apresentação / botão iniciar.** Nova regra `INÍCIO IMEDIATO`
+  no `GAME_DIRECTIVE`: proibido splash, título, menu inicial, "Iniciar/Jogar/Play";
+  proibido gate (`started`, clique, IntersectionObserver, `visibilityState`,
+  `requestIdleCallback`, espera de fontes/imagens); primeiro render síncrono antes do
+  rAF; pausa só sob pedido; restart no game over por clique/tecla.
+- **Desenhos também ganharam `PRIMEIRO FRAME — REGRA ABSOLUTA`**: objeto visível sem
+  interação, render síncrono antes do loop, sem gate de início.
+
+## v2.11.0 — 2026-10-21
+
+### Removido
+- **Seletor de temas (30 temas) eliminado.** O modal de configurações agora tem só
+  **API** e **GERAÇÃO** — a seção TEMA, os radios ESCUROS/CLAROS e o preview por
+  hover saíram. `prefs.themeIndex()` sempre devolve `0` e `Themes.ALL` tem 1 item.
+- **A paleta do app não vai mais para o prompt.** O bloco "Current app theme — use
+  these exact colors" e as diretivas "use TODAS as cores do tema" foram removidos:
+  jogos, desenhos e objetos escolhem a **própria paleta** (coerente com o pedido) ou
+  seguem as cores que o usuário pedir explicitamente.
+
+### Alterado
+- **Prévia ao vivo durante a geração (latência percebida).** Antes o iframe só mostrava
+  algo quando o modelo terminava (40-50 s de "gerando…" sem imagem). Agora o
+  `AiClient.postStream` acumula os deltas e chama `onProgress(bytes, texto)`; o shell
+  fecha as tags abertas (`</script>`, `</style>`, `</body>`, `</html>`) e renderiza o
+  documento parcial a cada ~1,2 s a partir de 1,2 KB, sem roubar foco. Selo
+  **⚡ prévia ao vivo** no canto do palco; o render final substitui a prévia e esconde o
+  selo. Ajustes de página (`EDITAR`) não usam prévia.
+- **Erro de UI não derruba mais o stream.** `onProgress` roda dentro de `try/catch` no
+  cliente: um bug na prévia matava a leitura do SSE e aparecia como falha de rede.
+- **`isNetworkFailure()` só considera `TypeError`.** Antes qualquer erro que não fosse
+  `AiException` era rotulado "falha de rede/CORS — rode serve.py" — um `ReferenceError`
+  de JS virava diagnóstico falso. Agora o erro real sobe para a UI.
+- **Tema único `PADRÃO · BLACK CYBER`** — base `#000000`, superfícies `#06100C` /
+  `#0B1A14`, accent **verde esmeralda `#00E88A`**, detalhes **rosa `#FF2D95`** e
+  **azul `#00A3FF`**, texto `#E6F5EE`, secundário `#7FA894`.
+  Contraste AA/AAA verificado: accent/bg 12.9:1 · texto/bg 18.7:1 · secundário/bg
+  7.9:1 · onAccent 11.9:1.
+- Brand do header (`.brand`) virou degradê esmeralda→rosa→azul (`--nx-c2`/`--nx-c3`),
+  o título da tela de boas-vindas colore letra a letra nas três cores e a linha
+  abaixo do título usa o mesmo degradê. VU meter passou a usar 3 tons
+  (base esmeralda → meio rosa → topo azul).
+
+## v2.10.0 — 2026-10-21
+
+### Adicionado
+- **3 modos de geração automática:** o app detecta inteligentemente se o comando
+  é **jogo** (GAME), **desenho/objeto/arte** (DRAWING) ou **chat/conversa** (CHAT)
+  e aplica a diretriz correta automaticamente.
+- **Modo Desenho/Objeto (`DRAWING_DIRECTIVE`):** ativado por ~120 termos
+  (desenho, ilustração, logo, infográfico, objeto 3D, paisagem, escultura,
+  poster, data viz, tipografia, animação visual, simulação física...).
+  Mesmo nível de qualidade e detalhe do modo jogo: exige acabamento em cada
+  forma (gradientes, contornos, highlight/sombra em shape, iluminação 3D),
+  composição equilibrada, paleta expansiva do tema — porém **leve e rápido**:
+  sem blur em tela cheia, sem trabalho caro por frame, desenho estático
+  desenhado uma vez. Exemplos de referência incluídos na diretriz para guiar a IA.
+- **Modo Chat (`CHAT_DIRECTIVE`):** ativado para saudações, perguntas curtas
+  e comandos que não são jogo nem desenho. Responde com HTML bonito:
+  cards centralizados, tipografia refinada com cores do tema, animações de
+  entrada sutis, microinterações hover. Nunca texto puro sem estilo.
+- **`detectMode(command)`** — função de detecção automática com precedência
+  game > drawing > chat. Commandos muito curtos (≤3 palavras) sem termos
+  de jogo/desenho viram chat.
+- **`drawingScopeNote()`** e **`chatScopeNote()`** — notas de escopo para
+  cada modo.
+- **`isDrawingCommand()`** e **`isChatCommand()`** — predicated exports.
+- **~120 termos de desenho** e ~40 termos de chat no `html-builder.js`.
+
+### Alterado
+- `systemPrompt()` agora usa `detectMode(command)` para escolher entre
+  GAME_DIRECTIVE, DRAWING_DIRECTIVE ou CHAT_DIRECTIVE automaticamente.
+- `BASE_PROMPT` atualizado para "CREATIVE generator" em vez de "GAME generator".
+- Texto da interface "NEXUS GAME" mantido (marca); os modos são transparentes
+  para o usuário — o prompt é apenas digitado e a IA decide o formato.
+- Prompt de 3D (three.js CDN) só é injetado nos modos game e drawing.
+- `mediaBlock` (imagens/sons do projeto) só entra no modo game.
+- `gameLightingNote` só entra nos modos game e drawing.
+- Interface HEADER mantida (o prompt placeholder ganhou exemplos mais amplos:
+  "jogo de nave", "desenhe um castelo", "oi").
+
+### Corrigido
+- **Textura procedural só entra quando o pedido pede material/textura.** O bloco
+  `@@NX_TEX_BEGIN@@…@@NX_TEX_END@@` do `DRAWING_DIRECTIVE`/`GAME_DIRECTIVE` é
+  removido de quem não pediu; no lugar entra `DRAWING_TEX_OFF_DIRECTIVE` /
+  `TEXTURE_OFF_DIRECTIVE` ("não use NxTex/createPattern/CanvasTexture; resolva com
+  cor + gradiente"). `wantsTextures()` reconhece material explícito (metal, madeira,
+  tijolo, lava…) e trata "sem textura / tira a textura" como negação. Página atual
+  que já tem textura mantém textura no ajuste.
+- **Marcador `@@NX_TEX_BEGIN@@` vazava no prompt do modo desenho.** O código
+  injetava um segundo marcador antes do PACK, e o split pegava o primeiro — o
+  literal `@@NX_TEX_BEGIN@@` aparecia para o modelo. Removida a injeção (os
+  marcadores já existem no texto da diretriz).
+- **Desenho/objeto deixou de exigir custo caro.** `ctx.shadowBlur`, `ctx.filter`,
+  `globalCompositeOperation` por forma e blur em tela cheia estavam sendo
+  *mandados* como padrão de acabamento (blur em software = frame lento). Agora a
+  regra é **LEVE E RÁPIDO**: acabamento por gradiente 2-4 stops + stroke +
+  highlight/sombra em shape deslocado, camadas caras pré-renderizadas em offscreen,
+  desenho estático desenhado UMA vez (sem rAF rodando) e meta de 60 fps em máquina
+  modesta. `drawingScopeNote()` acompanha.
+
 ## v2.9.3 — 2026-10-20
 
 ### Corrigido

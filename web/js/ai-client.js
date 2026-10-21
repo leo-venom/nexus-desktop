@@ -56,9 +56,13 @@
     return new AiException(phase === 'connect' ? 'timeout de conexão' : 'timeout de leitura');
   }
 
-  /* Erro de rede/CORS: fetch rejeitou com TypeError (não é AiException). */
+  /* Erro de rede/CORS: o fetch rejeita com TypeError. Qualquer outro erro de JS
+     (ReferenceError, SyntaxError, bug de UI…) NÃO é rede e deve subir com a
+     mensagem real — mascarar isso fazia um bug de código virar "rode serve.py". */
   function isNetworkFailure(e) {
-    return !(e instanceof AiException);
+    if (e instanceof AiException) return false;
+    var name = e && e.name ? String(e.name) : '';
+    return name === 'TypeError';
   }
 
   function isMissingProxy(e) {
@@ -190,7 +194,7 @@
       function finish(text, sawSse) {
         clearTimeout(timer);
         var t = checkText({ status: status, ok: ok, text: text });
-        if (!sawSse && onProgress) onProgress(byteLen(t));
+        if (!sawSse && onProgress) { try { onProgress(byteLen(t)); } catch (e) {} }
         return t;
       }
 
@@ -204,6 +208,7 @@
       var raw = '';
       var pending = '';
       var contentBytes = 0;
+      var acc = '';              /* texto acumulado (deltas) — usado para a prévia ao vivo */
       var sawSse = false;
       var finishReason = '';
 
@@ -217,7 +222,9 @@
         var piece = deltaPiece(payload);
         if (piece) {
           contentBytes += byteLen(piece);
-          if (onProgress) onProgress(contentBytes);
+          acc += piece;
+          /* Nunca deixe um erro de UI (progresso/prévia) derrubar o stream. */
+          if (onProgress) { try { onProgress(contentBytes, acc); } catch (e) {} }
         }
         try {
           var pj = JSON.parse(payload);
@@ -447,7 +454,7 @@
   }
 
   window.AiClient = {
-    VERSION: '2.9.2',
+    VERSION: '2.13.0',
     cancel: cancel,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
     CHAT_READ_TIMEOUT_MS: CHAT_READ_TIMEOUT_MS,

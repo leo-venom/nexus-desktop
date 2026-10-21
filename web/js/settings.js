@@ -1,7 +1,8 @@
 /* ============================================================
  * settings.js — port de SettingsActivity.kt para um modal.
- * Seções: API (endpoint/chave), GERAÇÃO (modelo, temperatura,
- * detalhe, max tokens) e TEMA (grupos ESCUROS/CLAROS).
+ * Seções: API (endpoint/chave) e GERAÇÃO (modelo, temperatura,
+ * max tokens). O seletor de TEMAS foi removido: o app usa um
+ * tema único padrão.
  * ============================================================ */
 (function () {
   'use strict';
@@ -105,61 +106,6 @@
     tokens.input.step = '1';
     card.appendChild(tokens.wrap);
 
-    /* ---------- TEMA ---------- */
-    card.appendChild(el('div', 'mx-sec', 'TEMA'));
-    var themeInputs = [];
-    function addThemeGroup(label, entries) {
-      if (!entries.length) return;
-      card.appendChild(el('div', 'mx-sec mx-sec-sub', label));
-      entries.forEach(function (entry) {
-        var lab = el('label', 'mx-radio');
-        var r = el('input');
-        r.type = 'radio';
-        r.name = 'mx-theme';
-        r.value = String(entry.index);
-        r.checked = entry.index === prefs.themeIndex();
-        themeInputs.push(r);
-        lab.appendChild(r);
-        lab.appendChild(document.createTextNode(' ' + entry.theme.name));
-        card.appendChild(lab);
-
-        /* Preview ao passar o mouse */
-        (function (idx) {
-          lab.addEventListener('mouseenter', function () {
-            var t = window.Themes.of(idx);
-            var s = document.documentElement.style;
-            s.setProperty('--nx-bg', t.background);
-            s.setProperty('--nx-surface', t.surface);
-            s.setProperty('--nx-surface-alt', t.surfaceAlt);
-            s.setProperty('--nx-accent', t.accent);
-            s.setProperty('--nx-accent-soft', window.Themes.hexA(t.accent, 140));
-            s.setProperty('--nx-accent-faint', window.Themes.hexA(t.accent, 20));
-            s.setProperty('--nx-text', t.text);
-            s.setProperty('--nx-secondary', t.secondary);
-            s.setProperty('--nx-on-accent', t.onAccent);
-            s.setProperty('--mx-error', t.isDark ? '#FF5C5C' : '#D32F2F');
-          });
-          lab.addEventListener('mouseleave', function () {
-            var cur = window.Themes.of(prefs.themeIndex());
-            var s = document.documentElement.style;
-            s.setProperty('--nx-bg', cur.background);
-            s.setProperty('--nx-surface', cur.surface);
-            s.setProperty('--nx-surface-alt', cur.surfaceAlt);
-            s.setProperty('--nx-accent', cur.accent);
-            s.setProperty('--nx-accent-soft', window.Themes.hexA(cur.accent, 140));
-            s.setProperty('--nx-accent-faint', window.Themes.hexA(cur.accent, 20));
-            s.setProperty('--nx-text', cur.text);
-            s.setProperty('--nx-secondary', cur.secondary);
-            s.setProperty('--nx-on-accent', cur.onAccent);
-            s.setProperty('--mx-error', cur.isDark ? '#FF5C5C' : '#D32F2F');
-          });
-        })(entry.index);
-      });
-    }
-    var indexed = window.Themes.ALL.map(function (t, i) { return { index: i, theme: t }; });
-    addThemeGroup('ESCUROS', indexed.filter(function (e) { return e.theme.isDark; }));
-    addThemeGroup('CLAROS', indexed.filter(function (e) { return !e.theme.isDark; }));
-
     /* ---------- Salvar ---------- */
     var saveBtn = el('button', 'mx-btn mx-btn-primary mx-btn-block mx-save', 'Salvar configurações');
     saveBtn.type = 'button';
@@ -256,16 +202,12 @@
         toast('Endpoint deve começar com http');
         return;
       }
-      var selected = -1;
-      themeInputs.forEach(function (r) { if (r.checked) selected = Number(r.value); });
-
       prefs.set('endpoint', endpointValue);
       prefs.set('apiKey', key.input.value);
       prefs.set('model', model.input.value);
       var mt = parseInt(tokens.input.value, 10);
       prefs.set('maxTokens', isNaN(mt) || mt < 0 ? 0 : mt);
       prefs.set('temperature', Number(tempBar.value) / 100);
-      if (selected >= 0) prefs.set('themeIndex', selected);
 
 
       toast('Configurações salvas ✓');

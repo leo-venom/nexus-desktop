@@ -1,6 +1,6 @@
 # ESTADO ATUAL — NEXUS GAME
 
-**Versão:** 2.9.3 (working tree) · **HEAD:** `38faba1` · **Atualizado:** 2026-10-21
+**Versão:** 2.13.0 (working tree) · **HEAD:** `38faba1` · **Atualizado:** 2026-10-21
 **Local:** `/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/`
 **Repositório:** `github.com/leo-venom/nexus-desktop`
 
@@ -8,11 +8,26 @@
 
 ## 1. O que é
 
-Gerador de **jogos HTML completos** com IA. Um shell web (Electron ou navegador) conversa com
-qualquer API compatível com OpenAI e renderiza o jogo gerado em `<iframe>` isolado
+Gerador de **jogos HTML, desenhos/objetos e respostas visuais** com IA. Um shell web (Electron ou navegador) conversa com
+qualquer API compatível com OpenAI e renderiza o resultado em `<iframe>` isolado
 (`sandbox="allow-scripts allow-pointer-lock allow-popups"`, origem opaca).
 
-**Um único modo: jogo.** Não existe mais SITE MODE nem modo página. Todo comando vira jogo.
+**3 modos automáticos:** o app detecta se o comando é jogo, desenho/objeto ou chat,
+aplicando a diretriz correta com o mesmo padrão de qualidade visual.
+
+**Tema único:** não existe mais seletor de temas. O shell usa `PADRÃO · BLACK CYBER`
+(preto `#000000`, accent esmeralda `#00E88A`, detalhes rosa `#FF2D95` e azul `#00A3FF`).
+Jogos/desenhos/objetos **não herdam** essa paleta: escolhem a própria ou a que o pedido citar.
+
+**Prévia ao vivo:** durante a geração o documento parcial é renderizado no iframe a cada
+~1,2 s (selo `⚡ prévia ao vivo`), então a imagem começa a aparecer em ~5-6 s em vez de só
+no fim. O render final substitui a prévia.
+
+| Modo | Gatilho | Diretriz |
+|------|---------|----------|
+| 🎮 **Jogo** | Termos de jogo (tetris, nave, plataforma, rpg...) | `GAME_DIRECTIVE` (16,6 KB) — 8-12 níveis, 3+ inimigos, áudio, texturas |
+| 🎨 **Desenho/Objeto** | Termos de arte (desenho, logo, infográfico, objeto 3D, paisagem...) | `DRAWING_DIRECTIVE` — qualidade visual **leve e rápida**, acabamento por gradiente/stroke, composição |
+| 💬 **Chat** | Saudações, perguntas curtas, fallback geral | `CHAT_DIRECTIVE` — HTML bonito, tipografia refinada, cards |
 
 ---
 
@@ -20,11 +35,14 @@ qualquer API compatível com OpenAI e renderiza o jogo gerado em `<iframe>` isol
 
 | Item | Valor |
 |---|---|
-| Linhas de código | **8.306** (JS 4.863 · CSS 721 · HTML 57 · Python 253 · Electron 524 · docs 1.888) |
+| Linhas de código | **~10.600** (JS 7.200 · CSS 721 · HTML 57 · Python 253 · Electron 524 · docs ~1.900) |
 | `app.js` | **1.701** |
-| `html-builder.js` | **825** |
+| `html-builder.js` | **~1.190** |
 | `GAME_DIRECTIVE` | 16.653 chars |
+| `DRAWING_DIRECTIVE` | ~14.000 chars |
+| `CHAT_DIRECTIVE` | ~3.500 chars |
 | Prompt de jogo (system completo) | **18.668 chars** com textura · **13.009** sem (bloco de textura é opt-in) + **~1.4 KB** mídia real |
+| Texturas procedurais | **44** (`nx-textures.js`, 36.856 bytes) |
 | Texturas procedurais | **44** (`nx-textures.js`, 36.856 bytes) |
 | Sons WebAudio | **13** receitas |
 | Temas | **30** — 20 escuros + 10 claros |
@@ -67,14 +85,14 @@ nexus-game/
 │   ├── css/app.css              721  tema via var(--nx-*), popover, modais
 │   ├── vendor/three/                 three.min.js r160 + module
 │   └── js/
-│       ├── themes.js            112  30 temas
+│       ├── themes.js             54  tema único (ALL=[DEFAULT])
 │       ├── prefs.js             152  localStorage["nexus77"] + tokens
-│       ├── html-builder.js      825  prompts, extração, edição tolerante, decoração
+│       ├── html-builder.js     1292  prompts, extração, edição tolerante, decoração
 │       ├── ai-client.js         464  SSE + proxy/fallback + cancel + finishReason
 │       ├── store.js             258  File System Access + IndexedDB
 │       ├── vu-meter.js          161  canvas 5 barras / 5 ondas
-│       ├── settings.js          286  modal config (API / geração / temas / fontes)
-│       ├── app.js              1701  fluxo principal + modo edição + bridge
+│       ├── settings.js          228  modal config (API / geração)
+│       ├── app.js              1884  fluxo principal + modo edição + bridge
 │       └── nx-textures.js       904  44 texturas procedurais (window.NxTex)
 └── docs/
     ├── ESTADO_ATUAL.md              este documento
@@ -203,10 +221,11 @@ NxTex.names()                              // 44 nomes
 
 ---
 
-## 8. Temas
+## 8. Tema único
 
-30 temas com `background`, `surface`, `surfaceAlt`, `accent`, `text`, `secondary`, `isDark`,
-`colors[]` e `onAccent`.
+Um só tema (`Themes.DEFAULT = PADRÃO · BLACK CYBER`) com `background`, `surface`,
+`surfaceAlt`, `accent`, `text`, `secondary`, `isDark`, `colors[]` (esmeralda/rosa/azul) e
+`onAccent`. O seletor de temas foi removido; `Themes.of(i)` ignora o índice.
 
 - **Escuros (20):** RGB neon, fire, synthwave, cyberpunk, rainbow, vaporwave, toxic, blood moon,
   galaxy, aurora, strawberry, ocean deep, lime blast, ultraviolet, candy, artic ice, lava, poison,
@@ -226,7 +245,7 @@ Header único, sem barra inferior:
 `✎ EDITAR` / `✔ FINALIZAR` · `SALVAR` · `ABRIR` · `CONSUMO` · `⚙`
 
 **Modal ⚙:** API (endpoint, key, modelo, buscar modelos) · GERAÇÃO (temperatura, max tokens) ·
-TEMA (30 swatches em dois grupos) · FONTES.
+FONTES.
 
 **Painel CONSUMO:** modelo ativo, barra da sessão, `↑entrada ↓saída · usado/1M`, 4 cartões
 (última hora / 24 h / 7 dias / 30 dias).
@@ -298,5 +317,5 @@ console.log('temas', window.Themes.ALL.length);
 ```
 
 **Última verificação (2026-10-20):** 9 arquivos JS com sintaxe OK · prompt 18.666 chars ·
-GAME MODE ativo · `NxTex` presente · 30 temas · Tetris E2E renderizando peças com textura ·
+GAME MODE ativo · 1 tema · prévia ao vivo · reparo de JS quebrado · three.js r160 local ·
 `applyEdits`/`userPrompt` 17/17 no harness · smoke Electron 20/20.

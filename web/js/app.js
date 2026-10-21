@@ -8,8 +8,8 @@
   'use strict';
 
   var prefs = window.Prefs;
-  var theme = window.Themes.of(prefs.themeIndex());
-  var lastThemeIndex = prefs.themeIndex();
+  /* Tema único: o app não tem mais seletor de temas. */
+  var theme = window.Themes.of(0);
 
   var lastRendered = null;   // documento canônico (CSS com CDN, sem rewrite)
   var lastPrompt = null;
@@ -25,6 +25,11 @@
   var liveActive = false;
   var liveIn = 0;
   var liveOut = 0;
+  var liveText = '';          /* texto acumulado do streaming (para a prévia ao vivo) */
+  var previewAt = 0;
+  var genEditing = false;     /* geração atual é ajuste de página existente */
+  var PREVIEW_MIN_CHARS = 1200;   /* documento mínimo p/ valer uma prévia */
+  var PREVIEW_EVERY_MS = 1200;    /* intervalo entre prévias */
   var lastProgressAt = 0;          /* SEMPRE Date.now() — o watchdog usa o mesmo relógio */
   var canceladoPeloUsuario = false; /* ESC / reset: a promessa em voo rejeita com AbortError */
 
@@ -38,7 +43,7 @@
     ['month', 'Últimos 30 dias']
   ];
 
-  var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel;
+  var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel, previewBadge;
   var dot, resetBtn, vu;
   var usageBtn, usagePanel, usageModel, usageFill, usageSession, usageStats, usageClose;
   var editBtn, finalizeBtn;
@@ -74,6 +79,8 @@
     s.setProperty('--nx-text', theme.text);
     s.setProperty('--nx-secondary', theme.secondary);
     s.setProperty('--nx-on-accent', theme.onAccent);
+    if (theme.colors && theme.colors[1]) s.setProperty('--nx-c2', theme.colors[1]);
+    if (theme.colors && theme.colors[2]) s.setProperty('--nx-c3', theme.colors[2]);
     s.setProperty('--mx-error', errorColor());
     if (vu) vu.setTheme(theme);
     updateSessionUi();
@@ -160,6 +167,18 @@
     'try{var _ce=console.error;console.error=function(){' +
     'try{_pushErr("console",Array.prototype.join.call(arguments," "),0)}catch(e){}' +
     'return _ce.apply(console,arguments)}}catch(e){}' +
+    /* Watchdog de canvas vazio: objeto que não aparece vira erro no próximo prompt. */
+    'setTimeout(function(){try{' +
+    'var cs=document.querySelectorAll("canvas");if(!cs.length)return;var bad=[],checked=0;' +
+    'for(var i=0;i<cs.length;i++){var c=cs[i];var w=c.width||0,h=c.height||0;' +
+    'if(w<8||h<8){bad.push("canvas "+(i+1)+" em "+(w||0)+"x"+(h||0)+" (nunca dimensionado)");continue}' +
+    'var g=null;try{g=c.getContext("2d")}catch(e){}if(!g)continue;checked++;' +
+    'try{var d=g.getImageData(0,0,w,h).data,painted=false;' +
+    'for(var p=3;p<d.length;p+=4*101){if(d[p]>8){painted=true;break}}' +
+    'if(!painted)bad.push("canvas "+(i+1)+" em branco ("+w+"x"+h+")")}catch(e){}' +
+    '}' +
+    'if(bad.length)_pushErr("blank",bad.join("; "),0);' +
+    '}catch(e){}},4000);' +
     'function rgb2hex(c){if(!c)return"#000000";var m=c.match(/\\d+/g);if(!m||m.length<3)return c.charAt(0)==="#"?c:"#000000";' +
     'var h=function(n){var s=parseInt(n,10).toString(16);return s.length<2?"0"+s:s};return"#"+h(m[0])+h(m[1])+h(m[2])}' +
     'function alphaOf(c){if(!c)return 1;var m=c.match(/rgba?\\(([^)]+)\\)/);if(!m)return 1;var p=m[1].split(",");return p.length>=4?Math.max(0,Math.min(1,parseFloat(p[3]))):1}' +
@@ -167,7 +186,7 @@
     'var _accent="#00E5FF";' +
     'var _raf=window.requestAnimationFrame.bind(window),_caf=window.cancelAnimationFrame.bind(window);' +
     'var _frozen=[];' +
-    'window.requestAnimationFrame=function(cb){return _raf(function(t){if(_ed.on){_frozen.push(cb)}else{try{cb(t)}catch(e){}}})};' +
+    'window.requestAnimationFrame=function(cb){return _raf(function(t){if(_ed.on){_frozen.push(cb)}else{try{cb(t)}catch(e){_pushErr("raf",(e&&e.message)||String(e),(e&&e.lineno)||0)}}})};' +
     'window.cancelAnimationFrame=function(id){return _caf(id)};' +
     'function sel(e){if(!e)return;e.style.outlineStyle="dashed";e.style.outlineWidth="3px";e.style.outlineColor=_accent;e.style.outlineOffset="-3px";e.style.boxShadow="0 0 0 5px "+_accent+"59"}' +
     'function desel(e){if(!e)return;e.style.outlineStyle="";e.style.outlineWidth="";e.style.outlineColor="";e.style.outlineOffset="";e.style.boxShadow=""}' +
@@ -439,6 +458,7 @@
     var out = window.Html.rewriteLibs(String(html == null ? '' : html), APP_BASE);
     frameErrors = [];
     frameErrToken++;
+    hidePreviewBadge();                        /* documento final substitui a prévia */
     frame.srcdoc = injectShim(out);
     /* Foca o iframe para teclado funcionar sem clique */
     setTimeout(function () {
@@ -537,9 +557,46 @@
     }
   }
 
+  /* Fecha tags abertas para a prévia poder renderizar (documento parcial). */
+  function completePartial(html) {
+    var s = String(html || '');
+    if (s.lastIndexOf('<script') > s.lastIndexOf('</script>')) s += '\n</script>';
+    if (s.lastIndexOf('<style') > s.lastIndexOf('</style>')) s += '\n</style>';
+    if (!/<\/body>/i.test(s)) s += '\n</body>';
+    if (!/<\/html>/i.test(s)) s += '\n</html>';
+    return s;
+  }
+
+  /* Prévia ao vivo: mostra o documento enquanto o modelo escreve.
+     Não rouba foco (o usuário continua podendo digitar/ESC) e não conta os
+     erros da prévia — o documento final substitui tudo. */
+  function previewPartial(text) {
+    if (!generating || genEditing || editMode || !previewBadge) return;
+    var s = String(text || '');
+    if (s.length < PREVIEW_MIN_CHARS) return;
+    var bodyAt = s.search(/<body[^>]*>/i);
+    if (bodyAt < 0 || s.length - bodyAt < PREVIEW_MIN_CHARS * 0.5) return;
+    var now = Date.now();
+    if (now - previewAt < PREVIEW_EVERY_MS) return;
+    previewAt = now;
+    try {
+      frameErrToken++;                          /* invalida watchFrameErrors da prévia */
+      frame.srcdoc = injectShim(window.Html.rewriteLibs(completePartial(s), APP_BASE));
+      previewBadge.hidden = false;
+    } catch (e) { /* prévia é cosmética — nunca derruba a geração */ }
+  }
+
+  function hidePreviewBadge() {
+    if (previewBadge) previewBadge.hidden = true;
+  }
+
   /* Progresso ao vivo. `null` = apenas sinal de vida (sem contagem de bytes):
      usado pelas continuações e pelo fallback sem streaming, que não relatam bytes. */
-  function onGenProgress(contentBytes) {
+  function onGenProgress(contentBytes, text) {
+    if (text != null) {
+      liveText = text;
+      previewPartial(text);
+    }
     if (contentBytes == null) { lastProgressAt = Date.now(); return; }
     var now = Date.now();
     if (now - lastProgressAt < 60) return;
@@ -614,6 +671,7 @@
     input.blur();
 
     var editing = lastRendered != null;
+    genEditing = editing;               /* bloqueia prévia parcial em ajustes de página */
     var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt, lastRendered, mediaManifest);
     var elementHint = '';
     if (editing && editSelHtml) {   /* só faz sentido quando há página em tela */
@@ -656,11 +714,38 @@
       );
     }
 
+    /* JS com erro de sintaxe = NADA roda: o cubo/peça nunca aparece.
+       Pede ao modelo o documento completo corrigido (máx. 2 rodadas). */
+    function repararJsQuebrado(out, tentativa) {
+      var erros = window.Html.jsSyntaxErrors(out.doc);
+      if (!erros.length) return Promise.resolve(out);
+      if (tentativa >= 2) {
+        status('⚠ JS ainda com erro de sintaxe', 'error', false);
+        return Promise.resolve(out);
+      }
+      status('⚠ corrigindo JS quebrado (' + (tentativa + 1) + ')…', 'accent', false);
+      liveOut = 0;
+      lastProgressAt = 0;
+      var msg = 'Current page (BROKEN — JavaScript syntax error, so nothing runs and no object appears):\n```html\n' +
+        out.doc + '\n```\n\nJavaScript errors found:\n' + erros.join('\n') +
+        '\n\nReturn the COMPLETE corrected HTML document: same features, nothing removed, every <script> block closed and syntactically valid. Output ONLY raw HTML, no explanations.';
+      return run(baseSystem, msg).then(function (r3) {
+        var doc3 = window.Html.extractDocument(r3.content || '');
+        if (!doc3.trim()) return out;
+        return repararJsQuebrado({ result: r3, doc: doc3 }, tentativa + 1);
+      }).catch(function (e) {
+        if (canceladoPeloUsuario) throw e;
+        return out;                       /* não perde o que já veio */
+      });
+    }
+
     var encoder = new TextEncoder();
     liveActive = true;
     liveIn = Math.floor((encoder.encode(system).length + encoder.encode(user).length) / 4);
     liveOut = 0;
     lastProgressAt = 0;
+    liveText = '';
+    previewAt = 0;
     updateSessionUi();
     var started = performance.now();
 
@@ -705,6 +790,9 @@
     }).then(function (out) {
       if (out.doc == null) return out;               /* mantém a página atual */
       return completarSeTruncado(out.result, out.doc).then(function (d) { out.doc = d; return out; });
+    }).then(function (out) {
+      if (out.doc == null) return out;
+      return repararJsQuebrado(out, 0);
     }).then(function (out) {
       /* Cancelado entre o fim da resposta e este callback: não renderiza nada. */
       if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
@@ -763,6 +851,7 @@
     saveBtn.disabled = false;
     openBtn.disabled = false;
     liveActive = false;
+    hidePreviewBadge();
     updateSessionUi();
     setLoading(false);
   }
@@ -795,14 +884,10 @@
   }
 
   function onSettingsSaved() {
-    var changed = prefs.themeIndex() !== lastThemeIndex;
-    theme = window.Themes.of(prefs.themeIndex());
-    lastThemeIndex = prefs.themeIndex();
+    theme = window.Themes.of(0);
     applyTheme();
     if (lastRendered == null) {
       showWelcome();
-    } else if (changed) {
-      render(themed(lastRendered));
     }
     updateSessionUi();
   }
@@ -1543,9 +1628,12 @@
     var corpo = String(doc || '');
     var cortou = (res && res.finishReason === 'length');
     var fechado = /<\/html>\s*$/i.test(corpo.trim());
+    var scriptsOk = (corpo.match(/<script/gi) || []).length === (corpo.match(/<\/script>/gi) || []).length;
     /* Só para quando o documento está realmente fechado; finish_reason='length'
-       pode chegar com o HTML já completo (o modelo só parou de falar). */
-    if (fechado) return Promise.resolve(corpo);
+       pode chegar com o HTML já completo (o modelo só parou de falar).
+       Um <script> sem </script> NÃO conta como fechado — era assim que o
+       documento parava com o JS pela metade e o jogo não desenhava nada. */
+    if (fechado && scriptsOk) return Promise.resolve(corpo);
     if (tentativa >= MAX_CONTINUACOES) {
       status('⚠️ documento ainda incompleto após ' + tentativa + ' continuações', 'accent', false);
       return Promise.resolve(corpo);
@@ -1596,6 +1684,7 @@
     openBtn = $('btn-open');
     statusEl = $('status');
     kbLabel = $('kb');
+    previewBadge = $('nx-preview');
     dot = $('dot');
     usageBtn = $('btn-usage');
     usagePanel = $('usage');
@@ -1760,8 +1849,7 @@
       }
     });
 
-    lastThemeIndex = prefs.themeIndex();
-    theme = window.Themes.of(lastThemeIndex);
+    theme = window.Themes.of(0);
     applyTheme();
     showWelcome();
 

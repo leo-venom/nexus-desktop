@@ -14,12 +14,12 @@
   var HEAD_REGEX = /<head[^>]*>/i;
   var HTML_REGEX = /<html[^>]*>/i;
 
-  var BASE_PROMPT = `You are the GAME generator of NEXUS GAME. From the user's short command, you build ONE complete, self-contained, PLAYABLE HTML game document.
+  var BASE_PROMPT = `You are the CREATIVE generator of NEXUS GAME. From the user's short command, you build ONE complete, self-contained HTML document — a game, a drawing, a 3D object, or a visual composition based on what the user asked for.
 
 Rules:
 - Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
 - Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.
-- You may load libraries from public CDNs. For 3D always use three.js via this exact script tag: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use import maps or module builds). This URL is always available in the app, even offline.
+- You may load libraries from public CDNs, EXCEPT three.js: use the local UMD build already shipped with the app: <script src="vendor/three/three.min.js"></script> (global THREE, never import maps or module builds). It is always available offline. IMPORTANT: this build has NO addons — THREE.OrbitControls / THREE.GLTFLoader / EffectComposer DO NOT EXIST; do camera orbit manually (pointer drag) and avoid post-processing.
 - The command defines the scope: build exactly what was asked, with no extra sections, features or decoration. When vague, choose the closest impressive interpretation - never pad it with unrequested content.
 - Keep text to the absolute minimum: titles and essential labels only, no paragraphs or descriptions unless asked.
 - Beauty comes from composition, typography, spacing, color and ONE strong focal idea - not from stacking effects. Prefer a clean, confident layout over visual noise.
@@ -53,11 +53,16 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     'drift','souls','bullet','rhythm','simulator','simulador','estrategia',
     'strategy','war','magic','dragon','dragão','fantasy','craft','build',
     'construction',
-    /* 3D / textura / material — também usam as receitas de textura procedural */
-    '3d','cubo','esfera','planeta','torus','cilindro','poliedro','malha','mesh',
-    'textura','texturas','material','shader','webgl','three','three.js',
-    'objeto 3d','cena 3d','modelo 3d','animação 3d','animacao 3d','iluminação',
-    'iluminacao','partícula','particula','pixel art','voxel','render 3d'
+    /* Português — termos que também devem cair em jogo */
+    'plataforma','nave','atirar','atira','pule','pular','pula','correr',
+    'mate','matar','mata','morte','morrer','morro','vida','vidas','score',
+    'pontos','pontuação','pontuacao','fase','fases','nivel','nível','boss',
+    'inimigo','inimigos','arma','armas','poder','poderes','magia','feitico',
+    'feitiço','espada','arco','flecha','escudo','velocidade','munição',
+    'municao','combate','batalha','duelo','arena','campo','mundo','fundo',
+    'mapa','cidade','floresta','deserto','gelo','caverna','masmorra',
+    /* three.js para jogos 3D */
+    'three','three.js','webgl',
   ];
 
   function isGameCommand(cmd) {
@@ -68,6 +73,106 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
       if (c.indexOf(GAME_TERMS[i]) >= 0) return true;
     }
     return false;
+  }
+
+  /* Palavras-chave que disparam o modo desenho/objeto: ilustrações, arte,
+     infográficos, logos, composições visuais, diagramas, objetos 3D, física,
+     simulações visuais, typography art e data viz — entregues com nível de
+     qualidade e detalhe equivalente ao do modo jogo. */
+  var DRAWING_TERMS = [
+    /* Ilustração e arte */
+    'desenho','desenhar','desenhe','ilustração','ilustracao','ilustrar',
+    'arte','art','artista','pintura','pintar','quadro','tela',
+    'retrato','paisagem','natureza-morta','abstract','abstrato',
+    'aquarela','nanquim','carvão','carvao','sketch','rascunho',
+    'cartoon','charge','mangá','anime','manga','personagem',
+    'arte digital','digital art','vector','vetor','vector art',
+    /* Logo e identidade visual */
+    'logo','logotipo','logomarca','brand','identidade visual',
+    'marca','emblema','símbolo','simbolo','icone','ícone','icon',
+    /* Infográfico e diagrama */
+    'infográfico','infografico','diagrama','gráfico','grafico',
+    'grafico de barras','grafico de pizza','grafico de linhas','chart',
+    'fluxograma','flowchart','mapa mental','mind map','organograma',
+    'linha do tempo','timeline','esquema','schema',
+    /* Objetos 3D e escultura */
+    'objeto 3d','objeto','escultura','estátua','estatua','busto','relevo',
+    '3d','cubo','esfera','planeta','cilindro','torus','cone','piramide',
+    'poliedro','malha','malhas','mesh','modelagem','geometry','geometria',
+    'vaso','jarra','taça','taca','tigela','prato','caneca',
+    'cadeira','mesa','sofá','sofa','armário','armario','cama',
+    'carro','moto','bicicleta','nave','navio','aviao','avião',
+    'casa','predio','prédio','castelo','ponte','torre','farol',
+    'arvore','árvore','flor','planta','animal','cachorro','gato','passaro',
+    'cavalo','peixe','tubarao','tubarão','dinossauro','foguete',
+    /* Composição visual */
+    'composição','composicao','layout','design','poster','cartaz',
+    'banner','flyer','folder','capa','moodboard','storyboard',
+    'colagem','collage','tipografia','lettering','caligrafia',
+    'wallpaper','papel de parede','background','fundo','plano de fundo',
+    /* Simulação visual e física */
+    'simulação','simulacao','simular','partículas','particulas',
+    'fluido','fluido simulator','fumaça','fumaca','fogo','explosão',
+    'explosao','água','agua','ondas','pendulo','mola','gravidade',
+    'teia','spider web','orbita','orbita','sistema solar',
+    /* Data visualization */
+    'data viz','visualização de dados','visualizacao de dados',
+    'dashboard','indicador','métricas','metricas','relatório','relatorio',
+    'termômetro','termometro','velocímetro','velocimetro','medidor',
+    /* Photography e filter (efeitos visuais) */
+    'efeito','efeitos','filtro','filter','photo','foto','fotografia',
+    'lomografia','vintage','glitch','neon','holograma','holographic',
+    /* Animações visuais */
+    'animação','animacao','animado','motion','animatic','bouncing',
+    'loading','spinner','progress','progresso'
+  ];
+
+  function isDrawingCommand(cmd) {
+    if (!cmd || typeof cmd !== 'string') return false;
+    var c = cmd.toLowerCase().trim();
+    if (!c) return false;
+    /* Se também parece jogo, prioriza jogo (game terms têm precedência). */
+    if (isGameCommand(cmd)) return false;
+    for (var i = 0; i < DRAWING_TERMS.length; i++) {
+      if (c.indexOf(DRAWING_TERMS[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  /* Palavras-chave que disparam o modo chat/conversa: saudações, perguntas
+     simples, conversas casuais, comandos que não são jogo nem desenho.
+     Tudo que não casa com game nem drawing vira automaticamente chat. */
+  var CHAT_TERMS = [
+    'oi','ola','olá','hey','hello','hi','bom dia','boa tarde','boa noite',
+    'tudo bem','como vai','e aí','e ai','td bem','beleza','blz','show',
+    'obrigado','obrigada','valeu','brigado','brigada','thanks','thx','ty',
+    'de nada','dnd','denada','disponha','por nada',
+    'quem é voce','quem e voce','quem é você','quem e você','quem é vc',
+    'que é isso','o que é isso','oq é isso','oq e isso',
+    'ok','okay','tá','ta','sim','nao','não','talvez','claro','com certeza'
+  ];
+
+  function isChatCommand(cmd) {
+    if (!cmd || typeof cmd !== 'string') return false;
+    /* Chat é o fallback: se não é jogo nem desenho, é chat.
+       Mas também detectamos saudações explícitas para acelerar. */
+    if (isGameCommand(cmd) || isDrawingCommand(cmd)) return false;
+    var c = cmd.toLowerCase().trim();
+    if (!c) return false;
+    for (var i = 0; i < CHAT_TERMS.length; i++) {
+      if (c === CHAT_TERMS[i] || c.indexOf(CHAT_TERMS[i]) === 0) return true;
+    }
+    /* Fallback: comandos muito curtos (< 4 palavras) que não são jogo/desenho */
+    var words = c.split(/\s+/).filter(function(w){return w.length > 0;});
+    if (words.length <= 3) return true;
+    return false;
+  }
+
+  function detectMode(command) {
+    /* Retorna: 'game', 'drawing', ou 'chat' */
+    if (isGameCommand(command)) return 'game';
+    if (isDrawingCommand(command)) return 'drawing';
+    return 'chat';
   }
 
   var GAME_DIRECTIVE = `
@@ -83,11 +188,22 @@ REGRAS DE TELA (OBRIGATÓRIO):
 - 100vw x 100dvh, sem scroll. body { margin:0; padding:0; overflow:hidden; width:100vw; height:100dvh; }
 - MEDIÇÃO DEFENSIVA DO VIEWPORT (obrigatório): o jogo roda dentro de um iframe e window.innerWidth/innerHeight podem retornar 0 no primeiro instante. NUNCA dimensione o canvas uma única vez no carregamento. Sempre: function fit(){var W=window.innerWidth||document.documentElement.clientWidth||0;var H=window.innerHeight||document.documentElement.clientHeight||0;if(W<40||H<40){requestAnimationFrame(fit);return}/* dimensiona canvas e recalcula escala */}. Chame fit() dentro de requestAnimationFrame, registre window.addEventListener('resize', fit) e window.addEventListener('orientationchange', fit), e repita via setTimeout(fit, 300) como rede de segurança. Se a primeira medição vier 0, o jogo DEVE esperar e remedir em vez de desenhar num canvas 0x0.
 - devicePixelRatio cap em Math.min(window.devicePixelRatio||1, 2).
-- Menus, pausa e game over: overlays position:fixed em tela cheia (inset:0) sobre o canvas. O campo de jogo NUNCA é menor que a tela.
-- HUD (score, vidas, nível, power-ups, textos) DEVE ficar nas bordas ESQUERDA e DIREITA como faixas verticais finas (60-80px de largura). O canvas de jogo ocupa a tela INTEIRA por trás. NADA sobre a área central do jogo — nem score, nem texto, nem botão. Em mobile (<500px): semi-transparente mas sempre nas extremidades, nunca no centro.
+- Pausa e game over: overlays position:fixed em tela cheia (inset:0) sobre o canvas. O campo de jogo NUNCA é menor que a tela. NÃO existe tela de menu/apresentação: o jogo começa jogando.
+- HUD EM BOLHAS NAS LATERAIS (obrigatório): cada informação (score, vidas, nível, power-ups, tempo, combo) vai numa BOLHA/pílula arredondada — cantos bem redondos (border-radius 12-20px ou pill), fundo semi-transparente (rgba do fundo do jogo, 55-75%), borda fina na cor de destaque e leve glow/sombra. Cada bolha com LARGURA MÁXIMA de 100px, encostada na borda ESQUERDA ou DIREITA com 10px de margem, empilhadas em coluna com 8-10px de espaço entre elas. Fonte pequena (10-13px), número grande em destaque e rótulo minúsculo. NADA no centro sobre o jogo; PROIBIDO faixa/painel largo de HUD. O canvas ocupa 100% da tela por trás, de borda a borda. Em mobile: bolhas menores (máx 80px) e mais transparentes.
+
+SEM BORDAS / SEM MOLDURA — REGRA ABSOLUTA:
+- A tela é DO JOGO: nenhum painel, card, moldura, margem, padding ou barra em volta. Canvas em 100vw x 100dvh desenhado até a borda.
+- PROIBIDO: moldura/borda decorativa, vinheta, faixa de título, cabeçalho, "caixa" em volta da área de jogo. A única margem permitida é a do HUD: no máximo 10px.
+- Menu de pausa e game over são OVERLAYS em tela cheia sobre o jogo (nunca painel pequeno com borda no meio).
 
 FOCO NO JOGO, NÃO NO FUNDO — REGRA ABSOLUTA:
-Fundo = cor sólida ou gradiente de 2-3 tons ou no máximo 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage por frame). PROIBIDO: cenário 3D elaborado, layers com textura animada, nebulosa recalculada por frame, blur ou shadow em tela cheia, milhares de partículas ambientes. O fundo não deve consumir mais que ~15% do tempo de frame. A beleza do jogo VEM dos objetos, inimigos, texturas, efeitos, HUD e som — não do fundo. Em dúvida entre fundo bonito e frame estável, escolha o frame.
+Fundo = cor sólida ou gradiente de 2-3 tons ou no máximo 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage por frame). PROIBIDO: cenário 3D elaborado, layers com textura animada, nebulosa recalculada por frame, blur ou shadow em tela cheia, milhares de partículas ambientes. O fundo não deve consumir mais que ~15% do tempo de frame. A qualidade máxima vai para O JOGO EM SI — personagens, inimigos, jogador, animações, efeitos de impacto, colisões, áudio — não para o fundo nem para a interface. Em dúvida entre fundo bonito e frame estável, escolha o frame.
+
+SÓ O QUE FOI PEDIDO — REGRA ABSOLUTA (nada de camadas extras):
+- Entregue o jogo pedido e mais nada: PROIBIDO seção "sobre", créditos, banners, cards institucionais, textos de marketing, legendas, telas extras, abas ou qualquer conteúdo fora do gameplay.
+- HUD = só o essencial do jogo (score, vidas, nível, power-ups e o que a mecânica exigir). Sem rótulos decorativos, sem frases, sem títulos grandes na tela.
+- PROIBIDO camada decorativa por cima do jogo (vinheta, scanlines, glow em tela cheia, partículas de ambiente em excesso). Efeito só quando faz parte da ação.
+- Só adicione tela/seção/elemento extra se o pedido pedir explicitamente.
 
 O JOGO PRECISA TER, NO MÍNIMO:
 - 8-12 níveis com dificuldade progressiva (velocidade, densidade, novos padrões/tipos)
@@ -96,8 +212,8 @@ O JOGO PRECISA TER, NO MÍNIMO:
 - Fundo leve com 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage)
 - Partículas de impacto + ambientes COM POOL e teto (~40-60 partículas no máximo, reuso de objetos)
 - Música procedural (osciladores WebAudio) + SFX para TODAS as ações
-- Screen shake + floating score + transições animadas entre telas
-- Menu animado + tela de pausa + tela de game over com estatísticas (score, nível, tempo)
+- Screen shake + floating score + transições animadas de fase e de game over
+- Pausa (P/ESC) e tela de game over com estatísticas (score, nível, tempo) — SEM tela de apresentação e SEM botão iniciar
 - Recorde máximo + último nível alcançado salvos em localStorage
 - Controles por TECLADO e TOQUE (touch events) — ambos funcionando
 
@@ -106,10 +222,18 @@ COMO ENTREGAR O JOGO COMPLETO:
 2. ÁUDIO: WebAudio com osciladores reais, não placeholder. AudioContext compartilhado criado no primeiro clique/interação (requisito do navegador). Função única playSom(tipo) que faz lookup de parâmetros, cria nós (OscillatorNode, GainNode, BiquadFilterNode), conecta, start + stop automático.
 3. Sistema de partículas COM POOL (array fixo reutilizado) e teto (~40-60 máx). Quando uma partícula morre, ela volta ao pool em vez de ser descartada. Prefira Float32Array + canvas a objetos avulsos.
 4. Fundo leve com 1-2 camadas de parallax desenhadas em offscreen canvas (uma vez) e apenas drawImage por frame — sem redesenhar, sem cálculos por frame.
-5. Transições animadas entre telas (menu→jogando→game over) com fade/deslize de 300-500ms.
+5. Transições animadas de onda/fase e na entrada do game over (fade/deslize de 300-500ms) — nunca uma transição de menu inicial.
 6. Efeitos dedicados por ação: screen shake no impacto, floating score ao matar inimigo, flash na borda ao tomar dano, glow ao pegar power-up.
 7. Tela de game over COM estatísticas: score final, nível alcançado, tempo de jogo, high score. Animação de entrada.
 8. Mecânicas secundárias: combos, multiplicadores de score por kills consecutivas, bônus de velocidade.
+
+INÍCIO IMEDIATO — REGRA ABSOLUTA (o jogo NUNCA espera o jogador):
+- PROIBIDO tela de apresentação, tela de título, tela de instruções, menu inicial e qualquer botão "Iniciar", "Jogar", "Play", "Start" ou "Toque para começar".
+- PROIBIDO atrasar o desenho/início por qualquer gate: flag "started", "if(!started)return", clique, tecla, IntersectionObserver, document.visibilityState, requestIdleCallback, setTimeout/setInterval de espera, esperar fontes/imagens antes do primeiro render, ou tela "carregando…".
+- Ao carregar a página o jogo JÁ está rodando: estado = jogando, nível 1, player/peça no campo, inimigos/obstáculos se movendo, HUD ativo, música/loop de áudio pronto (o áudio pode depender do primeiro toque, mas o jogo não).
+- O primeiro render é SÍNCRONO: chame draw()/renderer.render(scene,camera) uma vez ANTES de agendar o requestAnimationFrame. O objeto principal (cubo/peça/nave) TEM que estar visível nesse primeiro render.
+- A tela de game over pode existir e deve ter um restart por clique/tecla ("clique ou aperte ENTER para jogar de novo") — isso não é tela de apresentação.
+- Pausa só quando o jogador pedir (P/ESC); jamais pausado no boot.
 
 PRIMEIRO FRAME — REGRA ABSOLUTA:
 O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
@@ -216,22 +340,181 @@ DESEMPENHO — META 60 FPS CONSTANTES (obrigatório):
 - Reaproveite gradientes/paths (crie uma vez, reutilize); nada de criar gradiente ou string de cor dentro do loop.
 - Colisões simples (AABB/círculos), sem cálculos por pixel.
 - Cap de devicePixelRatio em 2; se a tela for grande, reduza a resolução interna do canvas em vez de perder frames.
+- FPS AUTO — REGRA ABSOLUTA (auto-ajuste silencioso): meça o fps de verdade contando frames em janelas de 1s (performance.now()). Se ficar abaixo de 50 fps em 2 janelas seguidas, reduza a qualidade sozinho: renderer.setPixelRatio(1) / canvas em resolução menor, metade das partículas, desligue sombras e glow extras. Se passar de 58 fps em 2 janelas, pode voltar ao dpr original. O ajuste é silencioso (sem UI, sem aviso), no máximo 1x por segundo, e o jogo NUNCA trava nem cai de 60 de uma vez.
 - Pause o loop quando document.hidden; retome no visibilitychange.
 - Áudio: nós criados por som e descartados (ou pool); nunca criar AudioContext por efeito.
 
 NÃO FAÇA:
 - Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
+- Moldura, borda, card ou margem em volta do jogo (a tela é do jogo, HUD com no máximo 10px)
+- Seções, telas, cards, créditos ou textos fora do gameplay
+- Camada decorativa por cima do jogo (vinheta, scanlines, glow de tela cheia)
 - 1 tipo de inimigo com cores diferentes chamado de "8 níveis"
-- Jogo sem som, sem música, sem game over, sem menu, sem tela de pausa
+- Jogo sem som, sem música, sem game over, sem tela de pausa
+- Tela de apresentação, tela de título, menu inicial ou botão "Iniciar/Jogar/Play" — o jogo começa sozinho
 - Arrays de configuração de nível vazios ou com só 1 entrada
 
 VERIFIQUE ANTES DE ENTREGAR:
-- 60fps? fundo leve? tela inteira? HUD nas laterais?
+- 60fps? fundo leve? canvas de borda a borda (sem moldura)? HUD em BOLHAS nas laterais (máx 100px, 10px de margem)?
+- Só o que foi pedido? nenhuma seção/tela/camada/texto extra?
 - 8-12 níveis? 3+ inimigos com comportamentos diferentes? 2-3 power-ups?
 - Parallax? partículas com pool (~40-60)? música+SFX? screen shake?
-- Menu+pausa+game over com stats? recorde salvo? teclado+toque?
+- Início imediato (sem tela de apresentação, sem botão iniciar, nível 1 já rodando)? pausa+game over com stats? recorde salvo? teclado+toque?
 - Texturas aplicadas quando o pedido pedir? sons em todas as ações?
 - Cada nível diferente do anterior (não só velocidade)?`;
+
+  /* ==========================================================
+   * DRAWING_DIRECTIVE — modo desenho/objeto/ilustração/arte.
+   * Ativado quando o comando pede desenho, ilustração, logo,
+   * objeto 3D, infográfico ou composição visual (mas não jogo).
+   * Mesmo nível de qualidade e detalhe do GAME_DIRECTIVE.
+   * A HEAD contém APENAS regras visuais genéricas (gradientes,
+   * sombras, iluminação, composição) — SEM menção a NxTex ou
+   * textura procedural. O bloco de textura (marcado @@NX_TEX)
+   * entra quando o pedido pede textura explícita.
+   * ========================================================== */
+  var DRAWING_DIRECTIVE = `
+
+MODO DESENHO ATIVADO — VOCÊ ESTÁ CRIANDO UM DESENHO/ILUSTRAÇÃO/OBJETO COMPLETO. Siga TODAS as regras abaixo. A saída é HTML + CSS + Canvas/three.js puro, SEM engine externa além do three.js para 3D.
+
+SÓ O QUE FOI PEDIDO — REGRA ABSOLUTA (a mais importante deste modo):
+- Entregue EXATAMENTE o que o pedido descreve, nada mais. Um cubo é um cubo; um vaso é um vaso; um logo é o logo.
+- PROIBIDO acrescentar por conta própria: títulos, subtítulos, rótulos ("SETOR 09", "ONLINE", "ENERGIA 98%"), legendas, HUD, painéis, cards, badges, contadores, molduras, botões, ícones, grades/estrelas de fundo, vinheta, "camadas" decorativas, segundo objeto ou cenário.
+- PROIBIDO texto visível na página: nenhuma palavra, a menos que o pedido peça texto/tipografia/logo com nome.
+- PROIBIDO encher a tela com elementos de apoio para "parecer completo". Pedido de UM objeto = esse objeto bem acabado e mais nada.
+- Para enriquecer, enriqueça DENTRO do objeto: material, luz, reflexo, sombra própria, detalhe de superfície.
+- Só adicione elemento extra quando o pedido pedir explicitamente ("com fundo", "com texto", "três objetos", "com legenda", "com interface").
+
+REGRA ABSOLUTA — ENTREGA COMPLETA EM UMA RESPOSTA:
+O documento inteiro precisa caber em UMA resposta do modelo. Priorize um desenho COMPLETO, visualmente impressionante e fechado (com </body></html>). Se estiver ficando grande, corte comentários e redundância — NUNCA corte detalhes visuais, cores, formas, iluminação ou o fechamento do HTML.
+
+REGRAS DE TELA (OBRIGATÓRIO):
+- 100vw x 100dvh, sem scroll. body: margin:0;padding:0;overflow:hidden;width:100vw;height:100dvh;display:flex;align-items:center;justify-content:center;
+- Centralize o desenho/objeto na tela com escala responsiva (min/max dimensões, viewport units, ou escala relativa ao canvas).
+- devicePixelRatio cap em Math.min(window.devicePixelRatio||1, 2).
+- FUNDO: use a cor/gradiente da paleta que VOCÊ escolheu (ou a que o pedido especificar), em 2-3 tons que não roubem a cena.
+- Se o desenho usar canvas, meça defensivamente: se innerWidth/innerHeight vier 0, remedir em requestAnimationFrame até obter valores > 0.
+
+PRIMEIRO FRAME — REGRA ABSOLUTA (o objeto aparece SEM interação):
+- O desenho/objeto precisa estar visível no primeiro frame, sem clique, tecla, scroll, hover ou espera.
+- PROIBIDO gate de início: flag "started", "if(!started)return", IntersectionObserver, document.visibilityState, requestIdleCallback, setTimeout/setInterval de espera, tela "carregando…", ou esperar fontes/imagens antes de desenhar.
+- Canvas 3D: chame renderer.render(scene,camera) uma vez de forma SÍNCRONA antes do loop; se o viewport medir 0, espere e redesenhe — nunca deixe em branco.
+- Canvas 2D: chame draw() uma vez antes de agendar o requestAnimationFrame.
+
+QUALIDADE VISUAL — REGRA ABSOLUTA (bonito, LEVE e RÁPIDO):
+- NADA de formas geométricas simples sem acabamento. Um círculo solto ou um retângulo sem estilo NÃO é entrega completa.
+- Acabamento se faz com o que é BARATO: gradientes de 2-4 stops, contorno (stroke) contrastante, camadas de cor (2-3 shapes sobrepostos), highlight e sombra em forma de shape deslocado. Isso já dá volume e brilho sem custo por pixel.
+- Em desenho 2D (canvas puro): cada forma principal = preenchimento com gradiente (radial/linear) + contorno + highlight/sombra desenhados como shape. Nada de ctx.fillStyle sólido + fillRect em elemento grande.
+- Em desenho 3D (three.js): cada mesh precisa de material configurado (MeshStandardMaterial com color/emissive/metalness/roughness coerentes) + iluminação (ambient + directional) + fundo condizente. NUNCA deixe a cor branca padrão do material.
+- ctx.shadowBlur e ctx.globalCompositeOperation são CAROS (blur em software): use no MÁXIMO em 1-2 elementos pequenos ou numa camada pré-renderizada em offscreen canvas. PROIBIDO shadowBlur/globalCompositeOperation dentro de loop, por forma, em tela cheia ou em animação de frame.
+- Desenho estático (não animado): desenhe UMA vez, fora de qualquer requestAnimationFrame, e pare. Não deixe loop rodando à toa.
+- ctx.save/restore é obrigatório ao transformar o estado do canvas (translate, rotate, scale).
+
+O QUE ENTREGAR — NADA ALÉM DISSO:
+- PARA DESENHO/ILUSTRAÇÃO: o objeto/cena pedido, com acabamento alto NO PRÓPRIO OBJETO (material, gradiente, contorno, highlight, sombra). 1 objeto bem feito vale mais que vários inventados.
+- PARA OBJETO 3D: modelo com geometria adequada + material configurado com cor/emissive/metalness/roughness coerentes + iluminação (ambient + directional) + câmera com órbita MANUAL por drag (OrbitControls não existe neste build) + fundo simples (cor/gradiente, não cenário)
+- PARA LOGO/ÍCONE: forma limpa e marcante, paleta reduzida (2-4 cores), apresentação sobre fundo que contraste, animação de entrada sutil
+- PARA INFOGRÁFICO/DIAGRAMA: dados reais (não placeholder), ícones/ilustrações de apoio, hierarquia visual clara (título > subtítulo > corpo > legenda)
+- PARA ANIMAÇÃO VISUAL: loop fluido rAF com delta time, easing (cubic-bezier, Math.sin/cos), partículas com pool (máx 60), sem alocação no loop
+- PARA SIMULAÇÃO FÍSICA: gravidade, atrito, colisão AABB/círculo, parâmetros ajustáveis no topo do script
+- PARA DATA VIZ: dados reais embutidos, eixos com labels + grid, tooltip no hover, animação de entrada dos dados (barras/pizzas crescendo)
+- PARA TIPOGRAFIA/LETTERING: cada letra como elemento span com cor/gradiente próprio, kerning manual, animação de entrada staggered
+
+COMO ENTREGAR O DESENHO COMPLETO:
+1. Planeje a composição antes de codificar: distribuição dos elementos, pesos visuais, paleta (escolha as cores que combinam com o pedido), hierarquia.
+2. Use a paleta escolhida EXPANSIVAMENTE — cada cor deve aparecer em pelo menos um gradiente, shape, partícula, brilho ou detalhe. Se o pedido citou cores/estilo, essas cores são obrigatórias e substituem a sua escolha.
+3. Canvas 2D — regras de ouro: ctx.save/restore antes de transformar; gradientes com 2-4 stops (ctx.createRadialGradient / createLinearGradient) criados UMA vez fora do loop; contornos com ctx.strokeStyle+lineWidth diferentes do fill; profundidade por highlight/sombra em shape deslocado. ctx.shadowBlur só em elemento pequeno ou em camada offscreen pré-renderizada — nunca por forma dentro do loop.
+4. Three.js 3D: scene → perspectiveCamera(75, w/h, 0.1, 1000) → WebGLRenderer({antialias:true, powerPreference:'high-performance'}) + renderer.setPixelRatio(Math.min(devicePixelRatio,2)) → órbita/rotação manual por drag ou autoRotate no rAF (NÃO use OrbitControls/GLTFLoader: não existem no build local) → ambient + directional/point lights (intensity 0.5-1.5) → shadowMap.enabled num único directional → material com color + emissive + metalness/roughness coerentes → fundo com scene.background = new THREE.Color() ou gradiente.
+5. Animações: requestAnimationFrame com delta time (clock.getDelta), easing suave (Math.sin/cos, cubic-bezier), sem stutter. Stagger de entrada com delay progressivo.
+6. Responsividade: window.addEventListener('resize', handler) com debounce (setTimeout 200ms), centralizar sempre, redimensionar canvas/DOM proporcionalmente.
+7. Acessibilidade: aria-label descritivo no elemento principal/svg/canvas, contraste de cor adequado (WCAG AA).
+
+@@NX_TEX_BEGIN@@
+
+PACK DE TEXTURAS PRONTO — window.NxTex:
+O documento já carrega js/nx-textures.js com 44 texturas procedurais (lava, metal, cromo, ouro, vidro, madeira, pedra, etc.).
+- ctx.fillStyle = NxTex.pattern(ctx, 'metal') → pattern para preencher formas no canvas 2D
+- NxTex.canvas('pedra', 64) → canvas de textura para criar patterns manuais
+- NxTex.css('nebulosa') → 'url(data:...)' para background de elementos DOM
+- NxTex.three('lava') → THREE.CanvasTexture para materiais 3D (RepeatWrapping já configurado)
+- NxTex.bloco(ctx, x, y, w, h, 'lava') → pinta bloco com textura + brilho topo + sombra base
+- NxTex.mapear('textura de chocolate') → traduz sinônimos para o nome correto
+
+INFERÊNCIA AUTOMÁTICA (aplicar quando fizer sentido ao tema do desenho):
+- Objeto metálico/robô/engrenagem → Metal, Cromo, Aço ou Titânio
+- Natureza/orgânico → Madeira, Pedra, Terra, Grama, Pântano
+- Água/líquido → Água, Gelo, Fogo Azul
+- Fogo/lava/energia → Lava, Fogo Azul, Aurora, Plasma
+- Pedra/construção → Pedra, Tijolo, Mármore, Concreto, Obsidiana, Basalto
+- Joia/cristal → Cristal, Ametista, Rubi, Safira, Turquesa, Ouro
+- Tecido/orgânico → Veludo, Couro, Camuflagem, Zebra, Tigre
+- Madeira/móvel → Madeira, Veludo, Pergaminho
+- Tecnologia/futurista → Circuito, Binário, Holograma, Neon, Fibra de Carbono
+- Céu/espaço → Nebulosa, Aurora
+- Doce/comida → Chocolate
+
+REGRA: se o pedido citar um material que existe no pack, CHAME NxTex para ele. Só crie textura manual quando o material não existir no pack — e nunca cor lisa em canvas/3D.
+
+@@NX_TEX_END@@
+
+DESEMPENHO — LEVE E RÁPIDO (REGRA ABSOLUTA):
+- Desenho/objeto leve: poucos paths, poucos gradientes, ZERO blur em tela cheia. Nada de repetir desenho caro a cada frame.
+- Estático (sem animação): desenhe UMA vez, sem requestAnimationFrame, e pare o loop.
+- Animado: UM único loop rAF com delta time. Partículas com pool fixo (máx 60), sem alocação dentro do loop.
+- Camadas caras (gradiente de fundo, glow, textura, sombra) desenhe UMA vez em canvas offscreen e só drawImage por frame.
+- Reaproveite gradientes/paths/patterns (crie uma vez, reutilize por referência). Nunca crie gradiente dentro do loop.
+- PROIBIDO: ctx.filter='blur()', shadowBlur dentro de loop, globalCompositeOperation por forma, centenas de partículas, canvas maior que a tela.
+- Cap de devicePixelRatio em 2 (canvas.width = w * dpr; ctx.scale(dpr,dpr)).
+- 3D: shadowMap ligado só num directional light, geometria enxuta, dpr cap 2, sem post-processing pesado.
+- 3D ANIMADO — FPS AUTO: conte frames em janelas de 1s; se cair abaixo de 50 fps em 2 janelas seguidas, baixe o pixelRatio para 1 e reduza efeitos; volte ao normal se passar de 58 fps. Silencioso, sem UI.
+- Pause animações quando document.hidden; retome no visibilitychange.
+- Meta: primeiro frame bonito e completo, sensação de 60 fps em máquina modesta.
+
+EXEMPLOS DE REFERÊNCIA (guia de qualidade, não cópia):
+- "desenhe um vaso": vaso 3D com revolução (LatheGeometry), gradiente suave de cerâmica (MeshStandardMaterial com color gradiente), iluminação dramática (directional + ambient), sombra projetada, fundo degradê.
+- "crie um logo neon": o lettering pedido com glow animado (text-shadow multicamada + @keyframes pulsando) sobre fundo escuro liso — sem partículas nem elementos extras.
+- "ilustre uma paisagem": 3 planos em canvas 2D (montanhas ao fundo com gradiente, árvores no meio, grama/rio na frente), cada forma com gradiente 3+ stops, contorno e sombra, céu com gradiente radial.
+- "faça um cubo 3D de metal": BoxGeometry + MeshStandardMaterial com cor metálica + emissive sutil + OrbitControls + ambient/directional lights + shadowMap + fundo escuro liso (sem grade, sem rótulos).
+
+NÃO FAÇA:
+- Títulos, rótulos, legendas, HUD, painéis, badges, molduras, botões ou qualquer texto que o pedido não pediu
+- Camadas decorativas de fundo (grade, estrelas, vinheta, partículas ambientes) para "enriquecer" a cena
+- Segundo objeto/cenário inventado quando o pedido é de um objeto só
+- Formas geométricas simples sem acabamento (círculo, quadrado, retângulo com cor lisa)
+- Placeholder, "exemplo", "ilustração meramente ilustrativa"
+- Objeto 3D sem iluminação (sem ambient nem directional) ou com MeshStandardMaterial na cor branca padrão
+- Canvas vazio ou com um único filledRect
+- Fundo branco puro sem contexto (a menos que o pedido peça fundo claro)
+- Custo desnecessário: blur/shadow em tela cheia, glow por forma, partículas aos milhares, loop rAF rodando em desenho estático
+- Criar textura procedural (NxTex, ctx.createPattern, THREE.CanvasTexture) quando o pedido NÃO cita material/textura
+
+VERIFIQUE ANTES DE ENTREGAR:
+- Entregou SÓ o que foi pedido? Nenhum texto, HUD, painel ou camada extra inventada? (se sim, remova antes de entregar)
+- Composição equilibrada? o objeto é o foco absoluto?
+- Paleta coerente com o pedido e usada de forma expansiva?
+- Se o pedido citou cores/estilo, elas foram respeitadas?
+- Acabamento em cada forma (gradiente, contorno, highlight/sombra em shape)?
+- 3D: material configurado + iluminação + câmera orbiting?
+- Canvas medido defensivamente (innerWidth 0 → remedir)?
+- Responsivo? centralizado na tela?
+- LEVE E RÁPIDO: sem blur em tela cheia, sem trabalho caro repetido por frame, desenho estático desenhado uma vez?
+- Textura só entrou se o pedido pediu material/textura? (pedido sem material = cor + gradiente)
+- Detalhamento adequado ao comando?`;
+
+  /* Os marcadores @@NX_TEX_BEGIN@@ / @@NX_TEX_END@@ já vêm no texto do
+     DRAWING_DIRECTIVE (antes do PACK de texturas e no fim das regras de
+     textura). Não injetar marcador extra: um segundo BEGIN ficava dentro do
+     bloco e vazava "@@NX_TEX_BEGIN@@" no prompt final. */
+
+  /* Separa DRAWING_DIRECTIVE em head / textura / tail */
+  var _drawTexBegin = DRAWING_DIRECTIVE.indexOf('@@NX_TEX_BEGIN@@');
+  var _drawTexEnd = DRAWING_DIRECTIVE.indexOf('@@NX_TEX_END@@');
+  var DRAWING_DIRECTIVE_HEAD = _drawTexBegin < 0 ? DRAWING_DIRECTIVE : DRAWING_DIRECTIVE.slice(0, _drawTexBegin);
+  var DRAWING_TEX_DIRECTIVE = (_drawTexBegin < 0 || _drawTexEnd < 0) ? '' :
+    DRAWING_DIRECTIVE.slice(_drawTexBegin + '@@NX_TEX_BEGIN@@'.length, _drawTexEnd);
+  var DRAWING_DIRECTIVE_TAIL = _drawTexEnd < 0 ? '' :
+    DRAWING_DIRECTIVE.slice(_drawTexEnd + '@@NX_TEX_END@@'.length);
+  DRAWING_DIRECTIVE = DRAWING_DIRECTIVE_HEAD + DRAWING_TEX_DIRECTIVE + DRAWING_DIRECTIVE_TAIL;
 
   /* Divide o GAME_DIRECTIVE em cabeça / bloco de texturas / cauda.
      O bloco de texturas entra no prompt SOMENTE quando o pedido pede textura. */
@@ -244,7 +527,7 @@ VERIFIQUE ANTES DE ENTREGAR:
     GAME_DIRECTIVE.slice(_texEnd + '@@NX_TEX_END@@'.length);
   GAME_DIRECTIVE = GAME_DIRECTIVE_HEAD + TEXTURE_DIRECTIVE + GAME_DIRECTIVE_TAIL;
 
-  /* Bloco curto no lugar do bloco de texturas quando o pedido NÃO pede textura. */
+  /* Bloco curto no lugar do bloco de texturas quando o pedido NÃO pede textura (modo jogo). */
   var TEXTURE_OFF_DIRECTIVE = `
 TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
 - NÃO use window.NxTex, NÃO chame ctx.createPattern, NÃO crie THREE.CanvasTexture e NÃO desenhe textura procedural.
@@ -252,6 +535,16 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
 - Não converta material em textura por conta própria e não escreva receitas de ruído/veios/pattern: não é requisito de entrega aqui.
 - Exceção: se o usuário pedir para REMOVER texturas da página atual, apague as existentes (trocando por cor sólida/gradiente) e não crie novas.
 - Se o pedido citar explicitamente um material/textura (ex.: "peças de tijolo", "metal", "lava"), aí sim use o pack NxTex para esse material.
+`;
+
+  /* Bloco curto no lugar do bloco de texturas quando o pedido NÃO pede textura (modo desenho). */
+  var DRAWING_TEX_OFF_DIRECTIVE = `
+TEXTURAS E MATERIAIS — NÃO USE textura procedural neste desenho:
+- NÃO use window.NxTex, NÃO chame ctx.createPattern, NÃO crie THREE.CanvasTexture e NÃO desenhe textura procedural.
+- Use cores sólidas, gradientes de 2-5 tons, formas geométricas limpas com sombra/brilho e contornos refinados — é o caminho mais LEVE e RÁPIDO.
+- O acabamento visual VEM de: gradientes multicoloridos, contornos (ctx.stroke), highlight/sombra em shape deslocado, camadas de cor e composição equilibrada — não de textura procedural.
+- Se o pedido citar EXPLICITAMENTE um material específico (ex.: "textura de tijolo", "metal", "madeira", "lava"),
+  aí sim use NxTex para aquele material. Caso contrário, resolva com cor e gradiente.
 `;
 
   /* Detecta pedido explícito de textura no comando do usuário (ou na página atual). */
@@ -292,9 +585,69 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
     return docHasTextures(doc);
   }
 
+  /* ==========================================================
+   * CHAT_DIRECTIVE — modo conversa/resposta textual.
+   * Ativado quando o comando não é jogo nem desenho. Responde
+   * com HTML bonito, interativo e visualmente refinado — nunca
+   * texto puro.
+   * ========================================================== */
+  var CHAT_DIRECTIVE = `
+
+MODO CHAT ATIVADO — VOCÊ ESTÁ RESPONDENDO A UMA MENSAGEM. Sua resposta NÃO é um jogo nem um desenho técnico. Crie uma página HTML bonita, elegante e interativa que comunique a resposta com estilo e personalidade.
+
+REGRAS ABSOLUTAS:
+- Saída é SEMPRE HTML completo (<!DOCTYPE html>), não texto puro.
+- A página deve ser visualmente impressionante mesmo para uma resposta simples: use tipografia refinada, cores do tema, microanimações sutis, espaçamento generoso.
+- FUNDO: use o --nx-bg do tema, ou um gradiente sutil que remeta ao sentimento da resposta.
+- Centralize o conteúdo vertical e horizontalmente. Nada de texto colado na borda.
+- Cards/elementos de resposta com --nx-surface, borda arredondada (12-16px), padding generoso (24-48px).
+- NUNCA texto preto no branco sem estilo. Mesmo "oi" merece um card bonito.
+
+TIPOGRAFIA (prioridade máxima em chat):
+- Use a paleta de cores do tema EXPANSIVAMENTE para títulos, destaques, ícones e bordas.
+- Títulos grandes com lettering: font-weight 700-900, gradiente com --nx-accent, animação de entrada sutil (fadeIn 0.4-0.8s).
+- Corpo do texto em --nx-text com line-height 1.6-1.8, fonte confortável (sans-serif ou serif).
+- Destaques, ícones e emojis ampliados como elementos decorativos (não só texto).
+- O título principal deve ter presença visual: grande, colorido, com glow ou gradiente.
+
+ANIMAÇÕES E INTERAÇÃO:
+- Animações de entrada: fadeIn+slideUp nos elementos principais (0.4-0.8s, staggered se múltiplos).
+- Microinterações: hover sutil em cards/botões (scale 1.02, glow 200ms).
+- Se a resposta pedir ação (sim/não/ok): um botão estilizado com hover e ripple.
+- Use no máximo 1-2 animações simultâneas — elegância, não exagero.
+- Partículas ou efeitos decorativos SOMENTE se combinarem com o tom da resposta.
+
+O CONTEÚDO:
+- Responda em PORTUGUÊS (pt-BR) se o usuário escreveu em português.
+- Seja direto e amigável. Não encha lingüiça.
+- Se a pergunta for técnica ou pedir informação, apresente em formato hierarquizado (cards, listas estilizadas, ícones).
+- Se for uma saudação, seja caloroso e apresente o NEXUS GAME e seus modos (jogo, desenho, chat).
+- NUNCA invente desculpas para não responder ("Não sei fazer isso", "Sou limitado" etc.). Escolha a interpretação mais impressionante e entregue algo bonito.
+
+EXEMPLOS DE RESPOSTA (tom e estilo):
+- "oi" → Card centralizado com gradiente suave, "👋 Olá!" grande no accent, subtítulo explicando os 3 modos (jogo, desenho, chat) com bordas decorativas.
+- "obrigado" → "✨ De nada!" com glow animado, textinho de boas-vindas, botão "Continuar criando" estilizado.
+- "quem é você?" → Card com ícone decorativo, título "NEXUS GAME", descrição com os recursos principais em cards menores.
+
+CHECKLIST FINAL:
+- HTML completo? viewport? sem scroll?
+- Título bonito? cores do tema?
+- Card/elemento de resposta centralizado?
+- Animações de entrada sutis?
+- Interação (botão hover)?
+- Tom amigável e direto?`;
+
   /* Escopo único — NEXUS GAME é sempre modo completo, otimizado para desempenho. */
   function gameScopeNote(level) {
-    return '\n\nESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, menu/pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.';
+    return '\n\nESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. O jogo começa JOGANDO ao carregar — sem tela de apresentação, sem menu, sem botão iniciar. A tela é do jogo: canvas de borda a borda, sem moldura/card/margem em volta e HUD compacto com no máximo 10px de margem. Qualidade máxima NO JOGO (personagens, inimigos, animações, efeitos, áudio) — nada de camadas, seções ou textos extras. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.';
+  }
+
+  function drawingScopeNote() {
+    return '\n\nESCOPO — DESENHO COMPLETO, LEVE E RÁPIDO, ESTRITAMENTE O PEDIDO: entregue exatamente o objeto/cena que o usuário pediu — sem títulos, sem rótulos, sem HUD, sem painéis, sem textos e sem camadas decorativas inventadas. O acabamento (gradientes, contornos, highlight/sombra em shape) vai NO OBJETO, não em elementos extras. Barato de desenhar: poucos paths, nada de blur em tela cheia, desenho estático desenhado UMA vez. Textura procedural SÓ se o pedido citar material/textura. Paleta: a que você escolher para o pedido (ou a que ele especificar).';
+  }
+
+  function chatScopeNote() {
+    return '\n\nESCOPO — RESPOSTA VISUALMENTE REFINADA: a página deve ser bonita, elegante e transmitir a mensagem com estilo. Mesmo respostas curtas merecem tipografia cuidada, cores do tema, animação de entrada sutil e um card centralizado. O tom é amigável e direto.';
   }
 
   function gameLightingNote(theme) {
@@ -306,7 +659,7 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
   }
 
   /* Cor do brilho que atravessa o título: branco sobre accent escuro,
-     quase-preto sobre accent claro — garante contraste nos 30 temas. */
+     quase-preto sobre accent claro — garante contraste no tema único. */
   function sheenOn(hex) {
     var h = String(hex || '').replace('#', '');
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
@@ -388,34 +741,58 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
     return out;
   }
 
-  /* System prompt — NEXUS GAME tem um único modo: jogo. */
+  /* System prompt — detecta automaticamente o modo:
+     game (GAME_DIRECTIVE) > drawing (DRAWING_DIRECTIVE) > chat (CHAT_DIRECTIVE) */
   function systemPrompt(theme, detailLevel, command, doc, media) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
-    var out = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+    var mode = detectMode(command);
+    var intro = '';
+    var directive = '';
+    var scope = '';
+    var lighting = '';
+
+    if (mode === 'game') {
+      intro = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+      directive = wantsTextures(command, doc)
+        ? GAME_DIRECTIVE
+        : (GAME_DIRECTIVE_HEAD + TEXTURE_OFF_DIRECTIVE + GAME_DIRECTIVE_TAIL);
+      scope = gameScopeNote(level);
+      lighting = gameLightingNote(theme);
+    } else if (mode === 'drawing') {
+      intro = 'You are creating a COMPLETE HTML DRAWING / ILLUSTRATION / OBJECT for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+      directive = wantsTextures(command, doc)
+        ? DRAWING_DIRECTIVE
+        : (DRAWING_DIRECTIVE_HEAD + DRAWING_TEX_OFF_DIRECTIVE + DRAWING_DIRECTIVE_TAIL);
+      scope = drawingScopeNote();
+      lighting = gameLightingNote(theme);
+    } else {
+      /* modo chat — resposta textual com HTML bonito */
+      intro = 'You are responding in HTML for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
+      directive = CHAT_DIRECTIVE;
+      scope = chatScopeNote();
+      lighting = '';
+    }
+
+    var out = intro;
     out += 'Rules:\n';
     out += '- Output ONLY raw HTML. No markdown fences, no explanations.\n';
     out += '- Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.\n';
-    out += '- For 3D use three.js: <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script> (global THREE - do not use imports or module builds).\n';
+    if (mode === 'game' || mode === 'drawing') {
+      out += '- For 3D use the LOCAL three.js UMD build: <script src="vendor/three/three.min.js"></script> (global THREE; never imports/module builds). No addons available: THREE.OrbitControls, GLTFLoader, EffectComposer do NOT exist — orbit the camera manually with pointer drag. Use only core APIs (WebGLRenderer, PerspectiveCamera, Mesh*, Lights, Color, Fog).\n';
+    }
     out += '- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.\n';
     out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
     out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
-    out += wantsTextures(command, doc)
-      ? GAME_DIRECTIVE
-      : (GAME_DIRECTIVE_HEAD + TEXTURE_OFF_DIRECTIVE + GAME_DIRECTIVE_TAIL);
-    out += gameScopeNote(level);
-    out += gameLightingNote(theme);
-    out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
-    out += '- background: ' + theme.background + '\n';
-    out += '- accent (primary/highlights): ' + theme.accent + '\n';
-    out += '- text: ' + theme.text + '\n';
-    out += '- secondary text: ' + theme.secondary + '\n';
-    out += '- surface (cards/panels): ' + theme.surface + '\n';
-    out += '- surface alt: ' + theme.surfaceAlt + '\n';
-    if (theme.colors && theme.colors.length) {
-      out += '- extra palette colors (use them freely for gradients, particle colors, UI accents and lighting): ' + theme.colors.join(', ') + '\n';
+    out += directive;
+    out += scope;
+    out += lighting;
+    out += '\n\nPALETA — VOCÊ ESCOLHE (REGRA):\n';
+    out += '- The palette is YOURS to choose: pick colors that fit the subject, mood and genre of the request, and look professional and vibrant. Default to a dark background unless the subject asks for something light.\n';
+    out += '- If the user explicitly asks for colors, a theme, a palette, "estilo X", or references a specific look, follow that EXACTLY and drop your own preference.\n';
+    out += '- Never fall back to the app shell UI colors for games, drawings or objects: the page must stand on its own, with its own palette.\n';
+    if (mode === 'game') {
+      out += mediaBlock(media);
     }
-    out += 'For a game, ignore the "at most one gradient" and "avoid rainbow noise" rules \u2014 use the palette expansively across gradients, particles, lighting and UI. Respect the dark background, but the game must be vibrant.\n';
-    out += mediaBlock(media);
     return out;
   }
 
@@ -432,6 +809,32 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
   }
 
   /* Tira cercas markdown e texto antes/depois do documento HTML. */
+  /* Erros de sintaxe nos blocos <script> inline do documento.
+     Um documento "fechado" com JS quebrado = tela sem objeto (cubo/peça que
+     nunca aparece). Detecta e devolve as mensagens para o app pedir reparo. */
+  function jsSyntaxErrors(html) {
+    var out = [];
+    if (!html) return out;
+    var re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    var m, i = 0;
+    while ((m = re.exec(String(html))) !== null) {
+      i++;
+      var attrs = String(m[1] || '');
+      if (/\bsrc\s*=/i.test(attrs)) continue;              /* script externo */
+      if (/type\s*=\s*["']?module/i.test(attrs)) continue;  /* módulo ES: não avaliar */
+      var code = m[2];
+      if (!code || !code.trim()) continue;
+      try {
+        /* new Function compila sem executar — só valida a sintaxe. */
+        new Function(code);
+      } catch (e) {
+        out.push('script #' + i + ': ' + (e && e.message ? e.message : String(e)));
+        if (out.length >= 6) break;
+      }
+    }
+    return out;
+  }
+
   function extractDocument(raw) {
     var s = String(raw == null ? '' : raw).trim();
     if (s.indexOf('```') === 0) {
@@ -577,6 +980,8 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
       '--nx-accent-faint: ' + window.Themes.hexA(theme.accent, 20) + ';\n' +
       '--nx-text: ' + theme.text + ';\n' +
       '--nx-secondary: ' + theme.secondary + ';\n' +
+      (theme.colors && theme.colors[1] ? '--nx-c2: ' + theme.colors[1] + ';\n' : '') +
+      (theme.colors && theme.colors[2] ? '--nx-c3: ' + theme.colors[2] + ';\n' : '') +
       '}';
   }
 
@@ -612,7 +1017,8 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
     if (!VIEWPORT_REGEX.test(html)) {
       injection += '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">\n';
     }
-    injection += STORAGE_SAFE + '\n';
+    /* Polyfill de storage: só injeta se ainda não existir (themed() já pode ter posto). */
+    if (html.indexOf('id="nx-safe"') < 0) injection += STORAGE_SAFE + '\n';
     /* Pack de texturas procedurais (js/nx-textures.js) — só entra quando a página
        usa textura (NxTex/pattern/CanvasTexture). Sem uso, não carrega 36 KB à toa. */
     if (/\bNxTex\b|createPattern|CanvasTexture|nx-textures/.test(html)) {
@@ -641,14 +1047,21 @@ TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
     var hi = sheenOn(accent);
     var accentSoft = window.Themes.hexA(theme.accent, 150);
     var accentFaint = window.Themes.hexA(theme.accent, 20);
+    /* Detalhes do tema único BLACK CYBER: esmeralda → rosa → azul. */
+    var c2 = (theme.colors && theme.colors[1]) || accent;
+    var c3 = (theme.colors && theme.colors[2]) || accent;
 
     var word = 'NEXUS GAME';
+    var visible = word.replace(/ /g, '').length;
+    var vi = 0;
     var letters = word.split('').map(function (ch, i) {
-      var style = ' style="--i:' + i + '"';
       if (ch === ' ') {
-        return '<span class="sp" aria-hidden="true"' + style + '></span>';
+        return '<span class="sp" aria-hidden="true" style="--i:' + i + '"></span>';
       }
-      return '<span aria-hidden="true"' + style + '>' + esc(ch) + '</span>';
+      var f = visible > 1 ? vi / (visible - 1) : 0;
+      vi++;
+      var col = f < 0.5 ? accent : (f < 0.8 ? c2 : c3);
+      return '<span aria-hidden="true" style="--i:' + i + ';--c:' + col + '">' + esc(ch) + '</span>';
     }).join('');
 
     return `<!DOCTYPE html>
@@ -670,7 +1083,7 @@ body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;dis
   animation:nx-glow 5s ease-in-out 1.4s infinite}
 .title span{display:inline-block;color:transparent;
   background-image:linear-gradient(100deg,transparent 42%,${hi} 50%,transparent 58%),
-                   linear-gradient(160deg,${accent} 0%,${accentSoft} 100%);
+                   linear-gradient(160deg,var(--c,${accent}) 0%,${accentSoft} 100%);
   background-size:300% 100%,100% 100%;
   background-position:0% 0,0 0;
   background-repeat:no-repeat;
@@ -691,8 +1104,8 @@ body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;dis
   .title{animation:none}
   .title span{animation:none;opacity:1;transform:none;
     background-image:none;color:${accent}}}
-.line{height:1px;width:min(56vw,440px);opacity:.6;
-  background:linear-gradient(90deg,transparent,${accent},transparent)}
+.line{height:1px;width:min(56vw,440px);opacity:.75;
+  background:linear-gradient(90deg,transparent,${accent} 25%,${c2} 60%,${c3} 85%,transparent)}
 </style>
 </head>
 <body>
@@ -843,11 +1256,18 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     BASE_PROMPT: BASE_PROMPT,
     EDIT_DIRECTIVE: EDIT_DIRECTIVE,
     GAME_DIRECTIVE: GAME_DIRECTIVE,
+    DRAWING_DIRECTIVE: DRAWING_DIRECTIVE,
+    CHAT_DIRECTIVE: CHAT_DIRECTIVE,
     TEXTURE_OFF_DIRECTIVE: TEXTURE_OFF_DIRECTIVE,
     wantsTextures: wantsTextures,
     STORAGE_SAFE: STORAGE_SAFE,
     isGameCommand: isGameCommand,
+    isDrawingCommand: isDrawingCommand,
+    isChatCommand: isChatCommand,
+    detectMode: detectMode,
     gameScopeNote: gameScopeNote,
+    drawingScopeNote: drawingScopeNote,
+    chatScopeNote: chatScopeNote,
     applyEdits: applyEdits,
     looksLikeDocument: looksLikeDocument,
     VIEWPORT_REGEX: VIEWPORT_REGEX,
@@ -866,6 +1286,7 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     baseCss: baseCss,
     esc: esc,
     escAttr: escAttr,
+    jsSyntaxErrors: jsSyntaxErrors,
     rewriteLibs: rewriteLibs
   };
 })();

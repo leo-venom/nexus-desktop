@@ -13,7 +13,7 @@
     <h1 class="brand" id="brand">NEXUS GAME</h1>
     <span class="dot" id="dot"></span>
     <div class="promptwrap">
-      <input id="prompt" class="prompt" type="text" placeholder="Ex: jogo de nave com tiro, tetris neon, plataforma com lava"
+      <input id="prompt" class="prompt" type="text" placeholder="Ex: jogo de nave, desenhe um castelo, logo neon, oi"
              autocomplete="off" spellcheck="false">
       <button class="reset" id="btn-reset" type="button" title="Reiniciar sessão"
               aria-label="Reiniciar sessão">↺</button>
@@ -42,8 +42,9 @@
 </div>
 <main class="stage">
   <iframe id="frame" class="frame" title="Página gerada"
-          allow="fullscreen; pointer-lock; keyboard-lock; autoplay"
+          allow="fullscreen; autoplay"
           sandbox="allow-scripts allow-pointer-lock allow-popups"></iframe>
+  <div id="nx-preview" class="nx-preview" hidden>⚡ prévia ao vivo</div>
 </main>
 <script src="js/themes.js"></script>
 <script src="js/prefs.js"></script>

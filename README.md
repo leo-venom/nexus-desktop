@@ -1,22 +1,50 @@
 # NEXUS GAME
 
-Gerador de **jogos HTML completos** com IA: chat + shell que cria, edita e roda jogos em iframe isolado.
+Gerador de **jogos HTML, desenhos/objetos e respostas visuais** com IA: digite o que
+você quer (jogo, desenho, logo, conversa) e o app detecta automaticamente o melhor
+formato — tudo com a mesma qualidade visual refinada.
+
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 
-**Versão 2.9.2** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
+**Versão 2.13.0** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
 
 ## Recursos
 
-- **Modo jogo único** — todo comando gera jogo (não existe modo site/página)
-- **`GAME_DIRECTIVE` de 16.651 chars** — regras de tela, HUD lateral, 8-12 níveis, 3+ inimigos,
-  power-ups, parallax, partículas com pool, música + SFX, menu/pausa/game over
-- **44 texturas procedurais prontas** (`window.NxTex`) — lava, metal, cristais, circuito, aurora…
+### 🎮 Modo Jogo
+- **`GAME_DIRECTIVE`** — regras de tela, 8-12 níveis, 3+ inimigos, power-ups, parallax,
+  partículas com pool, música + SFX, pausa/game over com estatísticas
+- **Começa jogando**: sem tela de apresentação, sem menu e sem botão iniciar — nível 1 já
+  rodando no primeiro frame, com render síncrono antes do loop
+- **HUD em bolhas laterais** (pílulas de vidro, máx. 100px, 10px de margem) e **canvas de
+  borda a borda**, sem moldura nem painel em volta
+- **Só o que foi pedido**: nada de seções, cards, créditos ou camadas decorativas extras
+- **FPS AUTO**: mede fps e reduz sozinho a qualidade (pixelRatio/partículas/sombras) para
+  manter o jogo fluido
+
+### 🎨 Modo Desenho/Objeto
+- **`DRAWING_DIRECTIVE`** — acabamento alto no próprio objeto (gradientes, contorno,
+  highlight/sombra em shape, iluminação 3D), leve e rápido
+- **Estritamente o pedido**: sem títulos, rótulos, HUD, painéis ou camadas inventadas —
+  enriquecer dentro do objeto, nunca ao redor
+- Cobre: ilustração, logo, infográfico, objeto 3D, paisagem, data viz, tipografia,
+  animação visual, simulação física e mais
+
+### 💬 Modo Chat
+- **`CHAT_DIRECTIVE`** — saudações, perguntas, conversas casuais viram páginas HTML
+  bonitas com cards, tipografia refinada e animações sutis.
+  Nunca texto puro — até "oi" ganha um cartão elegante.
+
+### Geral
+- **44 texturas procedurais prontas** (`window.NxTex`) — usadas **somente quando o pedido
+  cita material/textura** (lava, metal, cristais, circuito…)
 - **13 sons WebAudio** com receitas completas (frequências, envelopes, filtros)
-- **30 temas** — 20 escuros + 10 claros
-- **Desempenho 60 fps** cobrado no prompt (um canvas/um loop, fundo offscreen, pool de partículas)
-- **Proteções no app** — storage polyfill, loop de continuação de resposta cortada, resize nudge,
-  stall detector de 90 s
+- **1 tema único** `PADRÃO · BLACK CYBER` (preto + esmeralda/rosa/azul) — sem seletor de temas
+- **three.js r160 local** (`vendor/three/three.min.js`, UMD, sem addons) — 3D funciona offline
+- **Prévia ao vivo** durante a geração (documento parcial renderizado a cada ~1,2 s)
+- **Desempenho 60 fps** cobrado no prompt + auto-ajuste
+- **Proteções no app** — storage polyfill, continuação de resposta cortada, checagem de
+  sintaxe do JS com reparo automático, watchdog de canvas vazio, stall detector
 - **Modo edição visual** — clique seleciona, duplo clique abre popover, arrasto, redimensionamento
   por bordas, Ctrl+Z com pilha de 200, FINALIZAR grava as edições
 
@@ -65,7 +93,7 @@ existe só para isso: a janela fala com `127.0.0.1` (mesma origem) e o servidor 
 3. Informe o **Modelo** (ou use **Buscar modelos**).
 4. **Salvar configurações**.
 
-No rodapé do ⚙ aparece a versão (`ai-client v2.9.2 · origem …`) — útil para conferir se a
+No rodapé do ⚙ aparece a versão (`ai-client v2.13.0 · origem …`) — útil para conferir se a
 janela carregou o código atual.
 
 ## Interface e sessão
@@ -77,7 +105,7 @@ janela carregou o código atual.
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
   seguro para documento completo;
 - VU meter + KB ao vivo durante a geração; tokens estimados (`~`) e exatos ao final;
-- 30 temas (20 escuros + 10 claros) — trocar o tema redecora a página **sem chamar a IA**;
+- 1 tema único (`PADRÃO · BLACK CYBER`) — sem seletor; a paleta de jogos/desenhos vem do pedido;
 - SALVAR / ABRIR / excluir páginas `.html`;
 - three.js local em `web/vendor/three/` (URLs de CDN são reescritas para o vendor no render);
 - sessão com orçamento de 1M tokens e reset (`↺`).
@@ -100,7 +128,7 @@ nexus-game/
 │   ├── index.html           # shell: header, palco (iframe), barra de comando
 │   ├── css/app.css          # tema via var(--nx-*), modais e toast
 │   ├── js/
-│   │   ├── themes.js        # 30 temas + hexA()
+│   │   ├── themes.js        # tema único + hexA()
 │   │   ├── prefs.js         # localStorage["nexus77"]
 │   │   ├── html-builder.js  # prompt, extração, decoração e páginas internas
 │   │   ├── ai-client.js     # fetch + SSE + proxy + fallback não-streaming em HTTP 4xx
@@ -119,7 +147,7 @@ nexus-game/
 
 ## Status
 
-**v2.9.2** — validada em 2026-10-20. O shell Electron e as correções do topo do
+**v2.13.0** — validada em 2026-10-21. O shell Electron e as correções do topo do
 [`CHANGELOG`](docs/CHANGELOG.md) estão no working tree (não publicados); a matriz de
 2026-10-18 está em [`docs/VALIDACAO.md`](docs/VALIDACAO.md).
 
@@ -127,7 +155,7 @@ nexus-game/
 
 | Sintoma | Causa / solução |
 | --- | --- |
-| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.9.2`). |
+| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.13.0`). |
 | Electron não abre | Falta o binário: `npm --prefix desktop install`. Rode `./desktop/start.sh` no terminal para ver o erro (o launcher descarta a saída). |
 | `HTTP 401` / `Incorrect API key` | Chave inválida ou endpoint errado. Use **Buscar modelos** no ⚙ para testar. |
 | `HTTP 404`/`501` no `/_proxy` | Servidor não é o `serve.py`/`desktop/server.js` (ex.: `python3 -m http.server`). Troque para um deles. |
