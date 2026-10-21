@@ -1,5 +1,108 @@
 # Changelog — NEXUS GAME
 
+## v2.9.3 — 2026-10-20
+
+### Corrigido
+- **"Corrija o jogo" regenerava do zero e podia piorar.** Quando a resposta em modo edição
+  não era um objeto `{edits:[…]}` válido, o app chamava `sendPrompt` novamente com o comando
+  cru e **sem o documento atual** — a IA reinventava o jogo em vez de consertar o existente.
+  Agora existe um caminho de retentativa explícito: `run(baseSystem, retryUser)` reenvia com
+  `Html.userPrompt(userBase, lastRendered, notes)` + instrução para devolver o **documento
+  completo atualizado**. Se nem isso trouxer documento, a página em tela é **mantida**
+  (`doc == null` → `⚠ nada aplicado — página atual mantida`) em vez de ser substituída por
+  uma versão nova e possivelmente pior.
+- **Edição cirúrgica frágil (find/replace exato).** `applyEdits` falhava com qualquer
+  diferença de indentação ou `\r\n` e, pior, descartava **todas** as edições por causa de uma
+  âncora ruim. Agora o casamento é em cascata — exato → CRLF → whitespace normalizado
+  (`_wsRegex`) — e o resultado é **parcial**: aplica o que casar e reporta o que falhou
+  (`{ok, partial, html, applied, failed}`). `partial` faz `editCount++` e avisa
+  `⚠ N falha(s) não casaram — aplicado o resto`. Teto de 200 edições por resposta.
+- **A IA não sabia que o jogo estava quebrado.** O iframe é origem opaca: nada do erro
+  aparecia para o app, então "o jogo não funciona" chegava ao modelo como um comando cego.
+  O `SHIM` agora captura `error` (capture, incluindo falha de recurso com `tagName`/`src`),
+  `unhandledrejection` e `console.error`, deduplica e envia via bridge `errors`. O app guarda
+  `frameErrors` e injeta até 12 linhas (`k:linha · mensagem`) no prompt sob "Runtime errors
+  reported by the CURRENT page (it is broken — fix these first)". **A IA passa a receber o
+  sintoma que o usuário vê.**
+- **Aviso de erro dependia de sorte no timing.** `watchFrameErrors` checava uma única vez em
+  ~1 s; erro disparado no `load` tardio (áudio, textura, `THREE`) passava batido. Agora checa
+  em **2,5 s e 6 s**, com flag `notified` para avisar uma única vez.
+- **Estado da sessão anterior vazava para a próxima.** `resetSession` limpava só
+  `lastRendered`/tokens. Agora zera também `editSelHtml`, `editCount`, `frameErrors` e
+  `lastCommands` — elemento selecionado, contador de ajustes, erros e histórico não
+  contaminam uma geração nova.
+- **`elementHint` usava alvo velho.** Ao preservar `editSelHtml` para o refinamento
+  (correção anterior), uma geração **nova** podia herdar o elemento selecionado da página
+  antiga. O hint agora só é montado `if (editing && editSelHtml)`.
+- **Refinamento sem memória.** Cada ajuste era interpretado isolado e a IA podia desfazer o
+  anterior. `lastCommands` guarda os 6 últimos comandos aplicados com sucesso e injeta os 3
+  mais recentes como contexto ("Previous commands already applied to this page — do not undo
+  them").
+
+### Adicionado
+- **Telemetria de erro no `SHIM`** (`_pushErr`): normaliza espaços, corta em 300 chars,
+  deduplica por `k|msg|linha`, cap de 40 entradas, chaves `{k, m, l}`.
+- **`notes` em `Html.userPrompt`** (3º parâmetro): erros de runtime + comandos anteriores
+  entram entre o documento e o comando, mantendo o `Command:` no fim (posição de maior
+  aderência).
+
+### Alterado
+- **Tela de apresentação leve e animada em CSS puro.** `welcomePage()` continua sem
+  `<canvas>`, sem `requestAnimationFrame` e sem script — nenhum trabalho de JS na abertura —
+  mas voltou a ter movimento, agora **só com `@keyframes`** (compositor, custo zero de CPU):
+  - **Entrada letra a letra**: `nx-in` (`.7s`, `cubic-bezier(.22,.9,.24,1)`) com
+    `translateY(.45em) scale(.9)` → `none`, `animation-delay: calc(var(--i)*60ms)`.
+  - **Onda de brilho por letra**: `nx-sheen` (`3.6s` loop, `delay: calc(1.1s + var(--i)*120ms)`)
+    desloca uma faixa de `linear-gradient(100deg,transparent 42%,${hi} 50%,transparent 58%)`
+    de `background-position:0%` → `100%` (pico em 35%), de modo que o brilho atravessa
+    "NEXUS GAME" da esquerda para a direita e pausa antes de repetir. A palavra inteira fica
+    no accent; a faixa é apenas uma segunda camada de gradiente clipada no texto.
+  - **Glow**: `nx-glow` (`5s`, delay `1.4s`) pulsa `drop-shadow` em `.title`.
+  - **Espaço entre as palavras**: como os `<span>` são `inline-block`, o espaço colapsava —
+    corrigido com `<span class="sp">` e `.title .sp{width:.34em}`.
+  - **Contraste do brilho**: nova `sheenOn(hex)` escolhe `#0B0B0E` ou `#FFFFFF` pela
+    luminância (`0.299r+0.587g+0.114b`, corte `0.62`), em vez de usar `theme.text` — em temas
+    claros com accent claro a faixa ficava invisível. Nos 30 temas: 22 brancas, 8 escuras.
+  - **`prefers-reduced-motion`**: `animation:none` no título e `background-image:none;
+    color:${accent}` nos spans, garantindo letras sólidas (antes herdava
+    `background-position:50% 50%` e congelava a faixa branca no meio da palavra).
+  - `background-attachment:fixed` foi descartado: com `background-clip:text` as porcentagens
+    de `background-size`/`background-position` são resolvidas de forma inconsistente.
+  Página gerada: **2.785 bytes**, 10 spans, 3 keyframes, sem `canvas` e sem `fixed`.
+
+### Verificado
+- `node /tmp/nx-exp/edits.js` — **17/17**: exato, whitespace tolerante, CRLF, parcial,
+  nenhum casamento, não-JSON, cercas markdown, `find` vazio, >200 edits, array puro,
+  `replace` vazio, sem loop, metas de regex, e os 4 formatos de `userPrompt`.
+- Smoke Electron headless — **20/20, exit 0** (geração, sandbox, texturas, SALVAR, export
+  38 KB com `NxTex`, viewport móvel, ESC durante geração lenta, sem exceções).
+- `node --check` OK em `app.js` (**1.701 l.**) e `html-builder.js` (**825 l.**).
+- `welcomePage()` — harness com stubs de `window`/`Themes.hexA` sobre os **30 temas**: sem
+  `canvas`, sem `requestAnimationFrame`, sem `background-attachment`, sem `undefined`/`NaN`,
+  10 spans + `class="sp"` e os 3 keyframes em todos; bytes idênticos (**2.785 B**).
+  Screenshots em Chromium headless confirmaram a onda atravessando da esquerda para a direita
+  (`X` aceso em ~2,1 s, `G` em ~2,5 s) e letras sólidas no accent com
+  `--force-prefers-reduced-motion`.
+
+### Notas de investigação
+- **"A edição se perde" não era bug de estado.** `snapshot()` remove `#nx-shim`/`#nx-freeze`
+  e `sanitizeSnapshotHtml` remove `<style id="nx-fonts">` e reescreve `/vendor/three/`; logo
+  `applySnapshot` grava um documento canônico limpo. **Não** re-renderizar depois é correto
+  por design — um re-render recarregaria o iframe e apagaria o estado do jogo (score, posição).
+  A percepção de perda vinha do encadeamento regenerar → piorar, tratado acima.
+
+### Adicionado
+- **Mídia do projeto (`imagens/` e `sons/`)** — pastas na raiz do projeto onde o usuário coloca
+  backgrounds, texturas de bloco, sprites, músicas e efeitos sonoros. A lista real de arquivos
+  é servida em `/midia`, `/imagens/` e `/sons/` (JSON + arquivos com CORS/CORP) e entra no
+  system prompt via 5º argumento de `systemPrompt` (função `mediaBlock`). A página gerada
+  referencia os caminhos relativos exatos (`imagens/fundo.jpg`, `sons/tiro.mp3`). No `Salvar`,
+  `inlineMedia()` embute as mídias usadas como data URI (limites: 6 MB/arquivo, 20 MB total).
+- `LEIA-ME.txt` em ambas as pastas com instruções de uso.
+- Extensões suportadas: imagens — PNG, JPG, JPEG, WebP, GIF, SVG, AVIF, BMP; sons — MP3,
+  OGG, WAV, M4A, FLAC, Opus, AAC, WebM.
+- Servidores `serve.py` e `desktop/server.js` replicam o comportamento de `/fontes/` para mídia.
+
 ## v2.9.2 — 2026-10-20
 
 ### Corrigido

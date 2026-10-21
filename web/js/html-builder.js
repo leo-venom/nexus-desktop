@@ -111,7 +111,15 @@ COMO ENTREGAR O JOGO COMPLETO:
 7. Tela de game over COM estatísticas: score final, nível alcançado, tempo de jogo, high score. Animação de entrada.
 8. Mecânicas secundárias: combos, multiplicadores de score por kills consecutivas, bônus de velocidade.
 
-12 TEXTURAS PROCESSUAIS (three.js CanvasTexture — aplicar automaticamente conforme o material de cada objeto):
+PRIMEIRO FRAME — REGRA ABSOLUTA:
+O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
+- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
+- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
+- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
+- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
+
+@@NX_TEX_BEGIN@@
+12 TEXTURAS PROCESSUAIS (three.js CanvasTexture — aplicar somente quando o pedido pedir textura/material):
 Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height=128; var x=c.getContext('2d'); /* desenho */ var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; material.map=t;
 
 1. METAL: ruído ImageData (loop em pixels, variar R/G/B entre 140-200) + sobrepor listras horizontais finas (fillRect altura 1-2px, espaçadas 8px, cinza escuro). material: MeshStandardMaterial, metalness:0.8, roughness:0.3.
@@ -152,13 +160,6 @@ Jogo 2D (Tetris, Snake, plataforma, shooter top-down, quebra-cabeça) NÃO pode 
 - Nunca use só fillStyle = '#FF0000' numa peça/inimigo: peça com cor lisa = entrega incompleta.
 - Se o pedido diz "textura lava", TODAS as peças devem mostrar a lava (gradiente + veios + brilho), não apenas a borda ou o fundo.
 
-PRIMEIRO FRAME — REGRA ABSOLUTA:
-O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
-- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
-- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
-- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
-- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
-
 REGRA DE 3D SIMPLES: se o pedido for um objeto ou cena 3D — cubo, esfera, planeta, torus, cilindro, voxel — você DEVE aplicar uma textura procedural de verdade (CanvasTexture), nunca apenas uma cor lisa em MeshStandardMaterial. Escolha a textura pelo contexto do pedido (lava → LAVA animada; metal → METAL; planeta → TERRA ou CÉU; moeda → OURO). O cubo/cena 3D sem textura é considerado entrega incompleta.
 
 INFERÊNCIA AUTOMÁTICA DE TEXTURA (aplicar SEMPRE sem o usuário pedir):
@@ -175,6 +176,7 @@ ANIMAÇÃO DE TEXTURA:
 - Lava/água/fogo: loop rAF que redesenha o CanvasTexture a cada frame (desloca ruído, muda gradiente). SEMPRE setar texture.needsUpdate = true após redesenhar.
 - Efeito de fluxo mais leve (água, vento): texture.offset.x += 0.005 ou texture.offset.y += 0.005 a cada frame. RepeatWrapping obrigatório.
 - Piscar/brilho: variar material.emissiveIntensity com Math.sin(time * freq) no loop.
+@@NX_TEX_END@@
 
 13 SONS WEBAUDIO REALISTAS — ARQUITETURA COMPLETA:
 
@@ -228,8 +230,67 @@ VERIFIQUE ANTES DE ENTREGAR:
 - 8-12 níveis? 3+ inimigos com comportamentos diferentes? 2-3 power-ups?
 - Parallax? partículas com pool (~40-60)? música+SFX? screen shake?
 - Menu+pausa+game over com stats? recorde salvo? teclado+toque?
-- Texturas aplicadas conforme material? sons em todas as ações?
+- Texturas aplicadas quando o pedido pedir? sons em todas as ações?
 - Cada nível diferente do anterior (não só velocidade)?`;
+
+  /* Divide o GAME_DIRECTIVE em cabeça / bloco de texturas / cauda.
+     O bloco de texturas entra no prompt SOMENTE quando o pedido pede textura. */
+  var _texBegin = GAME_DIRECTIVE.indexOf('@@NX_TEX_BEGIN@@');
+  var _texEnd = GAME_DIRECTIVE.indexOf('@@NX_TEX_END@@');
+  var GAME_DIRECTIVE_HEAD = _texBegin < 0 ? GAME_DIRECTIVE : GAME_DIRECTIVE.slice(0, _texBegin);
+  var TEXTURE_DIRECTIVE = (_texBegin < 0 || _texEnd < 0) ? '' :
+    GAME_DIRECTIVE.slice(_texBegin + '@@NX_TEX_BEGIN@@'.length, _texEnd);
+  var GAME_DIRECTIVE_TAIL = _texEnd < 0 ? '' :
+    GAME_DIRECTIVE.slice(_texEnd + '@@NX_TEX_END@@'.length);
+  GAME_DIRECTIVE = GAME_DIRECTIVE_HEAD + TEXTURE_DIRECTIVE + GAME_DIRECTIVE_TAIL;
+
+  /* Bloco curto no lugar do bloco de texturas quando o pedido NÃO pede textura. */
+  var TEXTURE_OFF_DIRECTIVE = `
+TEXTURAS — SOMENTE SOB PEDIDO (este pedido NÃO pede textura):
+- NÃO use window.NxTex, NÃO chame ctx.createPattern, NÃO crie THREE.CanvasTexture e NÃO desenhe textura procedural.
+- Cada peça/inimigo/plataforma/objeto usa cor sólida, gradiente de 2-3 tons, forma geométrica ou sombra/brilho simples — visual limpo e flat.
+- Não converta material em textura por conta própria e não escreva receitas de ruído/veios/pattern: não é requisito de entrega aqui.
+- Exceção: se o usuário pedir para REMOVER texturas da página atual, apague as existentes (trocando por cor sólida/gradiente) e não crie novas.
+- Se o pedido citar explicitamente um material/textura (ex.: "peças de tijolo", "metal", "lava"), aí sim use o pack NxTex para esse material.
+`;
+
+  /* Detecta pedido explícito de textura no comando do usuário (ou na página atual). */
+  var TEX_TERMS = [
+    'textura', 'texturas', 'texturizado', 'texturizada', 'texturizar',
+    'pattern', 'material', 'materiais', 'shader', 'pbr',
+    'tijolo', 'tijolos', 'madeira', 'metal', 'metalico', 'pedra', 'rocha',
+    'lava', 'grama', 'asfalto', 'marmore', 'ouro', 'prata', 'gelo', 'agua',
+    'neon', 'chocolate', 'couro', 'cristal', 'ferrugem', 'concreto',
+    'holograma', 'obsidiana', 'basalto', 'ametista', 'rubi', 'safira',
+    'turquesa', 'cobre', 'bronze', 'titanio', 'camuflagem', 'zebra', 'tigre',
+    'veludo', 'pergaminho', 'circuito', 'binario', 'aurora', 'pantano',
+    'areia', 'terra', 'realista', 'realistas', 'fotorrealista', 'voxel'
+  ];
+  /* "sem textura", "tira a textura", "remove texture" → NÃO usar textura. */
+  var TEX_NEGATE = /(?:^|[^a-z0-9])(?:sem|no|without|remove|remover|remova|retire|retirar|retira|retiram|tirar|tira|tiram|tire|apague|apagar|desativa\w*|desligar\w*|desligue)\b[^.!?]{0,28}?textur\w*/;
+
+  function accentless(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function docHasTextures(doc) {
+    if (!doc || typeof doc !== 'string') return false;
+    return /\bNxTex\b|createPattern|CanvasTexture|nx-textures/.test(doc);
+  }
+
+  function wantsTextures(cmd, doc) {
+    var c = accentless(cmd);
+    if (c && TEX_NEGATE.test(c)) return false;
+    var i;
+    if (c) {
+      for (i = 0; i < TEX_TERMS.length; i++) {
+        if (new RegExp('(?:^|[^a-z0-9])' + TEX_TERMS[i] + '(?:[^a-z0-9]|$)').test(c)) return true;
+      }
+    }
+    /* Ajuste numa página que já tem textura: mantém textura. */
+    return docHasTextures(doc);
+  }
 
   /* Escopo único — NEXUS GAME é sempre modo completo, otimizado para desempenho. */
   function gameScopeNote(level) {
@@ -242,6 +303,17 @@ VERIFIQUE ANTES DE ENTREGAR:
               0.0722 * parseInt(theme.background.slice(5,7),16) / 255;
     if (lum < 0.2) return '\nThe game scene MUST be visibly lit. Add a subtle rim light or glow on characters and interactive elements so they stand out from the dark background.';
     return '';
+  }
+
+  /* Cor do brilho que atravessa o título: branco sobre accent escuro,
+     quase-preto sobre accent claro — garante contraste nos 30 temas. */
+  function sheenOn(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return '#FFFFFF';
+    var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.62 ? '#0B0B0E' : '#FFFFFF';
   }
 
   /* Escapa texto para HTML. Equivale ao replace global do Kotlin. */
@@ -272,8 +344,52 @@ VERIFIQUE ANTES DE ENTREGAR:
     return '';
   }
 
+  /* Arquivos de mídia que o usuário colocou em imagens/ e sons/ (vindos de
+     /midia). Entram no prompt como caminhos relativos: a página gerada é
+     servida de http://127.0.0.1:PORT/ no iframe, então "imagens/x.jpg"
+     resolve. No salvamento essas referências viram data URI (inlineMedia). */
+  var MEDIA_LIMIT = 60;   /* itens listados por tipo (mantém o prompt curto) */
+
+  function mediaBlock(media) {
+    if (!media || typeof media !== 'object') return '';
+    var imgs = Array.isArray(media.images) ? media.images : [];
+    var snds = Array.isArray(media.sounds) ? media.sounds : [];
+    if (!imgs.length && !snds.length) return '';
+
+    function rel(kind, item) {
+      /* url vem do servidor já percent-encoded ("/imagens/a%20b.png") */
+      var url = item && item.url ? String(item.url) : '';
+      return kind + '/' + (url.indexOf('/') >= 0 ? url.substring(url.lastIndexOf('/') + 1) : url);
+    }
+    function line(kind, item) {
+      var path = rel(kind, item);
+      var kb = item && item.size ? Math.max(1, Math.round(item.size / 1024)) : 0;
+      return '- ' + path + (kb ? ' (' + kb + ' KB)' : '');
+    }
+
+    var out = '\n\nMEDIA FILES available in this project (real files the user added). Use them when the command calls for a background, texture, sprite sheet, music or sound effect:\n';
+    if (imgs.length) {
+      out += 'Images:\n' + imgs.slice(0, MEDIA_LIMIT).map(function (it) { return line('imagens', it); }).join('\n') + '\n';
+      if (imgs.length > MEDIA_LIMIT) out += '- (' + (imgs.length - MEDIA_LIMIT) + ' more images not listed)\n';
+    }
+    if (snds.length) {
+      out += 'Sounds:\n' + snds.slice(0, MEDIA_LIMIT).map(function (it) { return line('sons', it); }).join('\n') + '\n';
+      if (snds.length > MEDIA_LIMIT) out += '- (' + (snds.length - MEDIA_LIMIT) + ' more sounds not listed)\n';
+    }
+    out += 'How to use them:\n';
+    out += '- Reference the EXACT relative path shown above. Never prefix it with "/", "http://", "file://" or an app URL, and never change the extension.\n';
+    out += '- Image as background: element.style.backgroundImage = \'url("imagens/x.jpg")\' or CSS background: url("imagens/x.jpg") center/cover no-repeat.\n';
+    out += '- Image as repeating block texture: const img = new Image(); img.src = "imagens/x.jpg"; img.onload = () => { ctx.fillStyle = ctx.createPattern(img, "repeat"); }.\n';
+    out += '- Sprite sheet: load with new Image() and slice it with ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh).\n';
+    out += '- Sound effects: new Audio("sons/x.mp3").play() on the event (shot, hit, jump, pickup). Set cloneNode for rapid repeats if needed.\n';
+    out += '- Music: const music = new Audio("sons/x.mp3"); music.loop = true; music.volume = 0.35; — start it on the first user gesture (click/keydown), never on load.\n';
+    out += '- Never invent filenames: use only the files listed above. If the command needs an asset that is not listed, build it procedurally (canvas, gradients, WebAudio oscillators) instead of guessing a path.\n';
+    out += '- Never inline base64 media in the generated HTML; the app embeds the files itself when the page is saved.\n';
+    return out;
+  }
+
   /* System prompt — NEXUS GAME tem um único modo: jogo. */
-  function systemPrompt(theme, detailLevel, command) {
+  function systemPrompt(theme, detailLevel, command, doc, media) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
     var out = 'You are creating a COMPLETE HTML GAME for NEXUS GAME. Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.\n\n';
     out += 'Rules:\n';
@@ -283,7 +399,9 @@ VERIFIQUE ANTES DE ENTREGAR:
     out += '- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.\n';
     out += '- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).\n';
     out += '- If the message includes a "Current page" HTML document, treat the command as an edit - change only what was asked.\n';
-    out += GAME_DIRECTIVE;
+    out += wantsTextures(command, doc)
+      ? GAME_DIRECTIVE
+      : (GAME_DIRECTIVE_HEAD + TEXTURE_OFF_DIRECTIVE + GAME_DIRECTIVE_TAIL);
     out += gameScopeNote(level);
     out += gameLightingNote(theme);
     out += '\n\nCurrent app theme \u2014 use these exact colors as the main palette:\n';
@@ -297,13 +415,20 @@ VERIFIQUE ANTES DE ENTREGAR:
       out += '- extra palette colors (use them freely for gradients, particle colors, UI accents and lighting): ' + theme.colors.join(', ') + '\n';
     }
     out += 'For a game, ignore the "at most one gradient" and "avoid rainbow noise" rules \u2014 use the palette expansively across gradients, particles, lighting and UI. Respect the dark background, but the game must be vibrant.\n';
+    out += mediaBlock(media);
     return out;
   }
 
-  /* Comando do usuário; se houver página atual, vira edição dela. */
-  function userPrompt(command, currentDoc) {
-    if (currentDoc == null || !String(currentDoc).trim()) return command;
-    return 'Current page (the HTML document currently displayed on screen):\n```html\n' + currentDoc + '\n```\n\nCommand: ' + command;
+  /* Comando do usuário; se houver página atual, vira edição dela.
+     `notes` entra DEPOIS do documento (erros de runtime, histórico curto) para o
+     modelo ver o estado real da página antes de decidir o que mudar. */
+  function userPrompt(command, currentDoc, notes) {
+    var extra = notes == null ? '' : String(notes);
+    if (currentDoc == null || !String(currentDoc).trim()) {
+      return extra ? command + '\n\n' + extra : command;
+    }
+    return 'Current page (the HTML document currently displayed on screen):\n```html\n' + currentDoc +
+      '\n```' + (extra ? '\n\n' + extra : '') + '\n\nCommand: ' + command;
   }
 
   /* Tira cercas markdown e texto antes/depois do documento HTML. */
@@ -383,40 +508,62 @@ VERIFIQUE ANTES DE ENTREGAR:
     return null;
   }
 
+  /* Regex tolerante a indentação/quebras: cada bloco de espaços do "find" vira \s+. */
+  function _wsRegex(find) {
+    var parts = String(find).split(/\s+/).filter(function (s) { return s !== ''; });
+    if (!parts.length) return null;
+    var esc = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+    try { return new RegExp(parts.map(function (s) { return esc(s); }).join('\\s+')); }
+    catch (e) { return null; }
+  }
+
   /**
    * Aplica edições cirúrgicas ({edits:[{find,replace}]}) sobre o documento atual.
-   * Retorna {ok:true, html} ou {ok:false} — o app decide o fallback.
+   * Tolerante: casamento exato → CRLF → whitespace normalizado. Parcial: aplica o
+   * que casar e reporta o que não casou (uma âncora ruim não descarta o resto).
+   * Retorna {ok, partial, html, applied, failed}.
    */
   function applyEdits(doc, raw) {
-    if (!doc) return { ok: false };
+    var miss = { ok: false, partial: false, applied: 0, failed: 0 };
+    if (!doc) return miss;
     var chunk = firstJsonValue(stripFences(raw));
-    if (!chunk) return { ok: false };
+    if (!chunk) return miss;
     var parsed;
-    try { parsed = JSON.parse(chunk); } catch (e) { return { ok: false }; }
+    try { parsed = JSON.parse(chunk); } catch (e) { return miss; }
     var edits = Array.isArray(parsed) ? parsed
       : (parsed && Array.isArray(parsed.edits) ? parsed.edits : null);
-    if (!edits || !edits.length || edits.length > 200) return { ok: false };
+    if (!edits || !edits.length || edits.length > 200) return miss;
 
     var out = String(doc);
+    var applied = 0;
+    var failed = 0;
     for (var i = 0; i < edits.length; i++) {
       var e = edits[i] || {};
       var find = e.find == null ? '' : String(e.find);
       var replace = e.replace == null ? '' : String(e.replace);
-      if (!find) return { ok: false };
+      if (!find) { failed++; continue; }
       var idx = out.indexOf(find);
+      var target = find;
       if (idx < 0) {
         var variants = [find.replace(/\r\n/g, '\n'), find.replace(/\n/g, '\r\n')];
         for (var v = 0; v < variants.length && idx < 0; v++) {
           if (variants[v] !== find) {
             var at = out.indexOf(variants[v]);
-            if (at >= 0) { idx = at; find = variants[v]; }
+            if (at >= 0) { idx = at; target = variants[v]; }
           }
         }
       }
-      if (idx < 0) return { ok: false };
-      out = out.substring(0, idx) + replace + out.substring(idx + find.length);
+      if (idx < 0) {
+        var rx = _wsRegex(find);
+        var m = rx ? rx.exec(out) : null;
+        if (m) { idx = m.index; target = m[0]; }
+      }
+      if (idx < 0) { failed++; continue; }
+      out = out.substring(0, idx) + replace + out.substring(idx + target.length);
+      applied++;
     }
-    return { ok: true, html: out };
+    var ok = applied > 0 && failed === 0;
+    return { ok: ok, partial: applied > 0 && failed > 0, html: out, applied: applied, failed: failed };
   }
 
   /* Variáveis CSS do tema injetadas no documento da IA. */
@@ -466,8 +613,11 @@ VERIFIQUE ANTES DE ENTREGAR:
       injection += '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">\n';
     }
     injection += STORAGE_SAFE + '\n';
-    /* Pack de texturas procedurais (js/nx-textures.js) — disponível como window.NxTex. */
-    injection += '<script src="js/nx-textures.js"></script>\n';
+    /* Pack de texturas procedurais (js/nx-textures.js) — só entra quando a página
+       usa textura (NxTex/pattern/CanvasTexture). Sem uso, não carrega 36 KB à toa. */
+    if (/\bNxTex\b|createPattern|CanvasTexture|nx-textures/.test(html)) {
+      injection += '<script src="js/nx-textures.js"></script>\n';
+    }
     injection += '<style id="nx77-base">\n' + varsCss(theme) + '\n' + baseCss() + '\n</style>';
 
     var head = HEAD_REGEX.exec(html);
@@ -483,16 +633,22 @@ VERIFIQUE ANTES DE ENTREGAR:
     return '<!DOCTYPE html><html><head>\n' + injection + '\n</head><body>\n' + html + '\n</body></html>';
   }
 
-  /* Tela de apresentação: título animado (sem cubo nem textos). */
+  /* Tela de apresentação: halo estático + título animado (entrada letra a letra,
+     brilho deslizante e glow suave) — sem cubo e sem partículas. */
   function welcomePage(theme, hasKey) {
     var bg = theme.background;
     var accent = theme.accent;
-    var accentSoft = window.Themes.hexA(theme.accent, 140);
+    var hi = sheenOn(accent);
+    var accentSoft = window.Themes.hexA(theme.accent, 150);
     var accentFaint = window.Themes.hexA(theme.accent, 20);
 
     var word = 'NEXUS GAME';
     var letters = word.split('').map(function (ch, i) {
-      return '<span style="--i:' + i + '" aria-hidden="true">' + esc(ch) + '</span>';
+      var style = ' style="--i:' + i + '"';
+      if (ch === ' ') {
+        return '<span class="sp" aria-hidden="true"' + style + '></span>';
+      }
+      return '<span aria-hidden="true"' + style + '>' + esc(ch) + '</span>';
     }).join('');
 
     return `<!DOCTYPE html>
@@ -507,31 +663,36 @@ html,body{height:100%}
 body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px}
 .halo{position:absolute;width:min(78vw,660px);height:min(78vw,660px);border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,${accentFaint} 0%,transparent 62%);
-  filter:blur(8px);animation:breathe 7s ease-in-out infinite}
+  background:radial-gradient(circle,${accentFaint} 0%,transparent 62%)}
 .title{position:relative;display:block;margin:0;text-align:center;white-space:nowrap;
   font-family:'Courier New',monospace;font-weight:bold;
-  font-size:clamp(34px,7.4vw,88px);letter-spacing:.12em;text-indent:.12em}
+  font-size:clamp(34px,7.4vw,88px);letter-spacing:.12em;text-indent:.12em;
+  animation:nx-glow 5s ease-in-out 1.4s infinite}
 .title span{display:inline-block;color:transparent;
-  background:linear-gradient(100deg,${accent} 0%,#FFFFFF 42%,${accent} 58%,${accentSoft} 100%);
-  background-size:300% 100%;background-attachment:fixed;
+  background-image:linear-gradient(100deg,transparent 42%,${hi} 50%,transparent 58%),
+                   linear-gradient(160deg,${accent} 0%,${accentSoft} 100%);
+  background-size:300% 100%,100% 100%;
+  background-position:0% 0,0 0;
+  background-repeat:no-repeat;
   -webkit-background-clip:text;background-clip:text;
-  opacity:0;transform:translateY(.55em) scale(.9);filter:blur(10px);
-  animation:rise .95s cubic-bezier(.16,.84,.24,1) forwards, shimmer 6.5s linear infinite;
-  animation-delay:calc(var(--i)*.055s),calc(var(--i)*.055s + .9s)}
-.line{height:1px;width:0;background:linear-gradient(90deg,transparent,${accent},transparent);
-  animation:grow 1.3s .8s cubic-bezier(.2,.8,.2,1) forwards, pulse 3.4s 2.2s ease-in-out infinite}
-@keyframes rise{to{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 16px ${accentSoft})}}
-@keyframes shimmer{from{background-position:0% 50%}to{background-position:300% 50%}}
-@keyframes breathe{0%,100%{transform:scale(.9);opacity:.5}50%{transform:scale(1.08);opacity:1}}
-@keyframes grow{to{width:min(56vw,440px)}}
-@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.pixel{width:min(320px,68vw);height:100px;border-radius:4px;image-rendering:pixelated}
+  animation:nx-in .7s cubic-bezier(.22,.9,.24,1) calc(var(--i)*60ms) both,
+            nx-sheen 3.6s ease-in-out calc(1.1s + var(--i)*120ms) infinite}
+.title .sp{width:.34em}
+@keyframes nx-in{
+  from{opacity:0;transform:translateY(.45em) scale(.9)}
+  to{opacity:1;transform:none}}
+@keyframes nx-sheen{
+  0%{background-position:0% 0,0 0}
+  35%,100%{background-position:100% 0,0 0}}
+@keyframes nx-glow{
+  0%,100%{filter:drop-shadow(0 0 0 transparent)}
+  50%{filter:drop-shadow(0 0 22px ${accentFaint})}}
 @media (prefers-reduced-motion:reduce){
-  .title span,.line,.halo{animation:none}
-  .title span{opacity:1;transform:none;filter:none}
-  .line{width:min(56vw,440px);opacity:.8}
-}
+  .title{animation:none}
+  .title span{animation:none;opacity:1;transform:none;
+    background-image:none;color:${accent}}}
+.line{height:1px;width:min(56vw,440px);opacity:.6;
+  background:linear-gradient(90deg,transparent,${accent},transparent)}
 </style>
 </head>
 <body>
@@ -539,28 +700,7 @@ body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;dis
   <div class="halo"></div>
   <h1 class="title" aria-label="NEXUS GAME">${letters}</h1>
   <div class="line"></div>
-  <canvas id="pixel" class="pixel"></canvas>
 </div>
-<script>
-var c=document.getElementById('pixel'),x=c.getContext('2d');
-var W,H,p=[]
-function resize(){W=c.clientWidth||320;H=c.clientHeight||120;
-c.width=Math.round(W*2);c.height=Math.round(H*2);x.setTransform(2,0,0,2,0,0)}
-function rnd(a,b){return Math.random()*(b-a)+a}
-function spawn(){p.push({x:rnd(0,W),y:rnd(-30,0),vx:rnd(-.8,.8),vy:rnd(.4,1.2),
-s:Math.floor(rnd(2,5)),c:['${accent}','#FFD700','#00E5FF','#FF2D95','#7C4DFF'][Math.floor(rnd(0,5))],
-life:rnd(40,120),max:rnd(40,120)})}
-function draw(){x.clearRect(0,0,W,H);
-for(var i=p.length-1;i>=0;i--){var o=p[i];o.x+=o.vx;o.y+=o.vy;o.life--;
-var a=o.life/o.max;x.globalAlpha=a;x.fillStyle=o.c;
-var s=o.s;x.fillRect(Math.floor(o.x),Math.floor(o.y),s,s);
-x.fillRect(Math.floor(o.x)+1,Math.floor(o.y)+1,s-2,s-2);
-if(o.life<=0)p.splice(i,1)}
-if(p.length<30&&Math.random()<.3)spawn();
-x.globalAlpha=1;requestAnimationFrame(draw)}
-resize();window.addEventListener('resize',resize);
-for(var i=0;i<20;i++)spawn();draw();
-</script>
 </body>
 </html>`;
   }
@@ -703,6 +843,8 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     BASE_PROMPT: BASE_PROMPT,
     EDIT_DIRECTIVE: EDIT_DIRECTIVE,
     GAME_DIRECTIVE: GAME_DIRECTIVE,
+    TEXTURE_OFF_DIRECTIVE: TEXTURE_OFF_DIRECTIVE,
+    wantsTextures: wantsTextures,
     STORAGE_SAFE: STORAGE_SAFE,
     isGameCommand: isGameCommand,
     gameScopeNote: gameScopeNote,
@@ -712,6 +854,7 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     HEAD_REGEX: HEAD_REGEX,
     HTML_REGEX: HTML_REGEX,
     systemPrompt: systemPrompt,
+    mediaBlock: mediaBlock,
     detailDirective: detailDirective,
     userPrompt: userPrompt,
     extractDocument: extractDocument,

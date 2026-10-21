@@ -1,6 +1,6 @@
 # ESTADO ATUAL — NEXUS GAME
 
-**Versão:** 2.9.2 · **HEAD:** `7937076` · **Atualizado:** 2026-10-20
+**Versão:** 2.9.3 (working tree) · **HEAD:** `38faba1` · **Atualizado:** 2026-10-21
 **Local:** `/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/`
 **Repositório:** `github.com/leo-venom/nexus-desktop`
 
@@ -20,13 +20,28 @@ qualquer API compatível com OpenAI e renderiza o jogo gerado em `<iframe>` isol
 
 | Item | Valor |
 |---|---|
-| Linhas de código | **7.335** (JS 4.393 · CSS 721 · HTML 57 · Python 191 · Electron 454 · docs 1.519) |
-| `GAME_DIRECTIVE` | 16.651 chars |
-| Prompt de jogo (system completo) | **18.666 chars (~4.667 tok)** |
+| Linhas de código | **8.306** (JS 4.863 · CSS 721 · HTML 57 · Python 253 · Electron 524 · docs 1.888) |
+| `app.js` | **1.701** |
+| `html-builder.js` | **825** |
+| `GAME_DIRECTIVE` | 16.653 chars |
+| Prompt de jogo (system completo) | **18.668 chars** com textura · **13.009** sem (bloco de textura é opt-in) + **~1.4 KB** mídia real |
 | Texturas procedurais | **44** (`nx-textures.js`, 36.856 bytes) |
 | Sons WebAudio | **13** receitas |
 | Temas | **30** — 20 escuros + 10 claros |
-| Commits | 16 |
+| Commits | 20 |
+
+### 2.1 Mídia do projeto (novo em v2.9.3)
+
+Pastas `imagens/` e `sons/` na raiz do projeto onde o usuário coloca backgrounds, texturas de
+bloco, sprites, músicas e efeitos sonoros. A lista real de arquivos é servida em `/midia`,
+`/imagens/` e `/sons/` (JSON + arquivos com CORS/CORP) e entra no system prompt via 5º
+argumento de `systemPrompt` (função `mediaBlock`). A página gerada referencia os caminhos
+relativos exatos (`imagens/fundo.jpg`, `sons/tiro.mp3`). No `Salvar`, `inlineMedia()`
+embute as mídias usadas como data URI (limites: 6 MB/arquivo, 20 MB total).
+Extensões suportadas: imagens — PNG, JPG, JPEG, WebP, GIF, SVG, AVIF, BMP; sons — MP3,
+OGG, WAV, M4A, FLAC, Opus, AAC, WebM.
+`LEIA-ME.txt` em ambas as pastas com instruções de uso.
+Servidores `serve.py` e `desktop/server.js` replicam o comportamento de `/fontes/`.
 
 ---
 
@@ -34,14 +49,16 @@ qualquer API compatível com OpenAI e renderiza o jogo gerado em `<iframe>` isol
 
 ```
 nexus-game/
-├── README.md                    144  instruções de uso
+├── README.md                    168  instruções de uso
 ├── abrir.sh                      24  fallback: serve.py + xdg-open
 ├── NEXUS-GAME.desktop            10  atalho (Exec → desktop/start.sh)
-├── serve.py                     191  proxy CORS + estático + /fontes/
+├── serve.py                     253  proxy CORS + estático + /fontes/
 ├── fontes/                           Gameplay.ttf + LEIA-ME
+├── imagens/                          backgrounds, texturas, sprites + LEIA-ME
+├── sons/                             músicas, efeitos + LEIA-ME
 ├── desktop/
 │   ├── main.js                  146  BrowserWindow, F11/F12, single-instance
-│   ├── server.js                308  servidor Node (proxy + estático + /fontes/)
+│   ├── server.js                378  servidor Node (proxy + estático + /fontes/)
 │   ├── start.sh                      verifica node_modules, --disable-gpu, exec Electron
 │   ├── package.json / lock
 │   └── icon.png
@@ -52,19 +69,19 @@ nexus-game/
 │   └── js/
 │       ├── themes.js            112  30 temas
 │       ├── prefs.js             152  localStorage["nexus77"] + tokens
-│       ├── html-builder.js      728  prompts, extração, decoração, polyfill
+│       ├── html-builder.js      825  prompts, extração, edição tolerante, decoração
 │       ├── ai-client.js         464  SSE + proxy/fallback + cancel + finishReason
 │       ├── store.js             258  File System Access + IndexedDB
 │       ├── vu-meter.js          161  canvas 5 barras / 5 ondas
 │       ├── settings.js          286  modal config (API / geração / temas / fontes)
-│       ├── app.js              1601  fluxo principal + modo edição + bridge
+│       ├── app.js              1701  fluxo principal + modo edição + bridge
 │       └── nx-textures.js       904  44 texturas procedurais (window.NxTex)
 └── docs/
     ├── ESTADO_ATUAL.md              este documento
     ├── GAME_MODE.md                 diretriz do modo jogo (gerada do código)
     ├── DOCUMENTACAO.md              arquitetura e APIs
     ├── MAPA_UI.md                   elemento de tela → arquivo:linha
-    ├── CHANGELOG.md                 histórico v1.x → v2.9.2
+    ├── CHANGELOG.md                 histórico v1.x → v2.9.3
     ├── VALIDACAO.md                 matriz de testes
     └── BASE_REUTILIZAVEL.md         receita para novos projetos
 ```
@@ -78,7 +95,7 @@ prompt do usuário
    ↓
 app.sendPrompt()                                  app.js
    ↓
-Html.systemPrompt(tema, nível, comando)           html-builder.js — modo jogo único
+Html.systemPrompt(tema, nível, comando, lastRendered, mediaManifest)
    ↓
 AiClient.chat(...)                                ai-client.js — SSE
    ↓
@@ -178,6 +195,11 @@ NxTex.names()                              // 44 nomes
 | **Fallback não-streaming com teto próprio** | `ai-client.js` | `postText` não herda o stall de 90 s do stream: usa `CHAT_TEXT_TIMEOUT_MS` (5 min), senão provedor que não faz streaming morria sempre. |
 | **Abortar durante o fallback** | `ai-client.js` `requestText` | Registra `_activeCtrl`, então `Esc`/watchdog também cancelam a requisição não-streaming. |
 | **Proxy sem SSRF** | `serve.py` + `desktop/server.js` | `/_proxy` recusa rede privada, link-local e metadata de nuvem; redirecionamentos revalidados (máx. 4). Loopback liberado para LLM local. |
+| **Edição tolerante e parcial** | `html-builder.js` `applyEdits` | Cascata exato → CRLF → whitespace (`_wsRegex`). Uma âncora ruim não descarta o resto (`{ok, partial, applied, failed}`); teto de 200 edições. |
+| **Erro de runtime volta para a IA** | `app.js` `SHIM` + `notes` | `error`/`unhandledrejection`/`console.error` são deduplicados, enviados pela bridge `errors` e injetados no prompt (até 12 linhas) como "o sintoma que o usuário vê". |
+| **Aviso de jogo quebrado** | `app.js` `watchFrameErrors` | Checa em 2,5 s **e** 6 s (erro tardio de áudio/textura não escapa), avisa uma vez só. |
+| **Correção nunca piora a página** | `app.js` `run`/`retryUser` | Se a resposta de edição não for aplicável, reenvia com o documento atual + pedido de HTML completo. Sem documento novo: `⚠ nada aplicado — página atual mantida`. |
+| **Sessão limpa de verdade** | `app.js` `resetSession` | Zera `lastRendered`, `editSelHtml`, `editCount`, `frameErrors` e `lastCommands` — nada da página anterior entra no próximo prompt. |
 
 ---
 
@@ -244,11 +266,13 @@ python3 serve.py 8790
 **Médias**
 4. `maxTokens: 0` — o corte é decidido pelo provedor.
 5. `temperature: 0.7` — estrutura instável em jogos complexos; não há preset por gênero.
-6. **Edição cirúrgica frágil** — `applyEdits` é find/replace exato; em HTML grande com trechos
-   repetidos falha e regenera tudo.
+6. **Edição cirúrgica ainda é heurística** — `applyEdits` casa exato → CRLF → whitespace e
+   agora aplica parcialmente, mas âncoras ambíguas (trechos repetidos) podem acertar a
+   ocorrência errada; não há verificação sintática do resultado.
 7. **Sem testes de qualidade** — nada mede FPS real, touch, áudio tocando, texturas aplicadas.
 8. **Áudio pode ficar mudo** — `AudioContext` suspenso até gesto do usuário.
-9. **Sem watchdog pós-render** — jogo que trava o rAF ou entra em loop infinito não é detectado.
+9. **Watchdog pós-render é só de erro, não de travamento** — exceções e rejeições são
+   capturadas, mas um `while(true)` no rAF congela a aba sem gerar erro.
 
 **Baixas**
 10. Sem cache/reuso de assets entre gerações (exceto o pack `NxTex`).
@@ -274,4 +298,5 @@ console.log('temas', window.Themes.ALL.length);
 ```
 
 **Última verificação (2026-10-20):** 9 arquivos JS com sintaxe OK · prompt 18.666 chars ·
-GAME MODE ativo · `NxTex` presente · 30 temas · Tetris E2E renderizando peças com textura.
+GAME MODE ativo · `NxTex` presente · 30 temas · Tetris E2E renderizando peças com textura ·
+`applyEdits`/`userPrompt` 17/17 no harness · smoke Electron 20/20.

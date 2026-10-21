@@ -7,7 +7,8 @@ estilo OpenAI e renderiza o HTML gerado pela IA em um iframe isolado.
 
 ```text
 [prompt] -> app.sendPrompt()
-        -> Html.systemPrompt(theme, detailLevel) + Html.userPrompt(prompt, lastRendered)
+        -> Html.systemPrompt(theme, detailLevel, cmd, lastRendered, mediaManifest)
+           (5º arg: lista real de imagens/sons do projeto via /midia)
         -> AiClient.chat(...)            (streaming SSE; progresso em bytes)
         -> Html.extractDocument(texto)   (criação: documento completo)
            ou Html.applyEdits(doc, texto) (refino: edições cirúrgicas)
@@ -31,9 +32,10 @@ Layout do shell e dos modais. Todas as cores vêm de variáveis `--nx-*` aplicad
 `document.documentElement` por `app.applyTheme()`; `--mx-error` é derivado do tema.
 
 ### web/js/themes.js
-15 temas (`T(name, background, surface, surfaceAlt, accent, text, secondary, isDark)`),
-com `onAccent` calculado. Exporta `{ALL, of, hexA}`; `hexA('#RRGGBB', alpha)` devolve
-`#RRGGBBAA` (CSS válido, alpha por último).
+**30 temas** (20 escuros + 10 claros), com `onAccent` calculado.
+Exporta `{ALL, of, hexA}`; `hexA('#RRGGBB', alpha)` devolve
+`#RRGGBBAA` (CSS válido, alpha por último). Primeiro tema claro: índice 20
+("CLARO · rubi", `#C2185B`).
 
 ### web/js/prefs.js
 Persistência em `localStorage["nexus77"]` (JSON). Chaves: `endpoint`, `apiKey`, `model`,
@@ -49,19 +51,20 @@ Port de `Html.kt`. Exporta `window.Html`:
 | --- | --- |
 | `BASE_PROMPT` | regras da geração (escopo fiel ao pedido, efeitos contidos, beleza + performance) |
 | `EDIT_FRIENDLY` | diretriz de código compatível com o editor visual (ids por elemento, canvas só pro fundo, texto num único nó, sem `!important`, sem overlay full-screen, layout flex/grid) |
-| `systemPrompt(theme, level)` | prompt + diretriz de detalhe + paleta exata |
-| `detailDirective(level)` | 0 mínimo / 1 padrão / 2 máximo |
-| `userPrompt(cmd, doc)` | anexa a página atual para edição |
+| `systemPrompt(theme, level, cmd, doc, media)` | prompt + diretriz de detalhe + paleta exata + lista de mídia real; o bloco de texturas é **opt-in** (`wantsTextures(cmd, doc)`) |
+| `mediaBlock(media)` | bloco de texto em inglês (comentários PT) listando imagens/sons disponíveis; caps 60 por tipo; usado como 5º arg do systemPrompt |
+| `userPrompt(base, doc, notes)` | anexa a página atual (e erros de runtime/comandos anteriores) para edição |
+| `userPrompt(base, doc, notes)` | anexa a página atual (e erros de runtime/comandos anteriores) para edição |
 | `extractDocument(raw)` | remove cercas e corta até `<!doctype`/`<html` |
 | `varsCss(theme)` / `baseCss()` | bloco `<style id="nx77-base">` |
 | `decorate(html, theme)` | injeta viewport (se faltar) + CSS base |
-| `welcomePage(theme, hasKey)` | tela de apresentação: título animado (letra a letra, shimmer, halo e linha) |
+| `welcomePage(theme, hasKey)` | tela de apresentação animada **em CSS puro**: título letra a letra (`nx-in`, delay 60 ms), onda de brilho por span (`nx-sheen`, 120 ms, `sheenOn` escolhe a cor da faixa pela luminância, corte 0.62), glow (`nx-glow`), halo e linha — sem partículas/`requestAnimationFrame`; `prefers-reduced-motion` → letras sólidas no accent; **2.785 bytes** gerados nos 30 temas |
 | `errorPage(theme, title, detail)` | cartão de erro |
 | `savedListPage(theme, entries)` | lista de salvos (ponte `Nexus77.*`) |
 | `esc` / `escAttr` | escape de texto/atributo |
 | `rewriteLibs(html, base)` | CDN do three.js → `vendor/three/` |
 | `EDIT_DIRECTIVE` | instrução de edição cirúrgica (JSON `find/replace`) |
-| `applyEdits(doc, raw)` | aplica `{edits:[{find,replace}]}`; `{ok:false}` se não casar |
+| `applyEdits(doc, raw)` | aplica `{edits:[{find,replace}]}` em cascata (exato → CRLF → whitespace); devolve `{ok, partial, html, applied, failed}`; **teto de 200 edições por resposta** |
 | `looksLikeDocument(raw)` | detecta HTML completo (usado no fallback) |
 
 Observações de fidelidade:
@@ -160,7 +163,7 @@ regra de devolver o documento inteiro). O modelo responde:
 
 `Html.applyEdits` aplica os trechos em sequência sobre o documento atual (match exato;
 tolera CRLF nas duas direções). O restante da página fica **byte a byte intacto** — só o
-pedido muda (ex.: um título), sem reescrever o código todo. Limites: até 32 edições
+pedido muda (ex.: um título), sem reescrever o código todo. Limites: até 200 edições
 (a diretriz pede ≤ 8) e `find` não vazio.
 
 Fallback seguro, em ordem:
@@ -227,7 +230,12 @@ Os dois servidores enviam `Cache-Control: no-store` em todas as respostas (inclu
 proxy): um reload sempre pega o HTML/JS atuais (evita rodar um `ai-client.js` antigo do
 cache). Ambos também servem `/fontes/`: lista em JSON as fontes de `fontes/`
 (`.ttf/.otf/.woff/.woff2`), gera `/fontes/fonts.css` (`@font-face` por arquivo) e entrega
-os arquivos — usado pelo seletor de fonte do modo edição.
+os arquivos — usado pelo seletor de fonte do modo edição. **Também servem `/midia`,
+`/imagens/` e `/sons/`**: lista JSON de imagens e sons reais do projeto (`imagens/` e
+`sons/` na raiz), e entrega os arquivos com CORS/CORP — a lista entra no system prompt
+via `mediaBlock` e a página gerada referencia caminhos relativos (`imagens/x.jpg`,
+`sons/y.mp3`); no `Salvar`, `inlineMedia()` embute as mídias usadas como data URI
+(limites: 6 MB/arquivo, 20 MB total).
 
 ## 9. Abertura, `file://` (limitação) e atalhos
 

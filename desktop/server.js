@@ -19,6 +19,18 @@ const { pipeline } = require('stream/promises');
 const ROOT = path.join(__dirname, '..', 'web');
 const FONTS_DIR = path.join(__dirname, '..', 'fontes');
 const FONT_EXT = ['.ttf', '.otf', '.woff', '.woff2'];
+
+/* Mídia do projeto: a IA referencia "imagens/x.jpg" e "sons/y.mp3" (caminho
+ * relativo); o HTML salvo embute o que for usado. */
+const IMAGES_DIR = path.join(__dirname, '..', 'imagens');
+const SOUNDS_DIR = path.join(__dirname, '..', 'sons');
+const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.avif', '.bmp'];
+const SOUND_EXT = ['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.opus', '.aac', '.weba'];
+const MEDIA_KINDS = {
+  imagens: { dir: IMAGES_DIR, ext: IMAGE_EXT, key: 'images' },
+  sons: { dir: SOUNDS_DIR, ext: SOUND_EXT, key: 'sounds' },
+};
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -31,7 +43,17 @@ const MIME = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.gif': 'image/gif',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
   '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
+  '.opus': 'audio/ogg',
+  '.aac': 'audio/aac',
+  '.weba': 'audio/webm',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
@@ -180,6 +202,89 @@ async function serveFonts(req, res, pathname) {
   res.end(req.method === 'HEAD' ? undefined : data);
 }
 
+/* --- Mídia do projeto (imagens/ e sons/) ---------------------------------- */
+
+async function listMedia(dir, exts, prefix) {
+  let names = [];
+  try {
+    names = await fsp.readdir(dir);
+  } catch (_) {
+    return [];
+  }
+  const items = [];
+  for (const name of names.sort()) {
+    if (name.startsWith('.')) continue;
+    const ext = path.extname(name).toLowerCase();
+    if (!exts.includes(ext)) continue;
+    const full = path.join(dir, name);
+    let stat;
+    try {
+      stat = await fsp.stat(full);
+    } catch (_) {
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    items.push({
+      file: name,
+      name: path.basename(name, ext),
+      ext,
+      size: stat.size,
+      url: prefix + encodeURIComponent(name),
+    });
+  }
+  return items;
+}
+
+function sendJson(res, body) {
+  return send(res, 200, JSON.stringify(body), {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  });
+}
+
+async function serveMedia(req, res, pathname) {
+  const trimmed = pathname.replace(/\/+$/, '') || '/';
+
+  if (trimmed === '/midia') {
+    const images = await listMedia(IMAGES_DIR, IMAGE_EXT, '/imagens/');
+    const sounds = await listMedia(SOUNDS_DIR, SOUND_EXT, '/sons/');
+    return sendJson(res, { images, sounds });
+  }
+
+  const segment = pathname.slice(1).split('/')[0];
+  const kind = MEDIA_KINDS[segment];
+  if (!kind) return send(res, 404, 'nao encontrado');
+
+  if (trimmed === '/' + segment) {
+    const items = await listMedia(kind.dir, kind.ext, '/' + segment + '/');
+    return sendJson(res, { [kind.key]: items });
+  }
+
+  const name = path.basename(pathname);
+  const ext = path.extname(name).toLowerCase();
+  if (name.startsWith('.') || !kind.ext.includes(ext)) {
+    return send(res, 404, 'midia nao encontrada');
+  }
+
+  const full = path.join(kind.dir, name);
+  let data;
+  try {
+    data = await fsp.readFile(full);
+  } catch (_) {
+    return send(res, 404, 'midia nao encontrada');
+  }
+
+  res.writeHead(200, {
+    'Content-Type': MIME[ext] || 'application/octet-stream',
+    'Content-Length': data.length,
+    'Access-Control-Allow-Origin': '*',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'Cache-Control': 'no-store',
+  });
+  res.end(req.method === 'HEAD' ? undefined : data);
+}
+
 /* --- Proteção do /_proxy contra SSRF ---------------------------------------
  * A página gerada pela IA roda em iframe sandbox: ela não lê a resposta
  * (origem opaca), mas ainda pode disparar requisições cegas para dentro da
@@ -324,6 +429,10 @@ async function handle(req, res) {
   if (pathname.endsWith('/_proxy')) return proxy(req, res, url);
   if (pathname === '/fontes' || pathname.startsWith('/fontes/')) {
     return serveFonts(req, res, pathname);
+  }
+  if (pathname.replace(/\/+$/, '') === '/midia' ||
+      Object.keys(MEDIA_KINDS).some((k) => pathname === '/' + k || pathname.startsWith('/' + k + '/'))) {
+    return serveMedia(req, res, pathname);
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 404, 'nao encontrado');

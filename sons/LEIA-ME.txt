@@ -1,0 +1,28 @@
+PASTA DE SONS — NEXUS GAME
+===========================
+
+Jogue aqui dentro os sons/músicas do seu jogo (.mp3, .ogg, .wav, .m4a, .flac, .opus, .aac, .weba).
+Eles ficam disponíveis para a IA usar como:
+- Efeitos sonoros (new Audio("sons/tiro.mp3").play())
+- Música de fundo (loop=true, volume≈0.35)
+- Sons de UI (click, hover, pickup)
+
+Como usar
+---------
+1. Copie os arquivos de áudio para ESTA pasta
+   (ex.: musica.mp3, tiro.wav, jump.ogg)
+2. No NEXUS GAME, peça: "música sons/musica.mp3" ou "som de tiro sons/tiro.wav"
+3. A IA referencia o caminho EXATO como mostrado no prompt (ex.: sons/tiro.mp3)
+
+Detalhes
+--------
+- O caminho RELATIVO é o que aparece no prompt: "sons/nome.ext"
+- Nomes com espaço funcionam (ex.: "sons/som de explosao.wav")
+- Música: a IA deve criar const m=new Audio("sons/x.mp3"); m.loop=true; m.volume=0.35;
+  e INICIAR SOMENTE no primeiro gesto do usuário (click/keydown), nunca no load.
+- Efeitos: new Audio("sons/x.mp3").play() no evento; para repetição rápida use cloneNode().
+- Para remover: apague o arquivo; a lista no prompt é atualizada na próxima geração/edição.
+- Os sons são servidos pelo serve.py em /sons/  (não precisa reiniciar o servidor).
+- Quando você SALVA a página (botão "Salvar"), os sons referenciados são EMBUTIDOS no HTML (data URI).
+  Limites: 6 MB por arquivo, 20 MB no total. Arquivos maiores são pulados com aviso.
+- Esta pasta fica FORA de web/  — os arquivos originais não vão junto no save da página.

@@ -73,7 +73,7 @@ undo (`pushUndo`/`doUndo` `:239/:244`), `snapshot` `:231`, `drill`, `deselect`, 
 | Diálogo Salvar página | `web/js/app.js:610` | `showSaveDialog` | nome sugerido `app.js:588 defaultSaveName` (limpo, sem data/`.html`); 1º save pede a pasta (FSA) |
 | Abrir HTML (modal) | `web/js/app.js:731` | `pickHtmlFile` | "Escolher arquivo…" com gesto real no shell |
 | Confirmação de exclusão | `web/js/app.js:786` | `deleteSaved` | `Store.remove` + recarrega lista |
-| Welcome | `web/js/html-builder.js:257` | `welcomePage` | título animado (sem cubo/textos) |
+| Welcome | `web/js/html-builder.js:593` | `welcomePage` | título animado em CSS puro: `nx-in` (letra a letra), `nx-sheen` (onda de brilho) e `nx-glow`; `sheenOn` escolhe a cor da faixa |
 | Erro | `web/js/html-builder.js:339` | `errorPage` | "Falha na geração" só sem página prévia |
 | Lista de salvos | `web/js/html-builder.js:370` | `savedListPage` | botões chamam `Nexus77.*` (`html-builder.js:430-436`, postMessage) |
 

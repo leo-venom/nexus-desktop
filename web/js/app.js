@@ -18,6 +18,9 @@
   var showingList = false;
   var editCount = 0;        // patches consecutivos na mesma página
   var MAX_EDITS = 0;        // 0 = sem limite (nunca força regeneração por contagem)
+  var frameErrors = [];     // erros de runtime da página em tela (vão no próximo prompt)
+  var frameErrToken = 0;    // identifica o render atual (evita toast de página antiga)
+  var lastCommands = [];    // últimos comandos bem-sucedidos (contexto curto)
 
   var liveActive = false;
   var liveIn = 0;
@@ -143,6 +146,20 @@
   /* O iframe roda sem allow-same-origin (origem opaca): a ponte é postMessage. */
   var SHIM = '<script id="nx-shim">(function(){' +
     'function call(n,a){try{window.parent.postMessage({__nx:1,m:n,a:a},"*")}catch(e){}}' +
+    /* Telemetria: erros de runtime do jogo voltam para o app e entram no próximo prompt. */
+    'var _errs=[],_errSeen={};' +
+    'function _pushErr(k,msg,line){try{msg=String(msg==null?"":msg).replace(/\\s+/g," ").slice(0,300);' +
+    'if(!msg)return;var key=k+"|"+msg+"|"+(line||0);if(_errSeen[key])return;_errSeen[key]=1;' +
+    'if(_errs.length>=40)return;_errs.push({k:k,m:msg,l:line||0});call("errors",JSON.stringify(_errs))}catch(e){}}' +
+    'window.addEventListener("error",function(e){' +
+    'if(e&&e.target&&e.target!==window&&e.target.tagName){var t=e.target;' +
+    '_pushErr("resource",t.tagName.toLowerCase()+" falhou: "+String(t.src||t.href||""),0);return}' +
+    '_pushErr("error",e&&e.message?e.message:String(e),e&&e.lineno||0)},true);' +
+    'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;' +
+    '_pushErr("promise",(r&&(r.message||r))||"promise rejeitada sem detalhe",0)});' +
+    'try{var _ce=console.error;console.error=function(){' +
+    'try{_pushErr("console",Array.prototype.join.call(arguments," "),0)}catch(e){}' +
+    'return _ce.apply(console,arguments)}}catch(e){}' +
     'function rgb2hex(c){if(!c)return"#000000";var m=c.match(/\\d+/g);if(!m||m.length<3)return c.charAt(0)==="#"?c:"#000000";' +
     'var h=function(n){var s=parseInt(n,10).toString(16);return s.length<2?"0"+s:s};return"#"+h(m[0])+h(m[1])+h(m[2])}' +
     'function alphaOf(c){if(!c)return 1;var m=c.match(/rgba?\\(([^)]+)\\)/);if(!m)return 1;var p=m[1].split(",");return p.length>=4?Math.max(0,Math.min(1,parseFloat(p[3]))):1}' +
@@ -369,6 +386,33 @@
     try { x.send(); } catch (e) { fontList = []; if (cb) cb(); }
   }
 
+  /* ---------- mídia (imagens/ e sons/ do projeto) ---------- */
+
+  /* Lista de arquivos reais do projeto; vai no system prompt para a página
+     gerada referenciar "imagens/x.jpg" / "sons/y.mp3". null = ainda não sei
+     (servidor off ou aberto por file://): o prompt sai como antes. */
+  var mediaManifest = null;   // {images:[{file,name,ext,size,url}], sounds:[...]}
+
+  function loadMedia(cb) {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/midia', true);
+    x.timeout = 5000;
+    x.onload = function () {
+      if (x.status === 200) {
+        try {
+          var d = JSON.parse(x.responseText);
+          mediaManifest = {
+            images: (d && d.images) || [],
+            sounds: (d && d.sounds) || []
+          };
+        } catch (e) { mediaManifest = null; }
+      } else { mediaManifest = null; }
+      if (cb) cb();
+    };
+    x.onerror = x.ontimeout = function () { mediaManifest = null; if (cb) cb(); };
+    try { x.send(); } catch (e) { mediaManifest = null; if (cb) cb(); }
+  }
+
   /* Opções do seletor: apenas as fontes da pasta fontes/ do projeto. */
   function fontOptions() {
     var o = [['', '— padrão do tema —']];
@@ -393,11 +437,28 @@
 
   function render(html) {
     var out = window.Html.rewriteLibs(String(html == null ? '' : html), APP_BASE);
+    frameErrors = [];
+    frameErrToken++;
     frame.srcdoc = injectShim(out);
     /* Foca o iframe para teclado funcionar sem clique */
     setTimeout(function () {
       try { frame.contentWindow.focus(); } catch (e) { frame.focus(); }
     }, 50);
+    watchFrameErrors(frameErrToken);
+  }
+
+  /* Avisa uma única vez por render se o jogo quebrou; os erros seguem no prompt. */
+  function watchFrameErrors(token) {
+    var notified = false;
+    function check() {
+      if (token !== frameErrToken) return;         /* já houve outro render */
+      if (generating || lastRendered == null) return;
+      if (notified || !frameErrors.length) return;
+      notified = true;
+      toast('⚠ ' + frameErrors.length + ' erro(s) no jogo — peça a correção que a IA recebe os detalhes');
+    }
+    setTimeout(check, 2500);
+    setTimeout(check, 6000);   /* erros que só aparecem depois do primeiro segundo */
   }
 
   /* Decora com o tema atual; se a página já tem o bloco base, só troca. */
@@ -553,15 +614,30 @@
     input.blur();
 
     var editing = lastRendered != null;
-    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt);
+    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt, lastRendered, mediaManifest);
     var elementHint = '';
-    if (editSelHtml) {
+    if (editing && editSelHtml) {   /* só faz sentido quando há página em tela */
       elementHint = '\n\nTarget element (user clicked this to edit):\n```html\n' + editSelHtml + '\n```\nFocus ONLY on this element. Change what was asked, keep the rest intact.';
-      editSelHtml = '';
+      /* NÃO limpa aqui: se a requisição falhar, o alvo continua válido para a próxima. */
     }
+
+    /* Notas para o modelo: erros reais da página em tela + histórico curto de comandos. */
+    var notes = '';
+    if (editing && frameErrors.length) {
+      notes += 'Runtime errors reported by the CURRENT page (it is broken — fix these first, ' +
+        'they are the symptom the user sees):\n' +
+        frameErrors.slice(0, 12).map(function (e, i) {
+          return (i + 1) + '. [' + e.k + (e.l ? ':' + e.l : '') + '] ' + e.m;
+        }).join('\n');
+    }
+    if (editing && lastCommands.length) {
+      if (notes) notes += '\n\n';
+      notes += 'Previous commands already applied to this page (context only — do not undo them):\n- ' +
+        lastCommands.slice(-3).join('\n- ');
+    }
+
     var userBase = prompt + elementHint;
-    var user = window.Html.userPrompt(userBase, lastRendered);
-    var userFresh = userBase;  // fallback: só o comando, sem página atual
+    var user = window.Html.userPrompt(userBase, lastRendered, notes);
 
     /* Força regeneração completa a cada MAX_EDITS patches para evitar degradação */
     var editOverLimit = MAX_EDITS > 0 && editing && editCount >= MAX_EDITS;
@@ -591,24 +667,43 @@
     run(system).then(function (result) {
       if (editing) {
         /* Edição cirúrgica: aplica só os trechos pedidos (não reescreve a página). */
-        var patched = window.Html.applyEdits(lastRendered, result.content);
+        var patched = editOverLimit ? { ok: false } : window.Html.applyEdits(lastRendered, result.content);
         if (patched.ok) { editCount++; return { result: result, doc: patched.html }; }
-        editCount = 0;
+        if (patched.partial) {
+          /* Alguns trechos casaram: aplica o que deu certo e avisa o resto. */
+          editCount++;
+          toast('⚠ ' + patched.failed + ' trecho(s) não casaram — aplicado o resto');
+          return { result: result, doc: patched.html };
+        }
         if (window.Html.looksLikeDocument(result.content)) {
           return { result: result, doc: window.Html.extractDocument(result.content) };
         }
-        /* Patch inválido: refaz pedindo o documento completo (fallback seguro). */
-        status('⚠️ regenerando…', 'accent', false);
+        /* Patch inválido: segunda tentativa AINDA com a página atual em mãos
+           (regenerar do zero destruía o jogo do usuário). */
+        status('⚠️ ajuste não aplicável — refazendo com a página atual…', 'accent', false);
         liveOut = 0;
         lastProgressAt = 0;
         editCount = 0;
-        return run(baseSystem, userFresh).then(function (r2) {
-          return { result: r2, doc: window.Html.extractDocument(r2.content) };
+        var retryUser = window.Html.userPrompt(
+          userBase,
+          lastRendered,
+          (notes ? notes + '\n\n' : '') +
+            'The previous response returned edits whose "find" text did not match this document. ' +
+            'Return the COMPLETE updated HTML document instead of an edits object.'
+        );
+        return run(baseSystem, retryUser).then(function (r2) {
+          var doc2 = window.Html.extractDocument(r2.content || '');
+          if (!window.Html.looksLikeDocument(r2.content) || !doc2.trim()) {
+            /* Nada aproveitável: mantém a página intacta em vez de apagá-la. */
+            return { result: result, doc: null };
+          }
+          return { result: r2, doc: doc2 };
         });
       }
       editCount = 0;
       return { result: result, doc: window.Html.extractDocument(result.content) };
     }).then(function (out) {
+      if (out.doc == null) return out;               /* mantém a página atual */
       return completarSeTruncado(out.result, out.doc).then(function (d) { out.doc = d; return out; });
     }).then(function (out) {
       /* Cancelado entre o fim da resposta e este callback: não renderiza nada. */
@@ -616,11 +711,21 @@
       var result = out.result;
       var doc = out.doc;
       var elapsed = (performance.now() - started) / 1000;
+      if (doc == null) {
+        /* A tentativa de correção não devolveu documento: nada foi perdido. */
+        liveActive = false;
+        status('⚠ nada aplicado — página atual mantida', 'accent', true);
+        finishGeneration();
+        return;
+      }
       if (!doc.trim()) {
         failGeneration('resposta vazia do modelo');
         return;
       }
       lastRendered = doc;
+      editSelHtml = '';                    /* alvo consumido só quando a edição foi aplicada */
+      lastCommands.push(prompt);
+      if (lastCommands.length > 6) lastCommands.shift();
       render(themed(doc));
       var kb = Math.ceil(encoder.encode(doc).length / 1024);
       liveActive = false;
@@ -679,6 +784,11 @@
     }
     prefs.resetSessionTokens();
     lastRendered = null;
+    /* Sessão nova: nada do documento anterior deve vazar para o próximo prompt. */
+    editSelHtml = '';
+    editCount = 0;
+    frameErrors = [];
+    lastCommands = [];
     updateSessionUi();
     showWelcome();
     toast('Sessão reiniciada');
@@ -801,12 +911,74 @@
     });
   }
 
+  /* Limites de inline: 6 MB por arquivo, 20 MB no total. */
+  var MEDIA_INLINE_MAX_FILE = 6 * 1024 * 1024;
+  var MEDIA_INLINE_MAX_TOTAL = 20 * 1024 * 1024;
+
+  function inlineMedia(html) {
+    if (!html) return Promise.resolve(html);
+    var src = '(?:imagens|sons)/[A-Za-z0-9._%~+@-]+(?:/[A-Za-z0-9._%~+@-]+)*';
+    var re = new RegExp(src, 'g');
+    var matches = html.match(re);
+    if (!matches || !matches.length) return Promise.resolve(html);
+
+    var seen = {};
+    var unique = [];
+    for (var i = 0; i < matches.length; i++) {
+      var m = matches[i];
+      if (!seen[m]) { seen[m] = true; unique.push(m); }
+    }
+    if (!unique.length) return Promise.resolve(html);
+
+    var total = 0;
+    var skipped = 0;
+    var base = APP_BASE.replace(/\/$/, '');
+
+    return unique.reduce(function (chain, rel) {
+      return chain.then(function (currentHtml) {
+        if (skipped) return currentHtml;
+        var url = base + '/' + rel;
+        return fetch(url, { cache: 'force-cache' }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        }).then(function (blob) {
+          if (blob.size > MEDIA_INLINE_MAX_FILE) {
+            skipped++;
+            return currentHtml;
+          }
+          if (total + blob.size > MEDIA_INLINE_MAX_TOTAL) {
+            skipped++;
+            return currentHtml;
+          }
+          total += blob.size;
+          return new Promise(function (resolve) {
+            var fr = new FileReader();
+            fr.onload = function () { resolve(fr.result); };
+            fr.onerror = function () { resolve(null); };
+            fr.readAsDataURL(blob);
+          });
+        }).then(function (dataUri) {
+          if (!dataUri) return currentHtml;
+          return currentHtml.replace(new RegExp(rel.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&'), 'g'), dataUri);
+        }).catch(function (e) {
+          console.warn('[nexus] inlineMedia falhou para', rel, e);
+          return currentHtml;
+        });
+      });
+    }, Promise.resolve(html)).then(function (finalHtml) {
+      if (skipped) {
+        toast('\u26A0 ' + skipped + ' m\u00EDdia(s) ficaram de fora do arquivo salvo (grandes demais)');
+      }
+      return finalHtml;
+    });
+  }
+
   function savePage(rawName) {
     var doc = lastRendered;
     if (!doc) return;
     var named = window.Store.fileName(rawName);
     saveBtn.disabled = true;
-    inlineTextures(themed(sanitizeSnapshotHtml(doc))).then(function (html) {
+    inlineTextures(themed(sanitizeSnapshotHtml(doc))).then(inlineMedia).then(function (html) {
       return window.Store.folderLabel().then(function (folder) {
         /* Primeiro save: pede a pasta (o clique em "Salvar" dá a ativação). */
         if (!folder && window.Store.supportsFolder()) {
@@ -1438,6 +1610,10 @@
 
     vu = window.VuMeter.attach($('vu'));
 
+    /* Carrega fontes e mídia do projeto para o prompt. */
+    loadFonts();
+    loadMedia();
+
     gearBtn.addEventListener('click', function () {
       window.Settings.open({ onSaved: onSettingsSaved });
     });
@@ -1478,6 +1654,7 @@
       popPinPos = null;
       editBtn.style.display = 'none';
       loadFonts();
+      loadMedia();
       finalizeBtn.style.display = '';
       status('✎ Clique p/ selecionar · duplo clique p/ editar valores · arraste p/ mover', 'accent', false);
       tryPostMessage({ accent: theme.accent, editMode: true });
@@ -1488,6 +1665,7 @@
       loadFonts(function () {
         toast('Fontes atualizadas (' + fontList.length + ' disponíveis)');
       });
+      loadMedia();
       /* captura o HTML editado ANTES de descongelar (vira o documento oficial) */
       tryPostMessage({ snapshot: true });
       finalizeBtn.style.display = 'none';
@@ -1545,6 +1723,14 @@
       }
       if (m === 'snapshot') {
         try { applySnapshot(d.a); } catch (err) { /* ignora */ }
+        return;
+      }
+      if (m === 'errors') {
+        /* Lista cumulativa enviada pelo shim; guarda a versão mais nova e completa. */
+        try {
+          var list = JSON.parse(String(d.a || '[]'));
+          if (Array.isArray(list)) frameErrors = list.slice(0, 40);
+        } catch (err) { /* ignora */ }
         return;
       }
       if (m === 'undoCount') {

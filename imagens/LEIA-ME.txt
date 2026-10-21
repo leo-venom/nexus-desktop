@@ -1,0 +1,25 @@
+PASTA DE IMAGENS — NEXUS GAME
+===============================
+
+Jogue aqui dentro as imagens do seu jogo (.png, .jpg, .jpeg, .webp, .gif, .svg, .avif, .bmp).
+Elas ficam disponíveis para a IA usar como:
+- Plano de fundo (background-image: url("imagens/arquivo.png"))
+- Textura de bloco repetida (ctx.createPattern(img, "repeat"))
+- Sprite sheet (ctx.drawImage com recorte)
+
+Como usar
+---------
+1. Copie os arquivos de imagem para ESTA pasta
+   (ex.: fundo.png, bloco.jpg, sprites.png)
+2. No NEXUS GAME, peça: "fundo com imagens/fundo.png" ou "blocos com textura imagens/bloco.jpg"
+3. A IA referencia o caminho EXATO como mostrado no prompt (ex.: imagens/fundo.png)
+
+Detalhes
+--------
+- O caminho RELATIVO é o que aparece no prompt: "imagens/nome.ext"
+- Nomes com espaço funcionam (ex.: "imagens/imagem de fundo.png")
+- Para remover: apague o arquivo; a lista no prompt é atualizada na próxima geração/edição.
+- As imagens são servidas pelo serve.py em /imagens/  (não precisa reiniciar).
+- Quando você SALVA a página (botão "Salvar"), as imagens referenciadas são EMBUTIDAS no HTML (data URI).
+  Limites: 6 MB por arquivo, 20 MB no total. Arquivos maiores são pulados com aviso.
+- Esta pasta fica FORA de web/  — os arquivos originais não vão junto no save da página.
