@@ -1,6 +1,6 @@
 # ESTADO ATUAL — NEXUS GAME
 
-**Versão:** 2.9.0 · **HEAD:** `1a2d7a5` · **Atualizado:** 2026-10-20
+**Versão:** 2.9.2 · **HEAD:** `981f5b4` · **Atualizado:** 2026-10-20
 **Local:** `/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/`
 **Repositório:** `github.com/leo-venom/nexus-game`
 
@@ -53,18 +53,18 @@ nexus-game/
 │       ├── themes.js            112  30 temas
 │       ├── prefs.js             152  localStorage["nexus77"] + tokens
 │       ├── html-builder.js      728  prompts, extração, decoração, polyfill
-│       ├── ai-client.js         444  SSE + proxy/fallback + cancel + finishReason
+│       ├── ai-client.js         464  SSE + proxy/fallback + cancel + finishReason
 │       ├── store.js             258  File System Access + IndexedDB
 │       ├── vu-meter.js          161  canvas 5 barras / 5 ondas
 │       ├── settings.js          286  modal config (API / geração / temas / fontes)
-│       ├── app.js              1508  fluxo principal + modo edição + bridge
+│       ├── app.js              1601  fluxo principal + modo edição + bridge
 │       └── nx-textures.js       904  44 texturas procedurais (window.NxTex)
 └── docs/
     ├── ESTADO_ATUAL.md              este documento
     ├── GAME_MODE.md                 diretriz do modo jogo (gerada do código)
     ├── DOCUMENTACAO.md              arquitetura e APIs
     ├── MAPA_UI.md                   elemento de tela → arquivo:linha
-    ├── CHANGELOG.md                 histórico v1.x → v2.9.0
+    ├── CHANGELOG.md                 histórico v1.x → v2.9.2
     ├── VALIDACAO.md                 matriz de testes
     └── BASE_REUTILIZAVEL.md         receita para novos projetos
 ```
@@ -172,9 +172,12 @@ NxTex.names()                              // 44 nomes
 | `rewriteLibs` | `html-builder.js` | CDN do three.js → vendor local (funciona offline). |
 | `sanitizeSnapshotHtml` | `app.js` | Remove artefatos do shim/fontes do HTML finalizado. |
 | **Erro síncrono não trava mais** | `app.js` `sendPrompt` | Corpo da geração em `try/catch` → qualquer exceção vira `failGeneration` e libera o botão. Antes, um erro antes do `.then` deixava `generating = true` para sempre. |
-| **Watchdog de geração** | `app.js` `armarWatchdog` | 2,5 min sem progresso → cancela, destrava a UI e avisa. |
-| **ESC cancela** | `app.js` init | `Esc` durante geração chama `AiClient.cancel()` + `finishGeneration()` (não age com modal aberto). |
+| **Watchdog de geração** | `app.js` `armarWatchdog` | 2,5 min sem progresso → cancela, destrava a UI e avisa. Relógio unificado em `Date.now()` e heartbeat de 20 s no corpo da resposta: provedor lento mas vivo não é mais morto. |
+| **ESC cancela limpo** | `app.js` init | `Esc` durante geração chama `AiClient.cancel()` + `finishGeneration()` (não age com modal aberto). `canceladoPeloUsuario` evita que o `AbortError` escreva página de erro na tela. |
 | **↺ reinicia mesmo gerando** | `app.js` `resetSession` | Antes só mostrava "aguarde"; agora cancela e reinicia. |
+| **Fallback não-streaming com teto próprio** | `ai-client.js` | `postText` não herda o stall de 90 s do stream: usa `CHAT_TEXT_TIMEOUT_MS` (5 min), senão provedor que não faz streaming morria sempre. |
+| **Abortar durante o fallback** | `ai-client.js` `requestText` | Registra `_activeCtrl`, então `Esc`/watchdog também cancelam a requisição não-streaming. |
+| **Proxy sem SSRF** | `serve.py` + `desktop/server.js` | `/_proxy` recusa rede privada, link-local e metadata de nuvem; redirecionamentos revalidados (máx. 4). Loopback liberado para LLM local. |
 
 ---
 

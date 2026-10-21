@@ -22,7 +22,8 @@
   var liveActive = false;
   var liveIn = 0;
   var liveOut = 0;
-  var lastProgressAt = 0;
+  var lastProgressAt = 0;          /* SEMPRE Date.now() — o watchdog usa o mesmo relógio */
+  var canceladoPeloUsuario = false; /* ESC / reset: a promessa em voo rejeita com AbortError */
 
   var APP_BASE = new URL('./', location.href).href;
   var THREE_CDN = 'https://unpkg.com/three@0.160.0/build/';
@@ -475,14 +476,20 @@
     }
   }
 
+  /* Progresso ao vivo. `null` = apenas sinal de vida (sem contagem de bytes):
+     usado pelas continuações e pelo fallback sem streaming, que não relatam bytes. */
   function onGenProgress(contentBytes) {
-    var now = performance.now();
+    if (contentBytes == null) { lastProgressAt = Date.now(); return; }
+    var now = Date.now();
     if (now - lastProgressAt < 60) return;
     lastProgressAt = now;
     kbLabel.textContent = kbText(contentBytes);
     liveOut = Math.floor(contentBytes / 4);
     updateSessionUi();
   }
+
+  /* Sinal de vida sem mexer no contador de KB (continuações / fallback). */
+  function marcarProgresso() { lastProgressAt = Date.now(); }
 
   /* Watchdog: se a geração ficar "presa" sem progresso, destrava a UI. */
   var _genStartedAt = 0;
@@ -496,6 +503,7 @@
       var parado = Date.now() - Math.max(_genStartedAt, lastProgressAt || 0);
       if (parado > 150000) {                 /* 2,5 min sem nenhum progresso */
         clearInterval(_genWatch); _genWatch = null;
+        canceladoPeloUsuario = true;         /* evita que o AbortError sobrescreva a mensagem */
         try { window.AiClient.cancel(); } catch (e) {}
         finishGeneration();
         status('✗ geração travada — destravado', 'error', false);
@@ -534,6 +542,8 @@
 
   function iniciarGeracao(prompt) {
     showingList = false;
+    canceladoPeloUsuario = false;
+    lastProgressAt = 0;
     lastPrompt = prompt;
     lastOpenName = null;   // nova geração → o nome sugerido volta ao slug do prompt
     saveBtn.disabled = true;
@@ -601,6 +611,8 @@
     }).then(function (out) {
       return completarSeTruncado(out.result, out.doc).then(function (d) { out.doc = d; return out; });
     }).then(function (out) {
+      /* Cancelado entre o fim da resposta e este callback: não renderiza nada. */
+      if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
       var result = out.result;
       var doc = out.doc;
       var elapsed = (performance.now() - started) / 1000;
@@ -627,12 +639,17 @@
   }
 
   function failGeneration(message) {
+    var cancelado = canceladoPeloUsuario;
+    canceladoPeloUsuario = false;
+    finishGeneration();
+    /* Cancelamento pelo usuário (ESC/reset) ou watchdog: a mensagem já foi dada;
+       o AbortError não deve escrever um erro em inglês nem trocar a página. */
+    if (cancelado) return;
     status('✗ ' + message, 'error', false);
     if (lastRendered == null) {
       render(window.Html.errorPage(theme, 'Falha na geração', message));
     }
     toast(message);
-    finishGeneration();
   }
 
   function finishGeneration() {
@@ -655,6 +672,7 @@
 
   function resetSession() {
     if (generating) {
+      canceladoPeloUsuario = true;
       try { window.AiClient.cancel(); } catch (e) {}
       finishGeneration();
       toast('Geração cancelada — sessão reiniciada');
@@ -754,20 +772,50 @@
     });
   }
 
+  /* O HTML salvo é aberto por file:// — um <script src="js/nx-textures.js"> relativo
+     daria 404 e o jogo perderia window.NxTex. Inlinamos o pack no arquivo.
+     A regex é global porque o HTML gerado pela IA pode já trazer a tag além da que o
+     `decorate()` injeta: todas precisam sair e o pack entra uma única vez. */
+  var NX_TEX_TAG_SRC = '<script\\s+src=["\'](?:[^"\']*\\/)?js\\/nx-textures\\.js["\']\\s*>\\s*<\\/script>';
+  var NX_TEX_TAG = new RegExp(NX_TEX_TAG_SRC, 'gi');
+  var NX_TEX_TAG_TEST = new RegExp(NX_TEX_TAG_SRC, 'i');
+
+  function inlineTextures(html) {
+    if (!NX_TEX_TAG_TEST.test(html)) return Promise.resolve(html);
+    return fetch(APP_BASE + 'js/nx-textures.js', { cache: 'force-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(function (src) {
+      /* `</script` dentro do fonte quebraria o inline (o pack não tem, mas garantimos). */
+      var safe = String(src).replace(/<\/script/gi, '<\\/script');
+      var inlined = false;
+      return html.replace(NX_TEX_TAG, function () {
+        if (inlined) return '';   /* tags duplicadas: o pack entra só uma vez */
+        inlined = true;
+        return '<script>\n' + safe + '\n</script>';
+      });
+    }).catch(function (e) {
+      console.warn('[nexus] não foi possível inlinar nx-textures.js:', e);
+      toast('Texturas não embutidas — o jogo salvo pode perder texturas');
+      return html.replace(NX_TEX_TAG, '');
+    });
+  }
+
   function savePage(rawName) {
     var doc = lastRendered;
     if (!doc) return;
-    var html = themed(sanitizeSnapshotHtml(doc));
-    var name = window.Store.fileName(rawName);
+    var named = window.Store.fileName(rawName);
     saveBtn.disabled = true;
-    window.Store.folderLabel().then(function (folder) {
-      /* Primeiro save: pede a pasta (o clique em "Salvar" dá a ativação). */
-      if (!folder && window.Store.supportsFolder()) {
-        return window.Store.pickFolder().then(function () { return true; }).catch(function () { return false; });
-      }
-      return true;
-    }).then(function () {
-      return Promise.all([window.Store.save(name, html), window.Store.folderLabel()]);
+    inlineTextures(themed(sanitizeSnapshotHtml(doc))).then(function (html) {
+      return window.Store.folderLabel().then(function (folder) {
+        /* Primeiro save: pede a pasta (o clique em "Salvar" dá a ativação). */
+        if (!folder && window.Store.supportsFolder()) {
+          return window.Store.pickFolder().then(function () { return true; }).catch(function () { return false; });
+        }
+        return true;
+      }).then(function () {
+        return Promise.all([window.Store.save(named, html), window.Store.folderLabel()]);
+      });
     }).then(function (res) {
       saveBtn.disabled = false;
       var saved = res[0];
@@ -1336,7 +1384,7 @@
     var msg = 'The document was cut here. Continue from the exact next character:\n```html\n' + cauda + '\n```';
     return window.AiClient.chat(
       prefs.endpoint(), prefs.apiKey(), prefs.model(),
-      prefs.temperature(), prefs.maxTokens(), pedido, msg
+      prefs.temperature(), prefs.maxTokens(), pedido, msg, marcarProgresso
     ).then(function (r2) {
       var resto = String(r2.content || '');
       if (!resto.trim()) return corpo;                 /* nada veio: para */
@@ -1353,7 +1401,11 @@
       var emendado = corpo + resto;
       if (emendado === corpo) return corpo;            /* nada novo: evita loop */
       return completarSeTruncado(r2, emendado, tentativa + 1);
-    }).catch(function () { return corpo; });
+    }).catch(function (e) {
+      /* Cancelado pelo usuário: propaga para a geração terminar sem renderizar meia página. */
+      if (canceladoPeloUsuario) throw e;
+      return corpo;
+    });
   }
 
   function tryPostMessage(data) {
@@ -1398,6 +1450,8 @@
       if (e.key !== 'Escape') return;
       if (!generating) return;
       if (document.querySelector('.mx-modal')) return;   /* modal aberto: ESC fecha o modal */
+      e.preventDefault();
+      canceladoPeloUsuario = true;                        /* AbortError não sobrescreve esta mensagem */
       try { window.AiClient.cancel(); } catch (_) {}
       finishGeneration();
       status('✗ geração cancelada', 'error', false);

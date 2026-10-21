@@ -4,7 +4,7 @@ Gerador de **jogos HTML completos** com IA: chat + shell que cria, edita e roda 
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 
-**Versão 2.9.0** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
+**Versão 2.9.2** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
 
 ## Recursos
 
@@ -65,10 +65,10 @@ existe só para isso: a janela fala com `127.0.0.1` (mesma origem) e o servidor 
 3. Informe o **Modelo** (ou use **Buscar modelos**).
 4. **Salvar configurações**.
 
-No rodapé do ⚙ aparece a versão (`ai-client v2.2.0 · origem …`) — útil para conferir se a
+No rodapé do ⚙ aparece a versão (`ai-client v2.9.2 · origem …`) — útil para conferir se a
 janela carregou o código atual.
 
-## Recursos
+## Interface e sessão
 
 - app **Electron** em janela normal que detecta a resolução e ocupa a área útil da tela
   (F11 alterna tela cheia; F12 DevTools), sem barra de navegador;
@@ -77,7 +77,7 @@ janela carregou o código atual.
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
   seguro para documento completo;
 - VU meter + KB ao vivo durante a geração; tokens estimados (`~`) e exatos ao final;
-- 15 temas (12 escuros + 3 claros) — trocar o tema redecora a página **sem chamar a IA**;
+- 30 temas (20 escuros + 10 claros) — trocar o tema redecora a página **sem chamar a IA**;
 - SALVAR / ABRIR / excluir páginas `.html`;
 - three.js local em `web/vendor/three/` (URLs de CDN são reescritas para o vendor no render);
 - sessão com orçamento de 1M tokens e reset (`↺`).
@@ -100,7 +100,7 @@ nexus-game/
 │   ├── index.html           # shell: header, palco (iframe), barra de comando
 │   ├── css/app.css          # tema via var(--nx-*), modais e toast
 │   ├── js/
-│   │   ├── themes.js        # 15 temas + hexA()
+│   │   ├── themes.js        # 30 temas + hexA()
 │   │   ├── prefs.js         # localStorage["nexus77"]
 │   │   ├── html-builder.js  # prompt, extração, decoração e páginas internas
 │   │   ├── ai-client.js     # fetch + SSE + proxy + fallback não-streaming em HTTP 4xx
@@ -119,7 +119,7 @@ nexus-game/
 
 ## Status
 
-**v2.2.0** — validada em 2026-10-19. O shell Electron e as correções do topo do
+**v2.9.2** — validada em 2026-10-20. O shell Electron e as correções do topo do
 [`CHANGELOG`](docs/CHANGELOG.md) estão no working tree (não publicados); a matriz de
 2026-10-18 está em [`docs/VALIDACAO.md`](docs/VALIDACAO.md).
 
@@ -127,7 +127,7 @@ nexus-game/
 
 | Sintoma | Causa / solução |
 | --- | --- |
-| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.2.0`). |
+| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.9.2`). |
 | Electron não abre | Falta o binário: `npm --prefix desktop install`. Rode `./desktop/start.sh` no terminal para ver o erro (o launcher descarta a saída). |
 | `HTTP 401` / `Incorrect API key` | Chave inválida ou endpoint errado. Use **Buscar modelos** no ⚙ para testar. |
 | `HTTP 404`/`501` no `/_proxy` | Servidor não é o `serve.py`/`desktop/server.js` (ex.: `python3 -m http.server`). Troque para um deles. |
@@ -145,6 +145,14 @@ usa `postMessage` com whitelist de métodos (`setInput`, `openSaved`, `closeList
 A janela Electron carrega apenas `127.0.0.1`, com `contextIsolation`, `sandbox` e sem
 `nodeIntegration`; links externos (`http`/`https`) abrem em uma janela interna com as
 mesmas proteções, e outros protocolos são bloqueados.
+
+O proxy `/_proxy` aceita **apenas** `http`/`https` e recusa destinos em redes
+privadas, link-local e de metadata de nuvem (`10/8`, `172.16/12`, `192.168/16`,
+`169.254/16`, `100.100.100.200`, `[fe80::]`, `[fd00::]`, `metadata.*`,
+`0.0.0.0`…). **Loopback é liberado de propósito**, para LM Studio / Ollama / llama.cpp
+locais. Redirecionamentos são revalidados (máx. 4 saltos), então um `302` para
+`169.254.169.254` também é recusado. Resolução DNS não é validada (um host público
+que resolva para IP interno não é detectado) — use um endpoint de confiança.
 
 ## Diferenças em relação ao app Android
 

@@ -9,7 +9,9 @@
 
   var CONNECT_TIMEOUT_MS = 20000;
   var CHAT_READ_TIMEOUT_MS = 90000;   /* 90s sem NENHUM byte = stream travado (reset a cada chunk) */
+  var CHAT_TEXT_TIMEOUT_MS = 300000;  /* fallback não-streaming: 5min, pois o corpo só chega no fim */
   var MODELS_READ_TIMEOUT_MS = 60000;
+  var HEARTBEAT_MS = 20000;           /* sinal de vida p/ o watchdog enquanto não há bytes */
 
   /* Erro de comunicação/parse com a API compatível OpenAI. */
   function AiException(message) {
@@ -106,17 +108,31 @@
     return r.text;
   }
 
-  /* Requisição simples (corpo inteiro), com timeout de conexão e de leitura. */
-  function requestText(method, url, apiKey, body, connectMs, readMs) {
+  /* Requisição simples (corpo inteiro), com timeout de conexão e de leitura.
+   * onProgress (opcional) é chamado como sinal de vida a cada HEARTBEAT_MS
+   * durante a leitura: sem isso o watchdog do app mataria uma resposta
+   * não-streaming legítima, que só chega depois de minutos. */
+  function requestText(method, url, apiKey, body, connectMs, readMs, onProgress) {
     var ctrl = new AbortController();
+    _activeCtrl = ctrl;
     var timedOut = false;
     var phase = 'connect';
+    var hb = null;
     var timer = setTimeout(function () { timedOut = true; phase = 'connect'; ctrl.abort(); }, connectMs);
+
+    function stop() {
+      clearTimeout(timer);
+      if (hb) { clearInterval(hb); hb = null; }
+      if (_activeCtrl === ctrl) _activeCtrl = null;
+    }
 
     function armRead() {
       clearTimeout(timer);
       phase = 'read';
       timer = setTimeout(function () { timedOut = true; phase = 'read'; ctrl.abort(); }, readMs);
+      if (onProgress && !hb) {
+        hb = setInterval(function () { try { onProgress(); } catch (e) {} }, HEARTBEAT_MS);
+      }
     }
 
     var headers = { 'Authorization': 'Bearer ' + apiKey };
@@ -129,18 +145,19 @@
     return fetch(url, opts).then(function (res) {
       armRead();
       return res.text().then(function (text) {
-        clearTimeout(timer);
+        stop();
         return { status: res.status, ok: res.ok, text: text };
       });
     }).catch(function (e) {
-      clearTimeout(timer);
+      stop();
       if (timedOut) throw timeoutError(phase);
       throw e;
     });
   }
 
-  function postText(url, apiKey, body, readTimeoutMs) {
-    return requestText('POST', url, apiKey, body, CONNECT_TIMEOUT_MS, readTimeoutMs).then(checkText);
+  function postText(url, apiKey, body, readTimeoutMs, onProgress) {
+    return requestText('POST', url, apiKey, body, CONNECT_TIMEOUT_MS, readTimeoutMs, onProgress)
+      .then(checkText);
   }
 
   /* POST em streaming: lê o corpo aos poucos e reporta bytes de delta.content. */
@@ -373,7 +390,9 @@
         .then(function (raw) { return parseChat(raw); })
         .catch(function (e) {
           if (e && typeof e.message === 'string' && e.message.indexOf('HTTP 4') === 0) {
-            return postText(target, apiKey, body(false), CHAT_READ_TIMEOUT_MS)
+            /* Provedor sem streaming: o corpo inteiro só chega no fim, então
+             * usamos um timeout longo e mandamos heartbeat para o watchdog. */
+            return postText(target, apiKey, body(false), CHAT_TEXT_TIMEOUT_MS, onProgress)
               .then(function (raw) { return parseChat(raw); });
           }
           throw e;
@@ -428,10 +447,11 @@
   }
 
   window.AiClient = {
-    VERSION: '2.9.1',
+    VERSION: '2.9.2',
     cancel: cancel,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
     CHAT_READ_TIMEOUT_MS: CHAT_READ_TIMEOUT_MS,
+    CHAT_TEXT_TIMEOUT_MS: CHAT_TEXT_TIMEOUT_MS,
     MODELS_READ_TIMEOUT_MS: MODELS_READ_TIMEOUT_MS,
     AiException: AiException,
     buildUrl: buildUrl,

@@ -10,6 +10,7 @@ Uso:
     python3 serve.py 9000       # outra porta
 """
 import http.server
+import ipaddress
 import json
 import os
 import ssl
@@ -23,6 +24,66 @@ FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes")
 FONT_EXT = (".ttf", ".otf", ".woff", ".woff2")
 FONT_TYPES = {".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2"}
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8790
+
+# --- Proteção do /_proxy contra SSRF ----------------------------------------
+# A página gerada pela IA roda em iframe sandbox: não lê a resposta, mas pode
+# disparar requisições cegas para a rede interna. Faixas privadas/link-local/
+# metadata ficam bloqueadas; loopback segue liberado (LM Studio, Ollama etc.).
+# Resolução DNS não é validada (risco residual conhecido).
+_BLOCKED_HOSTS = {
+    "metadata",
+    "metadata.google.internal",
+    "instance-data",
+    "metadata.azure.com",
+}
+
+
+def _host_blocked(host):
+    h = (host or "").strip().lower()
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+    if not h:
+        return True
+    if h in _BLOCKED_HOSTS:
+        return True
+    if h == "localhost":
+        return False
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    if ip.is_loopback:
+        return False
+    return not ip.is_global
+
+
+def _target_blocked(target):
+    try:
+        parts = urllib.parse.urlparse(target)
+    except ValueError:
+        return True
+    if parts.scheme not in ("http", "https"):
+        return True
+    return _host_blocked(parts.hostname)
+
+
+class _AllowlistedRedirect(urllib.request.HTTPRedirectHandler):
+    max_redirections = 4
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _target_blocked(newurl):
+            raise urllib.error.HTTPError(
+                newurl, code, "redirecionamento bloqueado pelo proxy", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(
+    urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+    _AllowlistedRedirect(),
+)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -138,6 +199,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not target.startswith(("http://", "https://")):
             self.send_error(400, "parametro url invalido")
             return
+        if _target_blocked(target):
+            self.send_error(403, "destino nao permitido (rede interna)")
+            return
 
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
@@ -149,9 +213,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 req.add_header(header, value)
 
         try:
-            with urllib.request.urlopen(
-                req, timeout=600, context=ssl.create_default_context()
-            ) as resp:
+            with _OPENER.open(req, timeout=600) as resp:
                 self.send_response(resp.status)
                 self.send_header(
                     "Content-Type", resp.headers.get("Content-Type", "application/json")

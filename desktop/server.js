@@ -180,10 +180,81 @@ async function serveFonts(req, res, pathname) {
   res.end(req.method === 'HEAD' ? undefined : data);
 }
 
+/* --- Proteção do /_proxy contra SSRF ---------------------------------------
+ * A página gerada pela IA roda em iframe sandbox: ela não lê a resposta
+ * (origem opaca), mas ainda pode disparar requisições cegas para dentro da
+ * rede. Bloqueamos faixas privadas/link-local/metadata e revalidamos cada
+ * salto de redirecionamento. Loopback segue liberado porque provedores
+ * locais (LM Studio, Ollama, llama.cpp) são caso de uso legítimo.
+ * Resolução DNS não é validada (risco residual conhecido). */
+const BLOCKED_HOSTS = new Set([
+  'metadata',
+  'metadata.google.internal',
+  'instance-data',
+  'metadata.azure.com',
+]);
+
+function ipv4Blocked(ip) {
+  const p = ip.split('.').map(Number);
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const a = p[0];
+  const b = p[1];
+  if (a === 127) return false;                     /* loopback: provedores locais */
+  if (a === 0 || a === 10) return true;
+  if (a === 169 && b === 254) return true;         /* link-local / metadata */
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; /* CGNAT */
+  if (a >= 224) return true;                       /* multicast / reservado */
+  return false;
+}
+
+function hostBlocked(host) {
+  let h = String(host || '').toLowerCase();
+  if (!h) return true;
+  if (h.charAt(0) === '[') h = h.slice(1, -1);     /* [::1] -> ::1 */
+  if (BLOCKED_HOSTS.has(h)) return true;
+  if (h === 'localhost') return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return ipv4Blocked(h);
+  if (h.indexOf(':') >= 0) {
+    if (h === '::1' || h === '::') return false;
+    const mapped = h.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (mapped) return ipv4Blocked(mapped[1]);
+    if (h.indexOf('fe80') === 0 || h.indexOf('fc') === 0 || h.indexOf('fd') === 0) return true;
+  }
+  return false;
+}
+
+function targetBlocked(target) {
+  let u;
+  try { u = new URL(target); } catch (e) { return true; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return true;
+  return hostBlocked(u.hostname);
+}
+
+/* Segue no máximo 4 saltos, revalidando cada destino. */
+async function fetchAllowlisted(target, opts) {
+  let current = target;
+  for (let hop = 0; hop < 4; hop++) {
+    const upstream = await fetch(current, Object.assign({}, opts, { redirect: 'manual' }));
+    if (upstream.status < 300 || upstream.status >= 400) return upstream;
+    const loc = upstream.headers.get('location');
+    if (!loc) return upstream;
+    if (upstream.body) { try { await upstream.body.cancel(); } catch (e) {} }
+    const next = new URL(loc, current).href;
+    if (targetBlocked(next)) throw new Error('redirecionamento bloqueado pelo proxy');
+    current = next;
+  }
+  throw new Error('redirecionamentos demais');
+}
+
 async function proxy(req, res, url) {
   const target = url.searchParams.get('url') || '';
   if (!/^https?:\/\//i.test(target)) {
     return send(res, 400, 'parametro url invalido');
+  }
+  if (targetBlocked(target)) {
+    return send(res, 403, 'destino nao permitido (rede interna)');
   }
 
   const headers = {};
@@ -205,12 +276,11 @@ async function proxy(req, res, url) {
   res.on('close', onClose);
 
   try {
-    const upstream = await fetch(target, {
+    const upstream = await fetchAllowlisted(target, {
       method: req.method,
       headers,
       body: body && body.length ? body : undefined,
       signal: controller.signal,
-      redirect: 'follow',
     });
 
     res.writeHead(upstream.status, {

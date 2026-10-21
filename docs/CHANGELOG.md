@@ -1,5 +1,44 @@
 # Changelog — NEXUS GAME
 
+## v2.9.2 — 2026-10-20
+
+### Corrigido
+- **`Esc` durante a geração escrevia uma página de erro por cima do jogo.** O `AbortError`
+  caía no `catch` de `failGeneration` e renderizava "falha na geração" mesmo com o usuário
+  tendo cancelado de propósito. Nova flag `canceladoPeloUsuario` (setada em ESC, watchdog e
+  `resetSession`) faz `failGeneration` sair cedo — a UI só destrava, sem sujar o palco.
+- **Watchdog matava geração saudável.** `onGenProgress` media tempo com `performance.now()`
+  enquanto `armarWatchdog`/`_genStartedAt` usavam `Date.now()`: a comparação misturava
+  relógios e o watchdog virava teto rígido de 150 s ignorando progresso. Agora `lastProgressAt`
+  é **sempre** `Date.now()`, e o watchdog só dispara após 2,5 min reais sem sinal de vida.
+- **Fallback não-streaming herdava o stall de 90 s.** Em HTTP 4xx o `postText` era abortado
+  pelo mesmo limite do stream, e provedores que respondem o documento inteiro morriam sempre
+  em ~90 s. Agora o caminho não-streaming tem teto próprio: `CHAT_TEXT_TIMEOUT_MS` (5 min).
+- **`Esc` não abortava o fallback não-streaming.** `requestText` não registrava o
+  `AbortController` em `_activeCtrl`; agora registra e limpa no `stop()`, então ESC e watchdog
+  cancelam de fato qualquer requisição viva.
+- **`export` baixava o HTML sem as texturas inline.** `savePage` não inlinava
+  `nx-textures.js`: o arquivo salvo referênciava `js/nx-textures.js` e abria sem textura fora
+  da pasta do app. `inlineTextures()` (novo) embute o pack no `<script>` e usa
+  `Store.fileName()` na nomeação.
+
+### Adicionado
+- **Heartbeat de progresso (`HEARTBEAT_MS` = 20 s)** — ao ler a resposta, um tick periódico
+  chama `onProgress`, sinalizando vida sem exigir bytes novos. Provedor lento mas saudável não
+  é mais confundido com travado.
+- **Proxy `/_proxy` protegido contra SSRF** (`serve.py` e `desktop/server.js`): aceita apenas
+  `http`/`https` e recusa rede privada, link-local e metadata de nuvem (`10/8`, `172.16/12`,
+  `192.168/16`, `169.254/16`, `100.100.100.200`, `[fe80::]`, `[fd00::]`, `metadata.*`,
+  `0.0.0.0`). Redirecionamentos são seguidos manualmente e revalidados (máx. 4 saltos), para
+  que um `302` não fure a checagem. **Loopback continua liberado** — LM Studio / Ollama /
+  llama.cpp são uso legítimo. Resolução DNS não é validada (risco residual documentado).
+
+### Documentação
+- `README.md` — versão 2.9.2, 30 temas (20 escuros + 10 claros), `## Recursos` duplicado
+  renomeado para `## Interface e sessão`, nota de segurança do proxy, status atualizado.
+- `docs/ESTADO_ATUAL.md` — HEAD `981f5b4`, `app.js` 1601 linhas, `ai-client.js` 464 linhas,
+  tabela de proteções com as três falhas acima e o proxy.
+
 ## v2.9.1 — 2026-10-20
 
 ### Corrigido
