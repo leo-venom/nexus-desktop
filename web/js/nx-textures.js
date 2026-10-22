@@ -768,11 +768,65 @@
 
   var NOMES = Object.keys(TEX);
 
+  /* ---------- Fuzzy match por similaridade (fallback final) ---------- */
+
+  /* Levenshtein edit distance. */
+  function editDist(a, b) {
+    var m = a.length, n = b.length;
+    var dp = [];
+    for (var i = 0; i <= m; i++) { dp[i] = [i]; }
+    for (var j = 0; j <= n; j++) { dp[0][j] = j; }
+    for (i = 1; i <= m; i++) {
+      for (j = 1; j <= n; j++) {
+        var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      }
+    }
+    return dp[m][n];
+  }
+
+  /* Devolve o nome de textura mais próximo dentre NOMES.
+     Prioriza: (1) igual, (2) substring match, (3) palavra embutida, (4) menor editDist.
+     Sempre devolve algo — nunca undefined/null. */
+  function fuzzyMatch(nome) {
+    var norm = String(nome || '').toLowerCase().trim().replace(/[\s_-]+/g, '');
+    if (!norm) return NOMES[0] || 'pedra';
+
+    // Passada 1: exact match normalized
+    for (var i = 0; i < NOMES.length; i++) {
+      if (NOMES[i].replace(/[\s_-]+/g, '') === norm) return NOMES[i];
+    }
+    // Passada 2: word overlap — pelo menos uma palavra coincide (mais específico que substring)
+    var words = String(nome).toLowerCase().split(/[\s_-]+/);
+    for (i = 0; i < NOMES.length; i++) {
+      var twords = NOMES[i].split('_');
+      for (var w = 0; w < words.length; w++) {
+        for (var t = 0; t < twords.length; t++) {
+          if (words[w] === twords[t]) return NOMES[i];
+        }
+      }
+    }
+    // Passada 3: substring — nome contém tex ou tex contém nome
+    for (i = 0; i < NOMES.length; i++) {
+      var clean = NOMES[i].replace(/[\s_-]+/g, '');
+      if (clean.indexOf(norm) >= 0 || norm.indexOf(clean) >= 0) return NOMES[i];
+    }
+    // Passada 4: menor edit distance (só se razoável — max 3 ou 30% do tamanho)
+    var best = NOMES[0], bestD = Infinity;
+    var threshold = Math.max(3, Math.floor(norm.length * 0.3));
+    for (i = 0; i < NOMES.length; i++) {
+      var d = editDist(norm, NOMES[i].replace(/[\s_-]+/g, ''));
+      if (d < bestD) { bestD = d; best = NOMES[i]; }
+    }
+    return bestD <= threshold ? best : NOMES[0];
+  }
+
   /* ---------- API ---------- */
 
   function canvas(nome, tam) {
     var n = String(nome || '').toLowerCase().trim();
     if (!TEX[n]) n = mapear(n);
+    if (!TEX[n]) n = fuzzyMatch(n);           // <-- fuzzy fallback
     var t = tam || TAM;
     var key = n + '@' + t;
     if (CACHE[key]) return CACHE[key];
@@ -846,6 +900,7 @@
     if (!ctx) return null;
     var n = String(nome || '').toLowerCase().trim();
     if (!TEX[n]) n = mapear(n);
+    if (!TEX[n]) n = fuzzyMatch(n);           // <-- fuzzy fallback
     for (var i = 0; i < PATTERNS.length; i++) {
       if (PATTERNS[i].ctx === ctx && PATTERNS[i].nome === n) return PATTERNS[i].pat;
     }

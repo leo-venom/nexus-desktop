@@ -31,17 +31,6 @@ Rules:
 - If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).
 - If the message includes a "Current page" HTML document, that is the page currently on screen: treat the command as an edit to it - change only what was asked, keep everything else intact, and output the complete updated document. Only build a page from scratch when no current page is provided.`;
 
-  /* Regras para o código gerado ser totalmente editável pelo editor visual. */
-  var EDIT_FRIENDLY = `
-EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so structure the code for it:
-- Every visible piece (title, text, button, card, panel, shape) must be its OWN element with a meaningful id (e.g. id="titulo", id="btn-jogar", id="painel").
-- Canvas is ONLY for the animated scene/background. HUD, score, titles, buttons and menus must be real HTML elements layered on top — never drawn inside the canvas.
-- Keep each sentence in ONE text node: no <br> and no per-letter <span> inside a text. Animate a word/phrase with CSS on its parent element instead.
-- Never use !important in CSS: live inline edits must win.
-- Do not place a full-screen transparent overlay above the content, and never set pointer-events:none on visible layers.
-- Use px/rem font sizes and explicit colors so they can be tweaked live.
-- Lay out with flex/grid so elements never overlap or clip each other, and everything stays inside the viewport at any screen size.`;
-
   /* Palavras-chave que disparam o modo jogo com texturas e áudio. */
   var GAME_TERMS = [
     'jogo','jogar','game','joguinho','snake','tetris','flappy','bird','pacman',
@@ -63,6 +52,20 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
     'mapa','cidade','floresta','deserto','gelo','caverna','masmorra',
     /* three.js para jogos 3D */
     'three','three.js','webgl',
+    /* Termos criativos — montagem, cena, objeto 3D, simulação, visual */
+    'cubo','esfera','cilindro','torus','cone','piramide','poliedro',
+    'planeta','objeto 3d','cena 3d','mundo 3d','modelo 3d',
+    'montagem','construção','construcao','cena','cenário','cenario',
+    'mundo aberto','sandbox','playground',
+    'visualização','visualizacao','galeria','exposição','exposicao',
+    'instalação','instalacao','interativo','interativa',
+    'simulação','simulacao','física','fisica','gravidade','pêndulo','pendulo','mola',
+    'colorido','colorida','arco-íris','arco-iris','degradê','degrade',
+    'wallpaper','fundo animado','generativo','generative',
+    'procedural','criativo','criativa','fractal','padrão','padrao',
+    'fluido','líquido','liquido','fumaça','fumaca','onda','ondas',
+    'experiência','experiencia','ambiente','atmosfera',
+    'caos','infinito','partícula','particula','neon',
   ];
 
   function isGameCommand(cmd) {
@@ -176,74 +179,136 @@ EDIT-FRIENDLY MARKUP — the app has a visual editor that inspects this page, so
   }
 
   var GAME_DIRECTIVE = `
-GAME MODE ATIVADO — VOCÊ ESTÁ GERANDO UM JOGO COMPLETO. Siga TODAS as regras abaixo em PORTUGUÊS (pt-BR) para textos visíveis.
+MODO JOGO ATIVADO — JOGO / OBJETO 3D / CENA INTERATIVA.
 
-REGRA ABSOLUTA — ENTREGA COMPLETA EM UMA RESPOSTA:
-O documento inteiro precisa caber em UMA resposta do modelo. Comece a escrever o <script> do jogo cedo e mantenha o código enxuto: priorize um jogo COMPLETO, jogável e fechado (com </body></html> no final) em vez de volume. Se estiver ficando grande, corte cenário, partículas e comentários — NUNCA corte níveis, inimigos, controles, áudio, HUD ou o fechamento do HTML. Documento cortado no meio = entrega inválida e tela preta.
+Você entrega um BUILD JOGÁVEL E ACABADO, não um protótipo. O jogo é o produto: profundidade, resposta imediata, 60fps. Texto é ruído — nada de título, instruções, créditos ou legendas; HUD só com números e rótulos de até 3 palavras.
 
-REGRA ABSOLUTA — TAMANHO:
-Sem mínimo nem teto de tamanho de código. O código que o jogo exigir para ser completo e rodar liso a 60fps. Cortar redundância é obrigatório — mas não corte jogabilidade, níveis, inimigos, power-ups, som ou efeitos.
+1) CONTRATO DE SAÍDA
+- Um documento HTML completo e FECHADO (</body></html>). Sem markdown, sem cercas, sem texto antes ou depois.
+- <script> no topo do body. Se faltar espaço, corte comentários e código morto — NUNCA features nem o fechamento.
+- three.js: <script src="vendor/three/three.min.js"></script> (global THREE). PROIBIDO CDN de three, import map, type="module" e addons — OrbitControls, GLTFLoader, EffectComposer e RoomEnvironment NÃO existem neste build.
+- Nenhuma biblioteca além de three.js e WebAudio.
 
-REGRAS DE TELA (OBRIGATÓRIO):
-- 100vw x 100dvh, sem scroll. body { margin:0; padding:0; overflow:hidden; width:100vw; height:100dvh; }
-- MEDIÇÃO DEFENSIVA DO VIEWPORT (obrigatório): o jogo roda dentro de um iframe e window.innerWidth/innerHeight podem retornar 0 no primeiro instante. NUNCA dimensione o canvas uma única vez no carregamento. Sempre: function fit(){var W=window.innerWidth||document.documentElement.clientWidth||0;var H=window.innerHeight||document.documentElement.clientHeight||0;if(W<40||H<40){requestAnimationFrame(fit);return}/* dimensiona canvas e recalcula escala */}. Chame fit() dentro de requestAnimationFrame, registre window.addEventListener('resize', fit) e window.addEventListener('orientationchange', fit), e repita via setTimeout(fit, 300) como rede de segurança. Se a primeira medição vier 0, o jogo DEVE esperar e remedir em vez de desenhar num canvas 0x0.
-- devicePixelRatio cap em Math.min(window.devicePixelRatio||1, 2).
-- Pausa e game over: overlays position:fixed em tela cheia (inset:0) sobre o canvas. O campo de jogo NUNCA é menor que a tela. NÃO existe tela de menu/apresentação: o jogo começa jogando.
-- HUD EM BOLHAS NAS LATERAIS (obrigatório): cada informação (score, vidas, nível, power-ups, tempo, combo) vai numa BOLHA/pílula arredondada — cantos bem redondos (border-radius 12-20px ou pill), fundo semi-transparente (rgba do fundo do jogo, 55-75%), borda fina na cor de destaque e leve glow/sombra. Cada bolha com LARGURA MÁXIMA de 100px, encostada na borda ESQUERDA ou DIREITA com 10px de margem, empilhadas em coluna com 8-10px de espaço entre elas. Fonte pequena (10-13px), número grande em destaque e rótulo minúsculo. NADA no centro sobre o jogo; PROIBIDO faixa/painel largo de HUD. O canvas ocupa 100% da tela por trás, de borda a borda. Em mobile: bolhas menores (máx 80px) e mais transparentes.
+2) FUNDO — O JOGO É A TELA
+- Cena 3D: o fundo é a própria cena (cor de céu + fog + environment). NUNCA foto atrás do 3D.
+- Jogo 2D: o fundo é desenhado pelo jogo (gradiente de céu, parallax, tiles, profundidade). Nada de foto por padrão.
+- 'imagens/back1.jpg' é OPCIONAL: só em jogo 2D chapado cujo cenário combine com a foto, e então NADA por cima (sem vinheta, scanline, grid, gradiente ou glow). Se o pedido pedir outro fundo, obedeça o pedido.
+- Proibida qualquer camada decorativa entre o fundo e o jogo.
 
-SEM BORDAS / SEM MOLDURA — REGRA ABSOLUTA:
-- A tela é DO JOGO: nenhum painel, card, moldura, margem, padding ou barra em volta. Canvas em 100vw x 100dvh desenhado até a borda.
-- PROIBIDO: moldura/borda decorativa, vinheta, faixa de título, cabeçalho, "caixa" em volta da área de jogo. A única margem permitida é a do HUD: no máximo 10px.
-- Menu de pausa e game over são OVERLAYS em tela cheia sobre o jogo (nunca painel pequeno com borda no meio).
+3) ESQUELETO OBRIGATÓRIO — siga esta estrutura (adapte nomes, não invente outro loop)
 
-FOCO NO JOGO, NÃO NO FUNDO — REGRA ABSOLUTA:
-Fundo = cor sólida ou gradiente de 2-3 tons ou no máximo 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage por frame). PROIBIDO: cenário 3D elaborado, layers com textura animada, nebulosa recalculada por frame, blur ou shadow em tela cheia, milhares de partículas ambientes. O fundo não deve consumir mais que ~15% do tempo de frame. A qualidade máxima vai para O JOGO EM SI — personagens, inimigos, jogador, animações, efeitos de impacto, colisões, áudio — não para o fundo nem para a interface. Em dúvida entre fundo bonito e frame estável, escolha o frame.
+var c = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({ canvas: c, antialias: false, powerPreference: 'high-performance' });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-SÓ O QUE FOI PEDIDO — REGRA ABSOLUTA (nada de camadas extras):
-- Entregue o jogo pedido e mais nada: PROIBIDO seção "sobre", créditos, banners, cards institucionais, textos de marketing, legendas, telas extras, abas ou qualquer conteúdo fora do gameplay.
-- HUD = só o essencial do jogo (score, vidas, nível, power-ups e o que a mecânica exigir). Sem rótulos decorativos, sem frases, sem títulos grandes na tela.
-- PROIBIDO camada decorativa por cima do jogo (vinheta, scanlines, glow em tela cheia, partículas de ambiente em excesso). Efeito só quando faz parte da ação.
-- Só adicione tela/seção/elemento extra se o pedido pedir explicitamente.
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
+var W = 0, H = 0;
 
-O JOGO PRECISA TER, NO MÍNIMO:
-- 8-12 níveis com dificuldade progressiva (velocidade, densidade, novos padrões/tipos)
-- 3+ tipos de inimigo com comportamentos DIFERENTES (não só cor ou tamanho — movimentos, ataques, IA distintos)
-- 2-3 power-ups ou itens colecionáveis que realmente funcionam e alteram a jogabilidade
-- Fundo leve com 1-2 camadas de parallax pré-renderizadas (offscreen canvas, drawImage)
-- Partículas de impacto + ambientes COM POOL e teto (~40-60 partículas no máximo, reuso de objetos)
-- Música procedural (osciladores WebAudio) + SFX para TODAS as ações
-- Screen shake + floating score + transições animadas de fase e de game over
-- Pausa (P/ESC) e tela de game over com estatísticas (score, nível, tempo) — SEM tela de apresentação e SEM botão iniciar
-- Recorde máximo + último nível alcançado salvos em localStorage
-- Controles por TECLADO e TOQUE (touch events) — ambos funcionando
+function fit() {
+  var w = window.innerWidth | 0, h = window.innerHeight | 0;
+  if (w < 32 || h < 32) { requestAnimationFrame(fit); return; }
+  W = w; H = h;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H; camera.updateProjectionMatrix();
+}
+fit();
+window.addEventListener('resize', fit);
 
-COMO ENTREGAR O JOGO COMPLETO:
-1. Cada nível implementado individualmente com parâmetros próprios (velocidade, spawn rate, cores, padrões de inimigos). Não repita o mesmo código 12 vezes — use um array de configuração de níveis e um gerador.
-2. ÁUDIO: WebAudio com osciladores reais, não placeholder. AudioContext compartilhado criado no primeiro clique/interação (requisito do navegador). Função única playSom(tipo) que faz lookup de parâmetros, cria nós (OscillatorNode, GainNode, BiquadFilterNode), conecta, start + stop automático.
-3. Sistema de partículas COM POOL (array fixo reutilizado) e teto (~40-60 máx). Quando uma partícula morre, ela volta ao pool em vez de ser descartada. Prefira Float32Array + canvas a objetos avulsos.
-4. Fundo leve com 1-2 camadas de parallax desenhadas em offscreen canvas (uma vez) e apenas drawImage por frame — sem redesenhar, sem cálculos por frame.
-5. Transições animadas de onda/fase e na entrada do game over (fade/deslize de 300-500ms) — nunca uma transição de menu inicial.
-6. Efeitos dedicados por ação: screen shake no impacto, floating score ao matar inimigo, flash na borda ao tomar dano, glow ao pegar power-up.
-7. Tela de game over COM estatísticas: score final, nível alcançado, tempo de jogo, high score. Animação de entrada.
-8. Mecânicas secundárias: combos, multiplicadores de score por kills consecutivas, bônus de velocidade.
+/* IBL sem addons (core puro): ambiente gerado de uma cena de luzes */
+scene.environment = (function () {
+  var s = new THREE.Scene();
+  s.add(new THREE.Mesh(new THREE.SphereGeometry(60, 24, 12),
+    new THREE.MeshBasicMaterial({ color: 0x1b2a3a, side: THREE.BackSide })));
+  var k = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  k.position.set(18, 26, 10); s.add(k);
+  var g = new THREE.Mesh(new THREE.PlaneGeometry(40, 40),
+    new THREE.MeshBasicMaterial({ color: 0x0e4a36 }));
+  g.rotation.x = -Math.PI / 2; g.position.y = -12; s.add(g);
+  var pm = new THREE.PMREMGenerator(renderer);
+  var t = pm.fromScene(s, 0.04).texture;
+  pm.dispose();
+  return t;
+})();
 
-INÍCIO IMEDIATO — REGRA ABSOLUTA (o jogo NUNCA espera o jogador):
-- PROIBIDO tela de apresentação, tela de título, tela de instruções, menu inicial e qualquer botão "Iniciar", "Jogar", "Play", "Start" ou "Toque para começar".
-- PROIBIDO atrasar o desenho/início por qualquer gate: flag "started", "if(!started)return", clique, tecla, IntersectionObserver, document.visibilityState, requestIdleCallback, setTimeout/setInterval de espera, esperar fontes/imagens antes do primeiro render, ou tela "carregando…".
-- Ao carregar a página o jogo JÁ está rodando: estado = jogando, nível 1, player/peça no campo, inimigos/obstáculos se movendo, HUD ativo, música/loop de áudio pronto (o áudio pode depender do primeiro toque, mas o jogo não).
-- O primeiro render é SÍNCRONO: chame draw()/renderer.render(scene,camera) uma vez ANTES de agendar o requestAnimationFrame. O objeto principal (cubo/peça/nave) TEM que estar visível nesse primeiro render.
-- A tela de game over pode existir e deve ter um restart por clique/tecla ("clique ou aperte ENTER para jogar de novo") — isso não é tela de apresentação.
-- Pausa só quando o jogador pedir (P/ESC); jamais pausado no boot.
+var state = 'play';                       /* play | pause | over */
+var acc = 0, prev = performance.now(), STEP = 1 / 120;
 
-PRIMEIRO FRAME — REGRA ABSOLUTA:
-O jogo precisa mostrar conteúdo JÁ no primeiro frame, sem depender de clique ou tecla:
-- Desenhe o campo, o HUD e a peça/personagem ativa imediatamente após criar o canvas (chame draw() uma vez antes do loop).
-- SEMPRE exista um objeto ativo (peça atual / nave / jogador) posicionado no campo desde o início.
-- Se o loop usa requestAnimationFrame, dispare também um draw() síncrono antes dele.
-- Tela vazia no boot = bug de entrega. Se medir o viewport der 0, espere e redesenhe — nunca deixe o canvas em branco.
+function step(dt) { /* física com dt fixo */ }
+function draw(dt) { /* render */ }
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  var dt = (now - prev) / 1000; prev = now;
+  if (dt > 0.25) dt = 0.25;               /* volta de aba/minimizado */
+  acc += dt;
+  var guard = 0;
+  while (acc >= STEP && guard++ < 8) { step(STEP); acc -= STEP; }
+  draw(dt);
+}
+requestAnimationFrame(loop);
+
+document.addEventListener('visibilitychange', function () {
+  prev = performance.now(); acc = 0;
+});
+
+/* input único: teclado E ponteiro (mouse e toque) */
+var keys = {};
+window.addEventListener('keydown', function (e) {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'Escape' || e.key.toLowerCase() === 'p') togglePause();
+});
+window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+function togglePause() {
+  state = state === 'play' ? 'pause' : (state === 'pause' ? 'play' : state);
+}
+
+4) ACABAMENTO — o que "pronto" significa
+- 3+ tipos de inimigo/obstáculo com comportamento DIFERENTE (não a mesma coisa recolorida).
+- 5+ níveis com dificuldade crescente e progressão visível.
+- 3+ power-ups que mudam como se joga.
+- Colisão real (círculo/AABB), dano, invencibilidade curta com piscada, vidas ou barra.
+- Game over com estatísticas + restart em 1 tecla; recorde em localStorage.
+- Juice: tremor curto de tela, flash de dano, partículas em pool, hitstop de 60-90ms no impacto forte.
+- Áudio: SFX + ambiente procedural; um AudioContext criado uma vez e retomado no primeiro gesto.
+- Nada de estado sem saída: o jogo perde e ganha.
+
+5) REALISMO 3D EM GPU INTEGRADA
+- MeshStandardMaterial/MeshPhysicalMaterial com roughness/metalness coerentes (metal: .9/.25 · plástico: .6/.45 · pedra: .95/.05). Nunca material branco padrão.
+- scene.environment do PMREM acima dá reflexo e luz indireta de graça — sem ele o PBR fica morto.
+- 1 luz direcional (sombra 1024, bias -0.0005) + 1 hemisférica fraca; chão recebe sombra, objeto principal projeta.
+- ACES + exposição 1.0-1.15; fog na cor do fundo; céu como cor com gradiente suave em canvas.
+- Detalhe por geometria procedural (chanfros, ruído em vértices, lathe/extrude) e CanvasTexture 128-256px, anisotropia 4.
+- Órbita manual: pointerdown/move/up alterando theta/phi, wheel no raio, com limites. NUNCA THREE.OrbitControls.
+
+6) ORÇAMENTO (estourar = jogo travado)
+- <= 60 draw calls, <= 80k triângulos, <= 300 partículas em pool.
+- Zero alocação de objeto/vetor/string dentro de step()/draw() — crie antes, reutilize.
+- 1 canvas, 1 requestAnimationFrame, 1 AudioContext.
+- DPR cap 1.5, shadow map <= 1024, sem post-processing, sem bloom, sem EffectComposer.
+- FPS AUTO silencioso: conte frames em janelas de 1s; abaixo de 50fps em 2 janelas -> DPR 1, metade das partículas, sombra off; 58fps+ em 2 -> volta. Sem UI, sem aviso.
+- 2D: fundo pintado uma vez em canvas offscreen e reutilizado com drawImage; gradientes/paths cacheados; colisão AABB/círculo; nada de filter/blur/backdrop-filter animado.
+
+7) HUD E TEXTO
+- HUD mínimo em bolhas/cantos: score, vida, nível, power-up. Só números e rótulos de até 3 palavras.
+- Sem tela de título, menu ou botão "Iniciar" — começa jogando.
+- Sem instruções na tela; controle sempre por teclado/setas/WASD E ponteiro/toque.
+
+8) REPROVA (falha de entrega)
+- Protótipo mínimo, stub, TODO, placeholder, canvas vazio.
+- "8 níveis" que são o mesmo inimigo recolorido; array de níveis com 1 item.
+- Sem colisão, sem game over, sem restart, sem som.
+- Tela coberta de texto, cards, painéis, créditos, moldura, borda, vinheta ou camada decorativa.
+- Vazar marcador interno do pack de texturas, comentário de planejamento ou explicação fora do HTML.
 
 @@NX_TEX_BEGIN@@
-12 TEXTURAS PROCESSUAIS (three.js CanvasTexture — aplicar somente quando o pedido pedir textura/material):
+TEXTURAS PROCEDURAIS — receitas base (three.js CanvasTexture — aplicar somente quando o pedido pedir textura/material):
 Todas as texturas usam: var c=document.createElement('canvas'); c.width=c.height=128; var x=c.getContext('2d'); /* desenho */ var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; material.map=t;
 
 1. METAL: ruído ImageData (loop em pixels, variar R/G/B entre 140-200) + sobrepor listras horizontais finas (fillRect altura 1-2px, espaçadas 8px, cinza escuro). material: MeshStandardMaterial, metalness:0.8, roughness:0.3.
@@ -269,7 +334,7 @@ API (2D):
 - NxTex.canvas('pedra', 64)  → canvas cru (32/64/128/256).
 - NxTex.css('nebulosa')  → 'url(data:...)' para background de elemento.
 - NxTex.mapear('textura de chocolate')  → traduz o pedido do usuário para a textura mais próxima.
-- NxTex.names()  → lista as 24.
+- NxTex.names()  → lista as 44.
 
 API (3D/three.js):
 - material.map = NxTex.three('lava')  → THREE.CanvasTexture com RepeatWrapping (já configurada).
@@ -332,36 +397,17 @@ function playSom(tipo) {
 12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
 13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
 
-DESEMPENHO — META 60 FPS CONSTANTES (obrigatório):
-- Um único canvas e um único loop de requestAnimationFrame. Nada de vários loops concorrentes.
-- NÃO redesenhe o fundo a cada frame: pinte-o uma vez em canvas offscreen e use drawImage; parallax só com deslocamento de offset.
-- Partículas: array fixo com pool (máx 40-60), zero alocação de objetos dentro do loop.
-- Sem filter: blur(), box-shadow ou backdrop-filter em elementos animados; sem sombras por frame no canvas (use 1-2 sombras pré-renderizadas se indispensável).
-- Reaproveite gradientes/paths (crie uma vez, reutilize); nada de criar gradiente ou string de cor dentro do loop.
-- Colisões simples (AABB/círculos), sem cálculos por pixel.
-- Cap de devicePixelRatio em 2; se a tela for grande, reduza a resolução interna do canvas em vez de perder frames.
-- FPS AUTO — REGRA ABSOLUTA (auto-ajuste silencioso): meça o fps de verdade contando frames em janelas de 1s (performance.now()). Se ficar abaixo de 50 fps em 2 janelas seguidas, reduza a qualidade sozinho: renderer.setPixelRatio(1) / canvas em resolução menor, metade das partículas, desligue sombras e glow extras. Se passar de 58 fps em 2 janelas, pode voltar ao dpr original. O ajuste é silencioso (sem UI, sem aviso), no máximo 1x por segundo, e o jogo NUNCA trava nem cai de 60 de uma vez.
-- Pause o loop quando document.hidden; retome no visibilitychange.
-- Áudio: nós criados por som e descartados (ou pool); nunca criar AudioContext por efeito.
+CHECK FINAL — passe por cada item; se algum falhar, conserte antes de entregar:
+- Documento fechado (</body></html>), <script> todos balanceados, nenhum erro no primeiro frame?
+- Primeiro frame já mostra o jogo/objeto, sem clique e sem tela de título?
+- Vence e perde? Restart em 1 tecla? Recorde salvo?
+- Jogo: 3+ inimigos distintos, 5+ níveis, 3+ power-ups, colisão real?
+- Fundo é a própria cena (3D) ou desenhado pelo jogo (2D), sem camada decorativa por cima?
+- 60fps dentro do orçamento (DPR 1.5, 1 loop, pool de partículas, zero alocação no frame)?
 
-NÃO FAÇA:
-- Versão mínima funcional, código comentado/TODO, placeholder, canvas vazio
-- Moldura, borda, card ou margem em volta do jogo (a tela é do jogo, HUD com no máximo 10px)
-- Seções, telas, cards, créditos ou textos fora do gameplay
-- Camada decorativa por cima do jogo (vinheta, scanlines, glow de tela cheia)
-- 1 tipo de inimigo com cores diferentes chamado de "8 níveis"
-- Jogo sem som, sem música, sem game over, sem tela de pausa
-- Tela de apresentação, tela de título, menu inicial ou botão "Iniciar/Jogar/Play" — o jogo começa sozinho
-- Arrays de configuração de nível vazios ou com só 1 entrada
+ENTREGUE APENAS O HTML.
 
-VERIFIQUE ANTES DE ENTREGAR:
-- 60fps? fundo leve? canvas de borda a borda (sem moldura)? HUD em BOLHAS nas laterais (máx 100px, 10px de margem)?
-- Só o que foi pedido? nenhuma seção/tela/camada/texto extra?
-- 8-12 níveis? 3+ inimigos com comportamentos diferentes? 2-3 power-ups?
-- Parallax? partículas com pool (~40-60)? música+SFX? screen shake?
-- Início imediato (sem tela de apresentação, sem botão iniciar, nível 1 já rodando)? pausa+game over com stats? recorde salvo? teclado+toque?
-- Texturas aplicadas quando o pedido pedir? sons em todas as ações?
-- Cada nível diferente do anterior (não só velocidade)?`;
+`;
 
   /* ==========================================================
    * DRAWING_DIRECTIVE — modo desenho/objeto/ilustração/arte.
@@ -392,7 +438,8 @@ REGRAS DE TELA (OBRIGATÓRIO):
 - 100vw x 100dvh, sem scroll. body: margin:0;padding:0;overflow:hidden;width:100vw;height:100dvh;display:flex;align-items:center;justify-content:center;
 - Centralize o desenho/objeto na tela com escala responsiva (min/max dimensões, viewport units, ou escala relativa ao canvas).
 - devicePixelRatio cap em Math.min(window.devicePixelRatio||1, 2).
-- FUNDO: use a cor/gradiente da paleta que VOCÊ escolheu (ou a que o pedido especificar), em 2-3 tons que não roubem a cena.
+- FUNDO PADRÃO: a imagem 'imagens/back1.jpg' em center/cover sem repetição (o arquivo back1.jpg já existe no projeto e é servido pelo servidor local). Use-a como fundo do desenho/objeto a menos que o pedido peça outro fundo.
+- Se o pedido pedir outro fundo/mudança de fundo, troque por ele (cor, gradiente ou outra imagem). Se for imagem, use 'imagens/' como caminho.
 - Se o desenho usar canvas, meça defensivamente: se innerWidth/innerHeight vier 0, remedir em requestAnimationFrame até obter valores > 0.
 
 PRIMEIRO FRAME — REGRA ABSOLUTA (o objeto aparece SEM interação):
@@ -637,9 +684,9 @@ CHECKLIST FINAL:
 - Interação (botão hover)?
 - Tom amigável e direto?`;
 
-  /* Escopo único — NEXUS GAME é sempre modo completo, otimizado para desempenho. */
+  /* Escopo único — NEXUS GAME é sempre modo criativo completo. */
   function gameScopeNote(level) {
-    return '\n\nESCOPO — JOGO COMPLETO, OTIMIZADO PARA DESEMPENHO: entregue o checklist inteiro (8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax de 1-2 camadas, partículas com pool, música + SFX, screen shake, transições, pausa/game over com estatísticas e recorde salvo) DENTRO de um orçamento de 60fps constantes. O jogo começa JOGANDO ao carregar — sem tela de apresentação, sem menu, sem botão iniciar. A tela é do jogo: canvas de borda a borda, sem moldura/card/margem em volta e HUD compacto com no máximo 10px de margem. Qualidade máxima NO JOGO (personagens, inimigos, animações, efeitos, áudio) — nada de camadas, seções ou textos extras. Desempenho manda: prefira desenho simples e barato, reutilize objetos, evite recalcular por frame. Se algo precisa ser cortado para manter 60fps, corte cenário e efeito — nunca jogabilidade, inimigos, níveis ou áudio.';
+    return '\n\nESCOPO — CRIAÇÃO COMPLETA E OTIMIZADA: entregue o que o pedido pede com a qualidade que ele merece. Jogo tradicional = níveis, inimigos, power-ups, áudio, HUD, game over. Objeto 3D/cena = material bem configurado, iluminação, textura, rotação. Simulação/ambiente = loop rAF otimizado, partículas com pool, interação. Tudo com início imediato (sem menu/tela de apresentação), canvas de borda a borda, sem moldura, sem elementos extras que o pedido não pediu. Qualidade máxima NA CRIAÇÃO (personagens, materiais, efeitos, áudio) — nada de camadas, seções ou textos extras. Desempenho manda: prefira desenho leve e barato, reutilize objetos, evite recalcular por frame. 60fps constante.';
   }
 
   function drawingScopeNote() {
@@ -835,6 +882,70 @@ CHECKLIST FINAL:
     return out;
   }
 
+  /* Validação de qualidade do documento gerado (modos visuais).
+     Só falhas de ALTA confiança — cada item vira uma linha do pedido de reparo.
+     mode: 'game' | 'drawing' | 'chat' (detectMode). Devolve [{code, msg}]. */
+  function lint(html, mode) {
+    var out = [];
+    if (!html) return out;
+    var s = String(html);
+    var low = s.toLowerCase();
+    var isGame = mode === 'game';
+
+    /* 1) Resposta cortada: sem </html> ou pares <script> desbalanceados. */
+    if (low.indexOf('</html>') < 0) {
+      out.push({ code: 'truncated', msg: 'o documento termina sem </html> (resposta cortada)' });
+    }
+    var rest = s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+    if (/<script\b/i.test(rest)) {
+      out.push({ code: 'truncated', msg: 'há um <script> aberto e nunca fechado' });
+    }
+    if (/<\/script>/i.test(rest)) {
+      out.push({ code: 'truncated', msg: 'há um </script> sem <script> correspondente' });
+    }
+
+    /* 2) Addons/módulos: este três.js é só o core, addons não existem. */
+    var addon = low.match(/orbitcontrols|gltfloader|effectcomposer|roomenvironment|contactshadows|rgbelloader|importmap|type\s*=\s*["']?module/);
+    if (addon) {
+      out.push({ code: 'addon', msg: 'usa "' + addon[0] + '" (addons/ES modules não estão disponíveis; só o core do três.js)' });
+    }
+
+    /* 3) three.js vindo de CDN: offline quebra a página. */
+    var cdn = s.match(/<script\b[^>]*\bsrc\s*=\s*["'](https?:\/\/[^"']*three[^"']*)["']/i);
+    if (cdn) {
+      out.push({ code: 'cdnThree', msg: 'carrega three.js de CDN (' + cdn[1] + ') em vez do vendor local' });
+    }
+
+    /* 4) Placeholder no lugar de implementação. */
+    var stub = s.match(/\b(TODO|FIXME|XXX)\b/) || low.match(/lorem ipsum|not implemented|implementação pendente/);
+    if (stub) {
+      out.push({ code: 'stub', msg: 'deixou trecho por fazer ("' + String(stub[0]).slice(0, 40) + '")' });
+    }
+
+    if (isGame) {
+      /* 5) Sem loop de animação: o jogo não roda. */
+      if (!/requestAnimationFrame|setAnimationLoop/.test(s)) {
+        out.push({ code: 'noLoop', msg: 'não tem loop de animação (requestAnimationFrame/setAnimationLoop)' });
+      }
+      /* 6) Sem tratamento de resize: quebra ao girar a tela. */
+      if (!/addEventListener\s*\(\s*['"]resize|ResizeObserver|onresize/.test(s)) {
+        out.push({ code: 'noResize', msg: 'não trata resize (sem listener de resize/ResizeObserver)' });
+      }
+      /* 7) Parede de texto: jogo é jogo, não documentação. */
+      var vis = s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&[a-z#0-9]+;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (vis.length > 900) {
+        out.push({ code: 'textwall', msg: 'tem ' + vis.length + ' caracteres de texto visível (máx. ~900; é um jogo, não um texto)' });
+      }
+    }
+    return out;
+  }
+
   function extractDocument(raw) {
     var s = String(raw == null ? '' : raw).trim();
     if (s.indexOf('```') === 0) {
@@ -985,9 +1096,9 @@ CHECKLIST FINAL:
       '}';
   }
 
-  /* CSS base: fundo/texto do tema, sem barras de rolagem. */
+  /* CSS base: sem barras de rolagem, sem forçar background (o modelo define o próprio fundo). */
   function baseCss() {
-    return 'html,body{margin:0;padding:0;background:var(--nx-bg);color:var(--nx-text);overscroll-behavior:none}\n' +
+    return 'html,body{margin:0;padding:0;overscroll-behavior:none}\n' +
       '::-webkit-scrollbar{width:0;height:0}\n' +
       '::selection{background:var(--nx-accent-soft);color:var(--nx-text)}\n' +
       'a{color:var(--nx-accent)}';
@@ -1073,10 +1184,8 @@ CHECKLIST FINAL:
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;overflow:hidden}
+body{background:url('imagens/back1.jpg') center/cover fixed no-repeat #000;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px}
-.halo{position:absolute;width:min(78vw,660px);height:min(78vw,660px);border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,${accentFaint} 0%,transparent 62%)}
 .title{position:relative;display:block;margin:0;text-align:center;white-space:nowrap;
   font-family:'Courier New',monospace;font-weight:bold;
   font-size:clamp(34px,7.4vw,88px);letter-spacing:.12em;text-indent:.12em;
@@ -1110,7 +1219,6 @@ body{background:${bg};font-family:-apple-system,'Segoe UI',Roboto,sans-serif;dis
 </head>
 <body>
 <div class="stage">
-  <div class="halo"></div>
   <h1 class="title" aria-label="NEXUS GAME">${letters}</h1>
   <div class="line"></div>
 </div>
@@ -1287,6 +1395,7 @@ document.querySelectorAll('.del[data-n]').forEach(function(c){
     esc: esc,
     escAttr: escAttr,
     jsSyntaxErrors: jsSyntaxErrors,
+    lint: lint,
     rewriteLibs: rewriteLibs
   };
 })();

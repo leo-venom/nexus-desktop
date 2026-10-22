@@ -7,8 +7,8 @@
 (function () {
   'use strict';
 
-  var CONNECT_TIMEOUT_MS = 20000;
-  var CHAT_READ_TIMEOUT_MS = 90000;   /* 90s sem NENHUM byte = stream travado (reset a cada chunk) */
+  var CONNECT_TIMEOUT_MS = 60000;
+  var CHAT_READ_TIMEOUT_MS = 120000;   /* 120s sem NENHUM byte = stream travado (reset a cada chunk) */
   var CHAT_TEXT_TIMEOUT_MS = 300000;  /* fallback não-streaming: 5min, pois o corpo só chega no fim */
   var MODELS_READ_TIMEOUT_MS = 60000;
   var HEARTBEAT_MS = 20000;           /* sinal de vida p/ o watchdog enquanto não há bytes */
@@ -263,8 +263,8 @@
       if (_activeCtrl === ctrl) _activeCtrl = null;
       if (timedOut) {
         throw new AiException(phase === 'read'
-          ? 'o provedor parou de responder (90s sem dados) — tente de novo'
-          : 'tempo esgotado ao conectar no provedor');
+          ? 'o provedor parou de responder (120s sem dados) — tente de novo'
+          : 'tempo esgotado ao conectar no provedor (60s) — o modelo pode estar frio');
       }
       throw e;
     });
@@ -372,6 +372,23 @@
     return false;
   }
 
+  /* Teto de saída por modelo: pedir mais que o limite conhecido devolve
+     HTTP 400 e derruba a geração inteira. Nunca aumenta, só corta. */
+  function clampMaxTokens(model, maxTokens) {
+    var v = Math.floor(Number(maxTokens));
+    if (!(v > 0)) return 0;
+    var m = String(model == null ? '' : model).toLowerCase();
+    var cap;
+    if (m.indexOf('gemini-2') >= 0) cap = 65535;
+    else if (/(^|\/)(o3|o4)/.test(m) || m.indexOf('gpt-5') >= 0) cap = 100000;
+    else if (m.indexOf('gpt-4.1') >= 0) cap = 32768;
+    else if (m.indexOf('gpt-4o') >= 0 || m.indexOf('4-turbo') >= 0) cap = 16384;
+    else if (m.indexOf('claude') >= 0) cap = 32000;
+    else if (m.indexOf('deepseek') >= 0) cap = 8192;
+    else cap = 16384;
+    return Math.min(v, cap);
+  }
+
   function chat(endpoint, apiKey, model, temperature, maxTokens, system, user, onProgress) {
     var messages = [
       { role: 'system', content: system },
@@ -383,7 +400,8 @@
         temperature: Number(temperature),
         messages: messages
       };
-      if (maxTokens > 0) o.max_tokens = maxTokens;
+      var mt = clampMaxTokens(model, maxTokens);
+      if (mt > 0) o.max_tokens = mt;
       if (stream) {
         o.stream = true;
         o.stream_options = { include_usage: true };
@@ -465,6 +483,7 @@
     chatUrl: chatUrl,
     modelsUrl: modelsUrl,
     chat: chat,
+    clampMaxTokens: clampMaxTokens,
     listModels: listModels,
     errorMessage: errorMessage
   };

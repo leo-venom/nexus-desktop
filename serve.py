@@ -343,8 +343,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            return  # cliente já desconectou (timeout/cancelamento)
         except Exception as e:  # noqa: BLE001
-            self.send_error(502, "proxy: %s" % e)
+            try:
+                self.send_error(502, "proxy: %s" % e)
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # cliente já foi embora
 
 
 def main():

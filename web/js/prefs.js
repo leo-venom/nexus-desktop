@@ -14,7 +14,7 @@
     apiKey: '',
     model: 'gpt-4o-mini',
     temperature: 0.7,
-    maxTokens: 0,
+    maxTokens: 65535,
     themeIndex: 0,
     detailLevel: 1,
     sessionTokens: 0,

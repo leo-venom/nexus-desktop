@@ -1,6 +1,6 @@
 # ESTADO ATUAL — NEXUS GAME
 
-**Versão:** 2.13.0 (working tree) · **HEAD:** `38faba1` · **Atualizado:** 2026-10-21
+**Versão:** 2.13.0 · **HEAD base:** `9fd141c` · **Atualizado:** 2026-10-21
 **Local:** `/home/leo/Documents/Obsidian Vault/01_Projeto/nexus-game/`
 **Repositório:** `github.com/leo-venom/nexus-desktop`
 
@@ -25,7 +25,7 @@ no fim. O render final substitui a prévia.
 
 | Modo | Gatilho | Diretriz |
 |------|---------|----------|
-| 🎮 **Jogo** | Termos de jogo (tetris, nave, plataforma, rpg...) | `GAME_DIRECTIVE` (16,6 KB) — 8-12 níveis, 3+ inimigos, áudio, texturas |
+| 🎮 **Jogo** | Termos de jogo (tetris, nave, plataforma, rpg...) | `GAME_DIRECTIVE` (16,7 KB) — esqueleto 3D/2D, 8-12 níveis, 3+ inimigos, áudio, texturas |
 | 🎨 **Desenho/Objeto** | Termos de arte (desenho, logo, infográfico, objeto 3D, paisagem...) | `DRAWING_DIRECTIVE` — qualidade visual **leve e rápida**, acabamento por gradiente/stroke, composição |
 | 💬 **Chat** | Saudações, perguntas curtas, fallback geral | `CHAT_DIRECTIVE` — HTML bonito, tipografia refinada, cards |
 
@@ -35,18 +35,17 @@ no fim. O render final substitui a prévia.
 
 | Item | Valor |
 |---|---|
-| Linhas de código | **~10.600** (JS 7.200 · CSS 721 · HTML 57 · Python 253 · Electron 524 · docs ~1.900) |
-| `app.js` | **1.701** |
-| `html-builder.js` | **~1.190** |
-| `GAME_DIRECTIVE` | 16.653 chars |
-| `DRAWING_DIRECTIVE` | ~14.000 chars |
-| `CHAT_DIRECTIVE` | ~3.500 chars |
-| Prompt de jogo (system completo) | **18.668 chars** com textura · **13.009** sem (bloco de textura é opt-in) + **~1.4 KB** mídia real |
-| Texturas procedurais | **44** (`nx-textures.js`, 36.856 bytes) |
-| Texturas procedurais | **44** (`nx-textures.js`, 36.856 bytes) |
+| Linhas de código | **7.414** (JS 5.628 · CSS 746 · HTML 58 · Python 367 · Electron 615) + docs ~2.200 |
+| `app.js` | **1.915** |
+| `html-builder.js` | **1.401** |
+| `GAME_DIRECTIVE` | 16.753 chars |
+| `DRAWING_DIRECTIVE` | 12.842 chars |
+| `CHAT_DIRECTIVE` | 2.908 chars |
+| Prompt de jogo (system completo) | **19.063 chars** com textura · **13.391** sem (bloco de textura é opt-in) + **~1.4 KB** mídia real |
+| Texturas procedurais | **44** (`nx-textures.js`, 39.125 bytes) |
 | Sons WebAudio | **13** receitas |
-| Temas | **30** — 20 escuros + 10 claros |
-| Commits | 20 |
+| Tema | **1** — `PADRÃO · BLACK CYBER` |
+| Commits | 22 |
 
 ### 2.1 Mídia do projeto (novo em v2.9.3)
 
@@ -61,47 +60,55 @@ OGG, WAV, M4A, FLAC, Opus, AAC, WebM.
 `LEIA-ME.txt` em ambas as pastas com instruções de uso.
 Servidores `serve.py` e `desktop/server.js` replicam o comportamento de `/fontes/`.
 
+**`imagens/back1.jpg`** (124.961 bytes, 1920×1080, q82) existe para o modo desenho: é o
+`FUNDO PADRÃO` do `DRAWING_DIRECTIVE`. Em jogo é **opcional** — cena 3D desenha o próprio
+fundo; jogo 2D desenha céu/parallax/tiles. O downscale de 7640×4585 (2,9 MB) para 1920×1080
+reduziu o inline no `Salvar` de ~3,9 MB para ~167 KB de base64. Política completa na
+`REGRAS_DEFINITIVAS.md`, Regra 2.
+
 ---
 
 ## 3. Estrutura
 
 ```
 nexus-game/
-├── README.md                    168  instruções de uso
+├── README.md                    196  instruções de uso
 ├── abrir.sh                      24  fallback: serve.py + xdg-open
-├── NEXUS-GAME.desktop            10  atalho (Exec → desktop/start.sh)
-├── serve.py                     253  proxy CORS + estático + /fontes/
+├── NEXUS-GAME.desktop             9  atalho (Exec → desktop/start.sh)
+├── serve.py                     367  proxy CORS + estático + /fontes/ + /midia
 ├── fontes/                           Gameplay.ttf + LEIA-ME
-├── imagens/                          backgrounds, texturas, sprites + LEIA-ME
+├── imagens/                          back1.jpg + backgrounds, texturas, sprites + LEIA-ME
 ├── sons/                             músicas, efeitos + LEIA-ME
 ├── desktop/
-│   ├── main.js                  146  BrowserWindow, F11/F12, single-instance
-│   ├── server.js                378  servidor Node (proxy + estático + /fontes/)
-│   ├── start.sh                      verifica node_modules, --disable-gpu, exec Electron
-│   ├── package.json / lock
+│   ├── main.js                  128  BrowserWindow, F11/F12, single-instance
+│   ├── server.js                487  servidor Node (proxy + estático + /fontes/)
+│   ├── start.sh                  32  verifica node_modules, --disable-gpu, exec Electron
+│   ├── package.json / lock       17  v2.13.0
 │   └── icon.png
 ├── web/
-│   ├── index.html                57  shell: header único + iframe
-│   ├── css/app.css              721  tema via var(--nx-*), popover, modais
+│   ├── index.html                58  shell: header único + iframe
+│   ├── css/app.css              746  tema via var(--nx-*), popover, modais
 │   ├── vendor/three/                 three.min.js r160 + module
 │   └── js/
 │       ├── themes.js             54  tema único (ALL=[DEFAULT])
 │       ├── prefs.js             152  localStorage["nexus77"] + tokens
-│       ├── html-builder.js     1292  prompts, extração, edição tolerante, decoração
-│       ├── ai-client.js         464  SSE + proxy/fallback + cancel + finishReason
+│       ├── html-builder.js     1401  prompts, extração, edição tolerante, lint, decoração
+│       ├── ai-client.js         490  SSE + proxy/fallback + cancel + clamp maxTokens
 │       ├── store.js             258  File System Access + IndexedDB
-│       ├── vu-meter.js          161  canvas 5 barras / 5 ondas
+│       ├── vu-meter.js          171  canvas 5 barras / 5 ondas
 │       ├── settings.js          228  modal config (API / geração)
-│       ├── app.js              1884  fluxo principal + modo edição + bridge
-│       └── nx-textures.js       904  44 texturas procedurais (window.NxTex)
+│       ├── app.js              1915  fluxo principal + modo edição + reparo de qualidade
+│       └── nx-textures.js       959  44 texturas procedurais (window.NxTex)
 └── docs/
     ├── ESTADO_ATUAL.md              este documento
-    ├── GAME_MODE.md                 diretriz do modo jogo (gerada do código)
-    ├── DOCUMENTACAO.md              arquitetura e APIs
-    ├── MAPA_UI.md                   elemento de tela → arquivo:linha
-    ├── CHANGELOG.md                 histórico v1.x → v2.9.3
-    ├── VALIDACAO.md                 matriz de testes
-    └── BASE_REUTILIZAVEL.md         receita para novos projetos
+    ├── REGRAS_DEFINITIVAS.md   256  regras permanentes (fundo, prompt) + checklist
+    ├── GAME_MODE.md            308  diretriz do modo jogo (gerada do código)
+    ├── gerar_game_mode.js      181  regera o GAME_MODE.md a partir do html-builder.js
+    ├── DOCUMENTACAO.md         275  arquitetura e APIs
+    ├── MAPA_UI.md              101  elemento de tela → arquivo:linha
+    ├── CHANGELOG.md            655  histórico v1.x → v2.13.0
+    ├── VALIDACAO.md             97  matriz de testes
+    └── BASE_REUTILIZAVEL.md    113  receita para novos projetos
 ```
 
 ---
@@ -136,34 +143,31 @@ iframe.srcdoc  ──►  JOGO (origem opaca)
 `systemPrompt()` monta o prompt **do zero** (sem `BASE_PROMPT`, sem `EDIT_FRIENDLY`, sem
 `detailDirective`) e concatena, nesta ordem:
 
-1. Intro + regras de saída (HTML puro, single-file, three.js via CDN global)
-2. **`GAME_DIRECTIVE`** (16.651 chars)
+1. Intro (1 linha) + regras de saída (HTML puro, single-file, `THREE` global via
+   `vendor/three/three.min.js`, pt-BR, "never ask questions")
+2. **`GAME_DIRECTIVE`** (16.753 chars) — ou, quando `wantsTextures()` reprova, o caminho sem
+   marcadores `GAME_DIRECTIVE_HEAD + TEXTURE_OFF_DIRECTIVE + GAME_DIRECTIVE_TAIL` (13.391 chars)
 3. `gameScopeNote()` — escopo completo otimizado para desempenho
 4. `gameLightingNote()` — reforço de iluminação se o tema for escuro (WCAG < 0.2)
-5. Paleta exata do tema + instrução de uso expansivo de cores
+5. **PALETA — VOCÊ ESCOLHE (REGRA)** — 3 cores decididas pela IA; jogo não herda o tema
+6. `mediaBlock(media)` — mídia do projeto, se houver
 
 ### Blocos do GAME_DIRECTIVE
 
 | Bloco | Conteúdo |
 |---|---|
-| ENTREGA COMPLETA EM UMA RESPOSTA | jogo fechado em `</body></html>`, cortar cenário antes de cortar estrutura |
-| TAMANHO | sem mínimo nem teto; cortar redundância, nunca funcionalidade |
-| REGRAS DE TELA | 100vw × 100dvh, sem scroll, overlays fullscreen, **HUD nas laterais 60-80px** |
-| MEDIÇÃO DEFENSIVA | `innerWidth` pode vir 0 no iframe → medir em rAF, remedir em resize/orientationchange/`setTimeout(300)` |
-| FOCO NO JOGO | fundo ≤ 15% do frame; proibido cenário 3D elaborado, blur/shadow fullscreen |
-| MÍNIMO | 8-12 níveis, 3+ inimigos com IA distinta, 2-3 power-ups, parallax, partículas com pool, música + SFX, screen shake, menu/pausa/game over, teclado + toque |
-| COMO ENTREGAR | 8 passos (níveis como dados, áudio real, pool de partículas, parallax offscreen, transições, efeitos por ação, game over com stats, combos) |
-| PACK `NxTex` | 44 texturas prontas + API + regra "chame, não reescreva" |
-| TEXTURAS PROCESSUAIS (3D) | 12 receitas CanvasTexture com material/parâmetros |
-| INFERÊNCIA AUTOMÁTICA | robô→metal, orgânico→pedra/terra/madeira, moeda→ouro, portal→lava… |
-| ANIMAÇÃO DE TEXTURA | `texture.offset` / redesenho por frame + `needsUpdate` |
-| TEXTURA EM JOGO 2D | obrigatório `createPattern` em cada peça/inimigo; proibido cor chapada |
-| PRIMEIRO FRAME | campo + HUD + objeto ativo desenhados no boot, antes do rAF |
-| REGRA DE 3D SIMPLES | cubo/esfera/planeta sempre com textura procedural |
-| 13 SONS WEBAUDIO | receitas completas (frequências, envelopes, filtros) + arquitetura |
-| DESEMPENHO — 60 FPS | um canvas/um loop, fundo offscreen, pool 40-60, sem blur animado, AABB, DPR cap 2, pausa em `visibilitychange` |
-| NÃO FAÇA | protótipo, placeholder, 1 inimigo = "8 níveis", jogo sem som/menu |
-| VERIFIQUE | checklist de 16 itens antes de entregar |
+| `1) CONTRATO DE SAÍDA` | HTML puro em uma resposta, fechado em `</html>`; proibido CDN de three, `import map`, `type="module"` e addons — só `vendor/three/three.min.js` com `THREE` global |
+| `2) FUNDO — O JOGO É A TELA` | 3D: a própria cena é o fundo (céu + fog + `environment`); 2D: fundo desenhado; `imagens/back1.jpg` **opcional** só em 2D chapado e sem camada por cima |
+| `3) ESQUELETO OBRIGATÓRIO` | `renderer` + ACES + `PCFSoftShadowMap`, `fit()` com guarda de 0 px, IBL via `PMREMGenerator.fromScene`, `state` play/pause/over, `STEP = 1/120`, pausa em `visibilitychange` |
+| `4) ACABAMENTO` | sombra, material PBR, chão texturizado, HUD legível, feedback em toda ação |
+| `5) REALISMO 3D EM GPU INTEGRADA` | textura procedural em todo material (`NxTex.three`), `roughness`/`metalness` coerentes, direcional + ambiente |
+| `6) ORÇAMENTO (estourar = jogo travado)` | ≤ 60 draw calls, ≤ 80k triângulos, ≤ 300 partículas, DPR ≤ 1.5, sombra ≤ 1024, sem post-processing |
+| `7) HUD E TEXTO` | HUD enxuto nas laterais, fonte do sistema, contraste alto, sem parágrafo de instrução em tela |
+| `8) REPROVA (falha de entrega)` | protótipo, placeholder, sem som/menu ou texto no lugar do jogo reprova |
+| PACK `NxTex` | 44 texturas prontas + `API (2D)` + `ANIMAÇÃO DE TEXTURA` — "chame, não reescreva" |
+| TEXTURAS PROCESSUAIS (3D) | 12 receitas `CanvasTexture` (METAL, CROMADO, OURO, VIDRO, MADEIRA, PEDRA, LAVA, CÉU/NEBULOSA, TERRA/BARRO, ASFALTO, GRAMA, GRADE/GRID) |
+| 13 SONS WEBAUDIO | receitas completas (MÚSICA, TIRO/LASER, EXPLOSÃO, IMPACTO/COLISÃO, MOTOR/ENGINE…) |
+| TAIL `CHECK FINAL` | 6 perguntas de conferência + "ENTREGUE APENAS O HTML." |
 
 ---
 
@@ -218,6 +222,10 @@ NxTex.names()                              // 44 nomes
 | **Aviso de jogo quebrado** | `app.js` `watchFrameErrors` | Checa em 2,5 s **e** 6 s (erro tardio de áudio/textura não escapa), avisa uma vez só. |
 | **Correção nunca piora a página** | `app.js` `run`/`retryUser` | Se a resposta de edição não for aplicável, reenvia com o documento atual + pedido de HTML completo. Sem documento novo: `⚠ nada aplicado — página atual mantida`. |
 | **Sessão limpa de verdade** | `app.js` `resetSession` | Zera `lastRendered`, `editSelHtml`, `editCount`, `frameErrors` e `lastCommands` — nada da página anterior entra no próximo prompt. |
+| **Validação antes de renderizar** | `html-builder.js` `lint` | 8 checagens: `truncated`, `addon`, `cdnThree` e `stub` em todos os modos; `noLoop`, `noResize` e `textwall` (> 900 chars visíveis) só em modo jogo. Devolve `[]` quando passa. |
+| **Reparo de qualidade** | `app.js` `repararQualidade` | `lint` reprovou (ou o JS está quebrado) → **uma** regeneração com a lista de falhas. Nunca em edição/chat; se o reparo falhar, a página atual é mantida. |
+| **Teto de `max_tokens` por modelo** | `ai-client.js` `clampMaxTokens` | `65535` (gemini-2*), `100000` (o3/o4/gpt-5), `32768` (gpt-4.1), `16384` (gpt-4o/4-turbo), `32000` (claude), `8192` (deepseek), `16384` default → evita HTTP 400 por teto inválido. |
+| **Timeouts por etapa** | `ai-client.js` | conexão 60 s, leitura do stream 120 s (stall de 90 s), fallback não-streaming 300 s, lista de modelos 60 s e heartbeat de 20 s no corpo para o watchdog. |
 
 ---
 
@@ -275,9 +283,10 @@ python3 serve.py 8790
 ## 11. Limitações conhecidas
 
 **Altas**
-1. **Sem validação do jogo gerado** — a única checagem antes de renderizar é `if (!doc.trim())`.
-   Não há verificação de sintaxe JS, canvas pintado ou tela vazia.
-2. **Dependência total do prompt** — 18.666 chars; regras no meio podem ser ignoradas
+1. **Validação é estática, não visual** — `jsSyntaxErrors`, `Html.lint` e uma regeneração
+   (`repararQualidade`) pegam sintaxe quebrada, addon/CDN indevido, stub, loop sem resize e
+   parede de texto. Continua sem medir FPS real, toque, áudio tocando ou textura aplicada.
+2. **Dependência total do prompt** — 19.063 chars; regras no meio podem ser ignoradas
    ("lost in the middle").
 3. **Loop de continuação caro** — até 12 × (system + 8 KB de cauda) ≈ **~80 mil tokens** de
    entrada num jogo grande.
@@ -316,6 +325,7 @@ console.log('temas', window.Themes.ALL.length);
 "
 ```
 
-**Última verificação (2026-10-20):** 9 arquivos JS com sintaxe OK · prompt 18.666 chars ·
+**Última verificação (2026-10-21):** 9 arquivos JS com sintaxe OK · prompt 19.063 chars
+(13.391 sem texturas) · `lint` 8 checagens · reparo de qualidade · `clampMaxTokens` ·
 GAME MODE ativo · 1 tema · prévia ao vivo · reparo de JS quebrado · three.js r160 local ·
 `applyEdits`/`userPrompt` 17/17 no harness · smoke Electron 20/20.

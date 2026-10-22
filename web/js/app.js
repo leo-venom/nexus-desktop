@@ -673,6 +673,7 @@
     var editing = lastRendered != null;
     genEditing = editing;               /* bloqueia prévia parcial em ajustes de página */
     var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt, lastRendered, mediaManifest);
+    var modo = window.Html.detectMode(prompt);   /* 'game' | 'drawing' | 'chat' */
     var elementHint = '';
     if (editing && editSelHtml) {   /* só faz sentido quando há página em tela */
       elementHint = '\n\nTarget element (user clicked this to edit):\n```html\n' + editSelHtml + '\n```\nFocus ONLY on this element. Change what was asked, keep the rest intact.';
@@ -739,6 +740,33 @@
       });
     }
 
+    /* Qualidade objetiva do documento (Html.lint): addon/CDN, loop ou resize
+       ausentes, parede de texto, trecho por fazer. UMA regeneração completa —
+       e nunca em ajuste de página, que destruiria a página do usuário. */
+    function repararQualidade(out, tentativa) {
+      if (editing || modo === 'chat') return Promise.resolve(out);
+      if (tentativa >= 1) return Promise.resolve(out);
+      if (out.doc == null || window.Html.jsSyntaxErrors(out.doc).length) return Promise.resolve(out);
+      var falhas = window.Html.lint(out.doc, modo);
+      if (!falhas.length) return Promise.resolve(out);
+      status('⚠ ajustando qualidade (' + falhas.length + ' falha' + (falhas.length > 1 ? 's' : '') + ')…', 'accent', false);
+      liveOut = 0;
+      lastProgressAt = 0;
+      var msg = 'The document below was generated for this request but failed quality checks:\n- ' +
+        falhas.map(function (f) { return f.msg; }).join('\n- ') +
+        '\n\nDocument to fix:\n```html\n' + out.doc + '\n```\n\n' +
+        'Return the COMPLETE corrected HTML document: same features, every item above fixed, ' +
+        'more polished. Output ONLY raw HTML, no explanations.';
+      return run(baseSystem, msg).then(function (r4) {
+        var doc4 = window.Html.extractDocument(r4.content || '');
+        if (!window.Html.looksLikeDocument(r4.content) || !doc4.trim()) return out;
+        return repararQualidade({ result: r4, doc: doc4 }, tentativa + 1);
+      }).catch(function (e) {
+        if (canceladoPeloUsuario) throw e;
+        return out;                       /* não perde o documento bom */
+      });
+    }
+
     var encoder = new TextEncoder();
     liveActive = true;
     liveIn = Math.floor((encoder.encode(system).length + encoder.encode(user).length) / 4);
@@ -793,6 +821,9 @@
     }).then(function (out) {
       if (out.doc == null) return out;
       return repararJsQuebrado(out, 0);
+    }).then(function (out) {
+      if (out.doc == null) return out;
+      return repararQualidade(out, 0);
     }).then(function (out) {
       /* Cancelado entre o fim da resposta e este callback: não renderiza nada. */
       if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
