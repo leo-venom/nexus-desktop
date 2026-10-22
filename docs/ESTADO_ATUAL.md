@@ -106,7 +106,7 @@ nexus-game/
     ├── gerar_game_mode.js      181  regera o GAME_MODE.md a partir do html-builder.js
     ├── DOCUMENTACAO.md         275  arquitetura e APIs
     ├── MAPA_UI.md              101  elemento de tela → arquivo:linha
-    ├── CHANGELOG.md            655  histórico v1.x → v2.13.0
+    ├── CHANGELOG.md            697  histórico v1.x → v2.13.0
     ├── VALIDACAO.md             97  matriz de testes
     └── BASE_REUTILIZAVEL.md    113  receita para novos projetos
 ```

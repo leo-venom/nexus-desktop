@@ -44,6 +44,48 @@
   créditos, títulos, rótulos, HUD decorativo ou camadas extras; enriquecer DENTRO do
   objeto/jogo, nunca ao redor.
 
+### Alterado (prompt de jogo — reescrita)
+- **`GAME_DIRECTIVE` reescrito e medido:** **16.753 chars** (antes o texto competia
+  com o jogo). Prompt de jogo fica em **13.391 chars sem texturas** e **19.063 com
+  texturas**; o pack `@@NX_TEX` (**6.413 chars**, 44 texturas, 12 receitas
+  `CanvasTexture`) e a cauda (**3.572 chars**, 13 sons WebAudio + `CHECK FINAL` +
+  `ENTREGUE APENAS O HTML.`) seguem intactos.
+- **8 blocos numerados** (`CONTRATO DE SAÍDA`, `FUNDO — O JOGO É A TELA`,
+  `ESQUELETO OBRIGATÓRIO`, `ACABAMENTO`, `REALISMO 3D EM GPU`, `ORÇAMENTO`,
+  `HUD E TEXTO`, `REPROVA`) com âncoras estáveis para verificação automática.
+- **Fundo:** jogo 3D desenha a própria cena; jogo 2D é desenhado; `back1.jpg` só
+  **opcional** em 2D chapado. `DRAWING_DIRECTIVE` mantém `back1.jpg` como padrão.
+  `baseCss()` nunca define `background` em `html,body`.
+
+### Adicionado (qualidade)
+- **`Html.lint(html, mode)`** — 8 checagens objetivas: resposta truncada, addon/ES
+  module, three.js por CDN, trecho por fazer (`TODO`), loop de animação, resize e
+  parede de texto (>900 chars visíveis, só em jogo).
+- **`repararQualidade()`** no pipeline de `app.js` — no máximo **uma** regeneração
+  completa quando o lint reprova; nunca em ajuste de página nem em modo chat, e
+  nunca descarta o documento bom se o reparo falhar.
+- **`clampMaxTokens(model, maxTokens)`** — teto de saída por modelo (gemini-2
+  65535, o3/o4/gpt-5 100000, gpt-4.1 32768, gpt-4o/4-turbo 16384, claude 32000,
+  deepseek 8192, default 16384). Pedir acima do limite devolvia HTTP 400 e
+  derrubava a geração inteira. `prefs.maxTokens` passa de `0` para `65535`.
+- **`NxTex` com `fuzzyMatch`** (nome normalizado → palavra → substring →
+  Levenshtein) como último recurso: nome desconhecido nunca devolve textura
+  inexistente.
+- **`docs/gerar_game_mode.js`** — gera `docs/GAME_MODE.md` do próprio código
+  (split por âncoras `TEXTURAS PROCEDURAIS` / `13 SONS WEBAUDIO`, falha com
+  `exit 1` se as âncoras ou o export sumirem). `docs/REGRAS_DEFINITIVAS.md`
+  reúne as regras + checklist de 6 passos.
+
+### Corrigido (rede e build)
+- **`serve.py`:** `BrokenPipeError`/`ConnectionResetError` no `/_proxy` (cliente
+  cancelou ou deu timeout) não viram mais `502` nem logam stacktrace.
+- **Timeouts:** conexão `20s → 60s` (modelo frio demora) e leitura `90s → 120s`
+  sem nenhum byte; mensagens de erro dizem o tempo real.
+
+### Alterado (tamanho)
+- **`imagens/back1.jpg`: 2,9 MB / 7640×4585 → 125 KB / 1920×1080** (mesmo visual
+  de fundo desfocado, agora dentro do orçamento de mídia inline).
+
 ## v2.12.0 — 2026-10-21
 
 ### Corrigido
