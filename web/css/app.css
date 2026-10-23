@@ -12,7 +12,7 @@
   --nx-text: #E6F5EE;
   --nx-secondary: #7FA894;
   --nx-on-accent: #0A0E12;
-  --nx-c2: #FF2D95;
+  --nx-c2: #A855F7;
   --nx-c3: #00A3FF;
   --mx-error: #FF5C5C;
 }
@@ -36,9 +36,9 @@ body {
 .titlebar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 8px 14px;
+  gap: 6px;
+  min-height: 35px;
+  padding: 1px 6px;
   background: var(--nx-surface);
   border-bottom: 1px solid var(--nx-surface-alt);
 }
@@ -60,17 +60,18 @@ body {
 
 .hbtn {
   flex: none;
-  border: 1px solid var(--nx-surface-alt);
-  border-radius: 10px;
-  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 6px;
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--nx-accent);
   background: var(--nx-surface-alt);
   cursor: pointer;
   transition: all 0.18s ease;
+  line-height: 1.2;
 }
 .hbtn:disabled { opacity: 0.45; cursor: default; }
 .hbtn:hover:not(:disabled) {
@@ -89,8 +90,8 @@ body {
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   flex: none;
   border-radius: 50%;
   background: var(--nx-secondary);
@@ -100,14 +101,14 @@ body {
   position: absolute;
   right: 4px;
   top: 50%;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   flex: none;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--nx-secondary);
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
   transition: all 0.18s ease;
@@ -129,27 +130,28 @@ body {
 }
 
 .vu {
-  width: 54px;
-  height: 20px;
+  /* 20 retângulos de 10px + 19 vãos de 1px = 219px (desenhados em vu-meter.js) */
+  width: 219px;
+  height: 24px;
   flex: none;
 }
 
 .kblabel {
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
   color: var(--nx-accent);
   white-space: nowrap;
 }
 
 .status {
-  flex: 1 1 140px;
+  flex: 1 1 100px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'Courier New', monospace;
-  font-size: 11.5px;
+  font-size: 10px;
   color: var(--nx-secondary);
 }
 .status.end { text-align: right; }
@@ -302,8 +304,9 @@ body {
 
 .promptwrap {
   position: relative;
-  flex: 2 1 220px;
-  min-width: 120px;
+  flex: 2 1 140px;
+  min-width: 80px;
+  max-width: 250px;
   display: flex;
   align-items: center;
 }
@@ -312,11 +315,12 @@ body {
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  height: 36px;
+  max-width: 250px;
+  height: 30px;
   border: 0;
-  border-radius: 18px;
-  padding: 0 40px 0 14px;
-  font-size: 13.5px;
+  border-radius: 15px;
+  padding: 0 30px 0 10px;
+  font-size: 12px;
   color: var(--nx-text);
   background: var(--nx-surface-alt);
   outline: none;
@@ -325,12 +329,12 @@ body {
 .prompt:focus { box-shadow: 0 0 0 1px var(--nx-accent-soft); }
 
 .iconbtn {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   flex: none;
-  border: 1px solid var(--nx-surface-alt);
-  border-radius: 11px;
-  font-size: 17px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   transition: all 0.18s ease;

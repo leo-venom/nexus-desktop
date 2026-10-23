@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Harness — NEXUS GAME</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:24px;background:#0a0a0f;color:#eee;font:14px system-ui,sans-serif}
+h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px 8px 12px 0;background:#102018;color:#00e88a;border:1px solid #00e88a66;border-radius:6px;cursor:pointer}
+.pass{color:#00e88a}.fail{color:#ff5577}.row{padding:5px 0;border-bottom:1px solid #ffffff12}#summary{margin:12px 0;font-weight:700}
+</style>
+</head>
+<body>
+<h1>NEXUS GAME — Test Harness</h1>
+<p>Testes locais sem gravação, restauração ou exclusão de projetos. A bateria roda somente ao clicar.</p>
+<button id="run" type="button">▶ Rodar testes seguros</button><button id="clear" type="button">Limpar saída</button>
+<div id="summary">Pronto</div><div id="log" aria-live="polite"></div>
+<script src="js/themes.js"></script>
+<script src="js/prefs.js"></script>
+<script src="js/html-builder.js"></script>
+<script src="js/ai-client.js"></script>
+<script src="js/store.js"></script>
+<script src="js/nx-textures.js"></script>
+<script>
+(function () {
+  'use strict';
+  var log = document.getElementById('log');
+  var summary = document.getElementById('summary');
+  function assert(value, message) { if (!value) throw new Error(message || 'assertion falhou'); }
+  function test(name, fn) { return { name: name, fn: fn }; }
+  var tests = [
+    test('Módulos do app carregados', function () {
+      ['Prefs', 'Themes', 'Html', 'AiClient', 'Store', 'NxTex'].forEach(function (key) { assert(window[key], key + ' indisponível'); });
+    }),
+    test('Store.sanitizeName', function () {
+      var fn = window.Store.sanitizeName;
+      assert(fn('jogo-nave') === 'jogo-nave', 'nome simples');
+      assert(fn('jogo/nave') === 'jogo-nave', 'barra convertida');
+      assert(fn('') === 'projeto', 'nome vazio');
+      assert(fn('../salvos') !== '../salvos', 'tentativa de caminho não escapou');
+    }),
+    test('Store API de backup e assets', function () {
+      assert(typeof Store.listBackups === 'function', 'listBackups');
+      assert(typeof Store.restoreBackup === 'function', 'restoreBackup');
+      assert(typeof Store.saveWithAssets === 'function', 'saveWithAssets');
+      assert(typeof Store.extractAssetsFromHtml === 'function', 'extractAssetsFromHtml');
+    }),
+    test('Diretiva contém regras e caminhos atuais', function () {
+      var directive = String(Html.DIRECTIVE || '');
+      for (var i = 1; i <= 7; i++) assert(directive.indexOf('REGRA ' + i) >= 0, 'REGRA ' + i);
+      assert(directive.indexOf('assets/') >= 0, 'convenção assets/');
+    }),
+    test('NxTex lista as texturas distribuídas', function () {
+      var names = NxTex.names();
+      assert(Array.isArray(names) && names.length >= 88, 'quantidade inesperada: ' + (names && names.length));
+      assert(names.indexOf('diamante') >= 0, 'diamante ausente');
+    }),
+    test('API de projetos responde somente leitura', async function () {
+      var response = await fetch('/_api/saves', { method: 'GET', cache: 'no-store' });
+      assert(response.ok, 'HTTP ' + response.status);
+      assert(Array.isArray(await response.json()), 'resposta não é array');
+    })
+  ];
+  document.getElementById('run').addEventListener('click', async function () {
+    log.textContent = '';
+    var passed = 0, failed = 0;
+    for (var i = 0; i < tests.length; i++) {
+      var result = document.createElement('div');
+      result.className = 'row';
+      try { await tests[i].fn(); passed++; result.classList.add('pass'); result.textContent = '✓ ' + tests[i].name; }
+      catch (error) { failed++; result.classList.add('fail'); result.textContent = '✗ ' + tests[i].name + ': ' + error.message; }
+      log.appendChild(result);
+    }
+    summary.textContent = passed + ' passaram, ' + failed + ' falharam';
+    summary.className = failed ? 'fail' : 'pass';
+  });
+  document.getElementById('clear').addEventListener('click', function () { log.textContent = ''; summary.textContent = 'Pronto'; summary.className = ''; });
+})();
+</script>
+</body>
+</html>

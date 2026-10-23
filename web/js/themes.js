@@ -28,7 +28,7 @@
      Usado apenas pela interface do shell (header, modal, popover, páginas de
      sistema). Não vai para o prompt: jogos/desenhos escolhem a própria paleta. */
   var DEFAULT_THEME = T('PADRÃO · BLACK CYBER', '#000000', '#06100C', '#0B1A14', '#00E88A', '#E6F5EE', '#7FA894', true,
-    ['#00E88A', '#FF2D95', '#00A3FF']);
+    ['#00E88A', '#A855F7', '#00A3FF']);
 
   var ALL = [DEFAULT_THEME];
 

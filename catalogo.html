@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>NxTex Catálogo — 70 Texturas Procedurais</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<style>
+:root{--bg:#0a0a0f;--fg:#e8e8f0;--muted:#6a6a7a;--accent:#00ffaa;--card:#12121a;--border:#2a2a3a;--neon-m:#ff0077;--neon-c:#00ffff;--neon-v:#33ff55;--neon-l:#ff8800;--neon-a:#0088ff;--neon-am:#ffff33}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;font-size:clamp(12px,2.5vw,16px)}
+#root{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto;gap:0}
+header{padding:clamp(8px,1.5vh,16px) clamp(12px,2vw,24px);border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(10,10,20,.95),transparent);position:sticky;top:0;z-index:10}
+header h1{font-size:clamp(16px,3.5vw,28px);font-weight:700;letter-spacing:.02em}
+header .sub{color:var(--muted);font-size:clamp(11px,2vw,14px);margin-top:2px}
+main{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(160px,22vw,220px),1fr));gap:clamp(8px,1.5vw,16px);padding:clamp(8px,1.5vh,16px) clamp(12px,2vw,24px);overflow:auto;align-content:start}
+.cat{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px}
+.cat:first-child{border-top:none;margin-top:0}
+.cat .bar{width:40px;height:3px;background:var(--accent);border-radius:2px}
+.cat h2{font-size:clamp(12px,2.2vw,16px);font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-height:220px;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative}
+.card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 32px -8px rgba(0,255,170,.15)}
+.card canvas{width:100%;aspect-ratio:1;display:block;background:#050508}
+.card .info{padding:clamp(8px,1.5vw,12px);display:flex;flex-direction:column;gap:4px}
+.card .name{font-weight:600;font-size:clamp(11px,2vw,13px);word-break:break-word}
+.card .params{font-size:clamp(9px,1.6vw,11px);color:var(--muted);font-family:ui-monospace,monospace}
+.card .badge{position:absolute;top:8px;right:8px;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.04em}
+.badge-neon{background:rgba(255,0,119,.2);color:var(--neon-m);border:1px solid var(--neon-m)}
+.badge-ultra{background:rgba(0,255,170,.15);color:var(--accent);border:1px solid var(--accent)}
+.badge-rug{background:rgba(255,136,0,.15);color:#ff8800;border:1px solid #ff8800}
+.badge-classic{background:rgba(255,255,255,.08);color:var(--muted);border:1px solid var(--border)}
+footer{padding:clamp(8px,1.5vh,16px) clamp(12px,2vw,24px);border-top:1px solid var(--border);background:linear-gradient(0,rgba(10,10,20,.95),transparent);font-size:clamp(10px,1.8vw,12px);color:var(--muted);text-align:center}
+@media (max-width:480px){main{grid-template-columns:1fr 1fr}.card{min-height:200px}}
+@media (prefers-reduced-motion:reduce){.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<div id="root">
+<header>
+<h1>NxTex Catálogo</h1>
+<div class="sub">70 texturas procedurais · Canvas 2D offline · <span id="count">0</span> cards</div>
+</header>
+<main id="grid"></main>
+<footer>NEXUS GAME v1.5.0 · <code>NxTex.canvas(nome, 256)</code> · <a href="web/js/nx-textures.js" target="_blank" style="color:var(--accent)">nx-textures.js</a></footer>
+</div>
+<script src="web/js/nx-textures.js"></script>
+<script>
+(() => {
+'use strict';
+
+const CATS = [
+{key:'neon',label:'NEON (luz própria)',filter:n=>n.startsWith('neon_'),badge:'badge-neon'},
+{key:'ultra',label:'ULTRA-BRILHANTES',filter:n=>['piano_preto','plastico_vermelho','plastico_azul','plastico_verde','plastico_amarelo','plastico_laranja','plastico_roxo','plastico_rosa','plastico_branco','vidro_brilhante','vidro_fumaca'].includes(n),badge:'badge-ultra'},
+{key:'rugosas',label:'RUGOSAS',filter:n=>['lixa','feltro','camurca','gesso','argila','cortica','juta','velcro','borracha_fosca'].includes(n),badge:'badge-rug'},
+{key:'classicas',label:'CLÁSSICAS',filter:n=>!['piano_preto','plastico_vermelho','plastico_azul','plastico_verde','plastico_amarelo','plastico_laranja','plastico_roxo','plastico_rosa','plastico_branco','vidro_brilhante','vidro_fumaca','lixa','feltro','camurca','gesso','argila','cortica','juta','velcro','borracha_fosca'].includes(n) && !n.startsWith('neon_'),badge:'badge-classic'}
+];
+
+const grid = document.getElementById('grid');
+const countEl = document.getElementById('count');
+
+let total = 0;
+CATS.forEach(cat => {
+const names = NxTex.names().filter(cat.filter).sort();
+if (!names.length) return;
+const header = document.createElement('div');
+header.className='cat';
+header.innerHTML=`<span class="bar"></span><h2>${cat.label}</h2>`;
+grid.appendChild(header);
+names.forEach(name => {
+total++;
+const card = document.createElement('div');
+card.className='card';
+card.dataset.name = name;
+
+const badge = document.createElement('span');
+badge.className = 'badge ' + cat.badge;
+badge.textContent = cat.key.toUpperCase();
+card.appendChild(badge);
+
+const canvas = document.createElement('canvas');
+canvas.width = 256;
+canvas.height = 256;
+card.appendChild(canvas);
+
+const info = document.createElement('div');
+info.className='info';
+const acab = NxTex.acabamento(name);
+info.innerHTML=`<div class="name">${name}</div><div class="params">roughness ${acab.roughness} · metalness ${acab.metalness} · relevo ${acab.relevo}</div>`;
+card.appendChild(info);
+grid.appendChild(card);
+
+drawTextureCanvas(canvas, name);
+});
+});
+
+countEl.textContent = total;
+
+function drawTextureCanvas(canvas, name) {
+const ctx = canvas.getContext('2d', {alpha:false, desynchronized:true});
+const texCanvas = NxTex.canvas(name, 256);
+ctx.drawImage(texCanvas, 0, 0, 256, 256);
+}
+
+})();
+</script>
+</body>
+</html>

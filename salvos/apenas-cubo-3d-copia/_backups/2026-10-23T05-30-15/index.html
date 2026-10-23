@@ -1,0 +1,252 @@
+<html lang="pt-BR">
+<head>
+<style id="nx77-base">
+:root{
+--nx-bg: #000000;
+--nx-surface: #06100C;
+--nx-surface-alt: #0B1A14;
+--nx-accent: #00E88A;
+--nx-accent-soft: #00E88A8C;
+--nx-accent-faint: #00E88A14;
+--nx-text: #E6F5EE;
+--nx-secondary: #7FA894;
+--nx-c2: #A855F7;
+--nx-c3: #00A3FF;
+}
+html,body{margin:0;padding:0;overscroll-behavior:none}
+::-webkit-scrollbar{width:0;height:0}
+::selection{background:var(--nx-accent-soft);color:var(--nx-text)}
+a{color:var(--nx-accent)}
+</style>
+
+<script id="nx-safe">(function(){function probe(){try{window.localStorage.getItem("__nx_t");return true}catch(e){return false}}if(probe())return;function mk(){var d={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){d={}},key:function(i){return Object.keys(d)[i]||null},get length(){return Object.keys(d).length}}}var L=mk(),S=mk();try{Object.defineProperty(window,"localStorage",{value:L,configurable:true,writable:true})}catch(e){try{window.localStorage=L}catch(_){}}try{Object.defineProperty(window,"sessionStorage",{value:S,configurable:true,writable:true})}catch(e){try{window.sessionStorage=S}catch(_){}}})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cubo 3D</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #101b20;
+  }
+  #scene {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    touch-action: none;
+    cursor: grab;
+    background: radial-gradient(ellipse at 50% 44%, #1b3034 0%, #142328 48%, #10191e 100%);
+  }
+  #scene:active { cursor: grabbing; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    outline: none;
+  }
+</style>
+</head>
+<body>
+<div id="scene" aria-label="Cubo tridimensional interativo"></div>
+<script src="vendor/three/three.min.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const root = document.getElementById('scene');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x142328);
+  scene.fog = new THREE.Fog(0x142328, 12, 32);
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 80);
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+    alpha: false,
+    stencil: false,
+    depth: true
+  });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  root.appendChild(renderer.domElement);
+
+  const ambient = new THREE.HemisphereLight(0xb8e8dc, 0x15242a, 1.05);
+  scene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xfff4df, 2.2);
+  key.position.set(-3.8, 6.2, 5.2);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.bias = -0.0005;
+  key.shadow.normalBias = 0.02;
+  key.shadow.camera.left = -3;
+  key.shadow.camera.right = 3;
+  key.shadow.camera.top = 3;
+  key.shadow.camera.bottom = -3;
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 16;
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0x78c9ff, 0.72);
+  fill.position.set(5, 1.5, 3.5);
+  scene.add(fill);
+
+  const rim = new THREE.DirectionalLight(0x36e7c3, 1.15);
+  rim.position.set(1, 4, -5);
+  scene.add(rim);
+
+  const geometry = new THREE.BoxGeometry(1.9, 1.9, 1.9);
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: 0x087f78, metalness: 0.36, roughness: 0.29 }),
+    new THREE.MeshStandardMaterial({ color: 0x075a66, metalness: 0.32, roughness: 0.33 }),
+    new THREE.MeshStandardMaterial({ color: 0x10a987, metalness: 0.28, roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: 0x075e69, metalness: 0.34, roughness: 0.31 }),
+    new THREE.MeshStandardMaterial({ color: 0x087b91, metalness: 0.34, roughness: 0.28 }),
+    new THREE.MeshStandardMaterial({ color: 0x064d63, metalness: 0.38, roughness: 0.32 })
+  ];
+  const cube = new THREE.Mesh(geometry, materials);
+  cube.castShadow = true;
+  cube.receiveShadow = true;
+  cube.rotation.set(0.25, -0.38, 0.04);
+  scene.add(cube);
+
+  const viewDirection = new THREE.Vector3(3.2, 2.35, 4.5).normalize();
+  const clock = new THREE.Clock();
+  let baseDistance = 6;
+  let zoom = 1;
+  let width = 1;
+  let height = 1;
+  let dragging = false;
+  let pointerX = 0;
+  let pointerY = 0;
+  let lowQuality = false;
+  let sampleTime = 0;
+  let sampleFrames = 0;
+  let accumulator = 0;
+  const step = 1 / 60;
+  const pixelRatioCap = Math.min(window.devicePixelRatio || 1, 1.5);
+
+  function updateCameraDistance() {
+    const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
+    const limitingHalfFov = Math.min(verticalFov, horizontalFov) * 0.5;
+    const cubeRadius = Math.sqrt(3) * 0.95;
+    baseDistance = cubeRadius * 1.42 / Math.sin(limitingHalfFov);
+    camera.position.copy(viewDirection).multiplyScalar(baseDistance * zoom);
+    camera.lookAt(0, 0, 0);
+  }
+
+  function applySize() {
+    const rect = root.getBoundingClientRect();
+    width = Math.max(1, rect.width);
+    height = Math.max(1, rect.height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(lowQuality ? 1 : pixelRatioCap);
+    renderer.setSize(width, height, false);
+    updateCameraDistance();
+  }
+
+  const resizeObserver = new ResizeObserver(applySize);
+  resizeObserver.observe(root);
+  window.addEventListener('resize', applySize, { passive: true });
+  window.addEventListener('orientationchange', applySize, { passive: true });
+  applySize();
+
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+    renderer.domElement.setPointerCapture(event.pointerId);
+  });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - pointerX;
+    const dy = event.clientY - pointerY;
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+    cube.rotation.y += dx * 0.008;
+    cube.rotation.x += dy * 0.008;
+    cube.rotation.x = THREE.MathUtils.clamp(cube.rotation.x, -Math.PI * 0.48, Math.PI * 0.48);
+  });
+  function endDrag() { dragging = false; }
+  renderer.domElement.addEventListener('pointerup', endDrag);
+  renderer.domElement.addEventListener('pointercancel', endDrag);
+  renderer.domElement.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    zoom = THREE.MathUtils.clamp(zoom * Math.exp(event.deltaY * 0.001), 0.72, 2.4);
+    updateCameraDistance();
+  }, { passive: false });
+  renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+
+  let running = true;
+  let animationId = 0;
+
+  function animate() {
+    if (!running) return;
+    animationId = requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.25);
+    accumulator += dt;
+    while (accumulator >= step) {
+      if (!dragging) cube.rotation.y += step * 0.16;
+      accumulator -= step;
+    }
+    renderer.render(scene, camera);
+
+    sampleTime += dt;
+    sampleFrames++;
+    if (sampleTime >= 2) {
+      const fps = sampleFrames / sampleTime;
+      if (!lowQuality && fps < 50) {
+        lowQuality = true;
+        renderer.shadowMap.enabled = false;
+        renderer.setPixelRatio(1);
+        renderer.setSize(width, height, false);
+      } else if (lowQuality && fps > 58) {
+        lowQuality = false;
+        renderer.shadowMap.enabled = true;
+        renderer.setPixelRatio(pixelRatioCap);
+        renderer.setSize(width, height, false);
+      }
+      sampleTime = 0;
+      sampleFrames = 0;
+    }
+  }
+
+  function onVisibilityChange() {
+    if (document.hidden) {
+      running = false;
+      cancelAnimationFrame(animationId);
+      clock.stop();
+    } else if (!running) {
+      running = true;
+      clock.start();
+      accumulator = 0;
+      animate();
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  clock.start();
+  animate();
+
+  window.addEventListener('pagehide', () => {
+    running = false;
+    cancelAnimationFrame(animationId);
+    resizeObserver.disconnect();
+    geometry.dispose();
+    for (const material of materials) material.dispose();
+    renderer.dispose();
+  }, { once: true });
+})();
+</script>
+</body>
+</html>

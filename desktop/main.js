@@ -10,7 +10,7 @@
 
 const path = require('path');
 const { app, BrowserWindow, Menu } = require('electron');
-const { startServer } = require('./server');
+const { startServer, stopServer } = require('./server');
 
 /* Wayland nativo quando disponível; XWayland como fallback. */
 app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -26,6 +26,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 let mainWindow = null;
 let localServer = null;
+let shuttingDown = false;
 
 function createWindow(port) {
   /* Sem bounds fixos: no Wayland o compositor ignora setBounds. Criar a janela
@@ -119,10 +120,22 @@ if (!hasLock) {
     app.quit();
   });
 
-  app.on('before-quit', () => {
-    if (localServer && localServer.server) {
-      localServer.server.close();
-      localServer = null;
-    }
+  async function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const active = localServer;
+    localServer = null;
+    if (active && active.server) await stopServer(active.server);
+  }
+
+  app.on('before-quit', (event) => {
+    if (shuttingDown) return;
+    event.preventDefault();
+    shutdown().then(() => app.quit()).catch(() => app.quit());
   });
+
+  /* Fechar pelo terminal/gerenciador de processos também precisa liberar a
+     porta; sem listener o processo recebe o sinal e pode pular o teardown. */
+  process.once('SIGINT', () => app.quit());
+  process.once('SIGTERM', () => app.quit());
 }

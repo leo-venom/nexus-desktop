@@ -15,6 +15,7 @@
     model: 'gpt-4o-mini',
     temperature: 0.7,
     maxTokens: 65535,
+    autoFix: false,
     themeIndex: 0,
     detailLevel: 1,
     sessionTokens: 0,
@@ -72,6 +73,7 @@
     },
     temperature: function () { return clamp(num(state.temperature, 0.7), 0, 2); },
     maxTokens: function () { return Math.max(0, Math.floor(num(state.maxTokens, 0))); },
+    autoFix: function () { return state.autoFix === true; },
     themeIndex: function () { return 0; },   /* tema único — seletor removido */
     detailLevel: function () { return 2; },   /* modo game único — sem seletor */
 

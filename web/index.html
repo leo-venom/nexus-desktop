@@ -10,7 +10,6 @@
 <body>
 <header class="top">
   <div class="titlebar">
-    <h1 class="brand" id="brand">NEXUS GAME</h1>
     <span class="dot" id="dot"></span>
     <div class="promptwrap">
       <input id="prompt" class="prompt" type="text" placeholder="Ex: jogo de nave, desenhe um castelo, logo neon, oi"
@@ -19,7 +18,7 @@
               aria-label="Reiniciar sessão">↺</button>
     </div>
     <span class="status" id="status"></span>
-    <canvas id="vu" class="vu" width="54" height="20"></canvas>
+    <canvas id="vu" class="vu" width="200" height="48"></canvas>
     <span class="kblabel" id="kb" hidden>…</span>
     <button class="hbtn" id="btn-edit" type="button" title="Editar elementos da página">✎ EDITAR</button>
     <button class="hbtn" id="btn-finalize" type="button" style="display:none">✔ FINALIZAR</button>
@@ -43,7 +42,7 @@
 <main class="stage">
   <iframe id="frame" class="frame" title="Página gerada"
           allow="fullscreen; autoplay"
-          sandbox="allow-scripts allow-pointer-lock allow-popups"></iframe>
+          sandbox="allow-scripts allow-pointer-lock allow-popups allow-modals"></iframe>
   <div id="nx-preview" class="nx-preview" hidden>⚡ prévia ao vivo</div>
 </main>
 <script src="js/themes.js"></script>

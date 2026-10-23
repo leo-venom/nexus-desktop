@@ -106,6 +106,14 @@
     tokens.input.step = '1';
     card.appendChild(tokens.wrap);
 
+    var autoFixWrap = el('label', 'mx-check', ' Correção automática contínua (anti-erro em loop)');
+    autoFixWrap.style.marginTop = '12px';
+    var autoFixCheck = el('input');
+    autoFixCheck.type = 'checkbox';
+    autoFixCheck.checked = prefs.autoFix();
+    autoFixWrap.insertBefore(autoFixCheck, autoFixWrap.firstChild);
+    card.appendChild(autoFixWrap);
+
     /* ---------- Salvar ---------- */
     var saveBtn = el('button', 'mx-btn mx-btn-primary mx-btn-block mx-save', 'Salvar configurações');
     saveBtn.type = 'button';
@@ -208,7 +216,7 @@
       var mt = parseInt(tokens.input.value, 10);
       prefs.set('maxTokens', isNaN(mt) || mt < 0 ? 0 : mt);
       prefs.set('temperature', Number(tempBar.value) / 100);
-
+      prefs.set('autoFix', autoFixCheck.checked === true);
 
       toast('Configurações salvas ✓');
       close();

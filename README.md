@@ -7,7 +7,7 @@ formato — tudo com a mesma qualidade visual refinada.
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva File System Access, iframe e renderização.
 
-**Versão 2.13.0** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
+**Versão 2.15.1** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md)
 
 ## Recursos
 
@@ -16,8 +16,10 @@ o Chromium embutido preserva File System Access, iframe e renderização.
   partículas com pool, música + SFX, pausa/game over com estatísticas
 - **Começa jogando**: sem tela de apresentação, sem menu e sem botão iniciar — nível 1 já
   rodando no primeiro frame, com render síncrono antes do loop
-- **HUD em bolhas laterais** (pílulas de vidro, máx. 100px, 10px de margem) e **canvas de
-  borda a borda**, sem moldura nem painel em volta
+- **Tela do jogo é a estrela** (REGRA 6): área de jogo central, maior espaço possível
+  respeitando a altura da tela, com **moldura metálica 2px**; textos/botões/controles só nas
+  **laterais** (item ≤150px, bolhas de HUD ≤100px), sem camada de fundo `background` e com
+  **som bonito obrigatório**
 - **Só o que foi pedido**: nada de seções, cards, créditos ou camadas decorativas extras
 - **FPS AUTO**: mede fps e reduz sozinho a qualidade (pixelRatio/partículas/sombras) para
   manter o jogo fluido
@@ -36,9 +38,9 @@ o Chromium embutido preserva File System Access, iframe e renderização.
   Nunca texto puro — até "oi" ganha um cartão elegante.
 
 ### Geral
-- **44 texturas procedurais prontas** (`window.NxTex`) — usadas **somente quando o pedido
+- **88 texturas procedurais prontas** (`window.NxTex`) — usadas **somente quando o pedido
   cita material/textura** (lava, metal, cristais, circuito…)
-- **13 sons WebAudio** com receitas completas (frequências, envelopes, filtros)
+- **Trilha futurista elaborada em 4 camadas + 13 efeitos WebAudio** com receitas completas (frequências, envelopes, filtros, FM, delay)
 - **1 tema único** `PADRÃO · BLACK CYBER` (preto + esmeralda/rosa/azul) — sem seletor de temas
 - **three.js r160 local** (`vendor/three/three.min.js`, UMD, sem addons) — 3D funciona offline
 - **Prévia ao vivo** durante a geração (documento parcial renderizado a cada ~1,2 s)
@@ -107,7 +109,7 @@ janela carregou o código atual.
 - VU meter + KB ao vivo durante a geração; tokens estimados (`~`) e exatos ao final;
 - 1 tema único (`PADRÃO · BLACK CYBER`) — sem seletor; a paleta de jogos/desenhos vem do pedido;
 - SALVAR / ABRIR / excluir páginas `.html`;
-- three.js local em `web/vendor/three/` (URLs de CDN são reescritas para o vendor no render);
+- three.js local em `web/vendor/three/` (o documento salvo pode ser aberto offline após a incorporação);
 - sessão com orçamento de 1M tokens e reset (`↺`).
 
 ## Estrutura
@@ -147,7 +149,7 @@ nexus-game/
 
 ## Status
 
-**v2.13.0** — validada em 2026-10-21. O shell Electron e as correções do topo do
+**v2.15.1** — correções de segurança e armazenamento aplicadas em 2026-10-23. O shell Electron e as correções do topo do
 [`CHANGELOG`](docs/CHANGELOG.md) estão no working tree (não publicados); a matriz de
 2026-10-18 está em [`docs/VALIDACAO.md`](docs/VALIDACAO.md).
 
@@ -155,12 +157,12 @@ nexus-game/
 
 | Sintoma | Causa / solução |
 | --- | --- |
-| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.13.0`). |
+| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v2.15.1`). |
 | Electron não abre | Falta o binário: `npm --prefix desktop install`. Rode `./desktop/start.sh` no terminal para ver o erro (o launcher descarta a saída). |
 | `HTTP 401` / `Incorrect API key` | Chave inválida ou endpoint errado. Use **Buscar modelos** no ⚙ para testar. |
 | `HTTP 404`/`501` no `/_proxy` | Servidor não é o `serve.py`/`desktop/server.js` (ex.: `python3 -m http.server`). Troque para um deles. |
 | `timeout de conexão/leitura` | Rede/provedor lento ou inacessível. |
-| Lista de salvos vazia | Clique **ABRIR** (pede a pasta na primeira vez) ou salve uma página primeiro. |
+| Lista de salvos vazia | Confirme que o app foi iniciado por `desktop/start.sh` ou `serve.py` e salve uma página primeiro. Os projetos ficam em `salvos/<nome>/`. |
 | Porta 8790 ocupada | No Electron, tenta 8791…8810 automaticamente. No fallback, `python3 serve.py 9000` e abra a porta indicada. |
 
 ## Segurança

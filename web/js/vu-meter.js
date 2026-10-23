@@ -1,37 +1,69 @@
 /* ============================================================
- * vu-meter.js — port de VuMeterView.kt para <canvas>.
- * 5 barras largas com animação de 5 ondas senoidais sobrepostas,
- * degradê rico e cap aceso.
+ * vu-meter.js — 20 retângulos 10×10 em fileira horizontal,
+ * separados por vãos fixos de 1px (219px no total).
+ * Uma "cabeça" percorre a fileira da esquerda para a direita e
+ * volta, acendendo cada retângulo com rastro curto. A cor de
+ * cada retângulo vem de um degradê (esmeralda → azul → rosa)
+ * derivado do tema atual.
  * ============================================================ */
 (function () {
   'use strict';
 
-  var BAR_COUNT = 5;
-  var DURATION_MS = 1400;
+  var BAR_COUNT = 20;
+  var BAR_W = 10;
+  var BAR_H = 10;
+  var GAP = 1;          /* vão fixo entre retângulos */
+  var CYCLE_S = 3.0;    /* ida + volta completa */
+  var TRAIL = 3.2;      /* alcance do brilho atrás da cabeça, em barras */
+  var FLOOR = 0.15;     /* brilho mínimo: a fileira nunca fica apagada */
 
-  function roundRect(ctx, x, y, w, h, r) {
-    r = Math.min(r, w / 2, h / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+  /* ---------- cor ---------- */
+
+  function parseHex(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h.slice(0, 6), 16);
+    if (isNaN(n)) return [255, 255, 255];
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function mixColor(a, b, t) {
+    var ca = parseHex(a);
+    var cb = parseHex(b);
+    var k = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return 'rgb(' +
+      Math.round(ca[0] + (cb[0] - ca[0]) * k) + ',' +
+      Math.round(ca[1] + (cb[1] - ca[1]) * k) + ',' +
+      Math.round(ca[2] + (cb[2] - ca[2]) * k) + ')';
   }
 
   function attach(canvas) {
     var ctx = canvas.getContext('2d');
-    var strong = '#00E5FF';
-    var dim = '#00E5FF33';
-    var mid = '';
-    var trackColor = '#FFFFFF1A';
+
+    /* degradê: posição 0 = esquerda, 2 = direita */
+    var palette = ['#00E88A', '#00A3FF', '#A855F7'];
+    var barColors = [];
+
     var raf = null;
     var startedAt = 0;
     var pausedAt = 0;
     var running = false;
 
     canvas.hidden = true;
+
+    function buildColors() {
+      barColors = [];
+      for (var i = 0; i < BAR_COUNT; i++) {
+        var pos = BAR_COUNT > 1 ? i / (BAR_COUNT - 1) : 0;   /* 0..1 */
+        var seg = pos < 0.5 ? 0 : 1;
+        var local = pos < 0.5 ? pos * 2 : (pos - 0.5) * 2;
+        barColors.push(mixColor(palette[seg], palette[seg + 1] || palette[seg], local));
+      }
+    }
+
+    buildColors();
+
+    /* ---------- geometria ---------- */
 
     function resize() {
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -44,74 +76,68 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    function draw(phase) {
+    function layout() {
       var w = canvas.clientWidth || 0;
       var h = canvas.clientHeight || 0;
-      if (w <= 0 || h <= 0) return;
-      ctx.clearRect(0, 0, w, h);
+      var gap = GAP;
+      var total = BAR_COUNT * BAR_W + gap * (BAR_COUNT - 1);
+      return {
+        w: w,
+        h: h,
+        gap: gap,
+        x0: (w - total) / 2,
+        y: (h - BAR_H) / 2
+      };
+    }
 
-      var gap = w * 0.08;
-      var barW = (w - gap * (BAR_COUNT - 1)) / BAR_COUNT;
-      var radius = barW * 0.35;
-      var p = phase * 2 * Math.PI;
+    /* ---------- animação ---------- */
+
+    /* 0..1..0 com suavização nas pontas: nada de "tranco" ao inverter */
+    function headPosition(seconds) {
+      var u = (seconds / CYCLE_S) % 1;
+      if (u < 0) u += 1;
+      var p = u < 0.5 ? u * 2 : (1 - u) * 2;
+      p = p * p * (3 - 2 * p);            /* smoothstep */
+      return p * (BAR_COUNT - 1);
+    }
+
+    function draw(seconds) {
+      var g = layout();
+      if (g.w <= 0 || g.h <= 0) return;
+
+      ctx.clearRect(0, 0, g.w, g.h);
+
+      var head = headPosition(seconds);
+      var pitch = BAR_W + g.gap;
 
       for (var i = 0; i < BAR_COUNT; i++) {
-        var left = i * (barW + gap);
+        var d = Math.abs(i - head);
+        var lit = d >= TRAIL ? 0 : 1 - d / TRAIL;
+        var inten = FLOOR + (1 - FLOOR) * Math.pow(lit, 1.35);
+        var color = barColors[i] || palette[0];
 
-        // trilho de fundo
-        ctx.fillStyle = trackColor;
-        roundRect(ctx, left, 0, barW, h, radius);
-        ctx.fill();
+        var x = g.x0 + i * pitch;
 
-        // 5 ondas senoidais com frequências e fases distintas
-        var w1 = Math.sin(p + i * 0.30);
-        var w2 = Math.sin(p * 1.7 + i * 0.80);
-        var w3 = Math.sin(p * 2.9 + i * 1.20);
-        var w4 = Math.sin(p * 0.6 + i * 0.50);
-        var w5 = Math.sin(p * 4.1 + i * 1.50);
-
-        // combinação ponderada — movimento orgânico e rico
-        var wave = (0.25 * w1 + 0.25 * w2 + 0.20 * w3 + 0.15 * w4 + 0.15 * w5) * 0.5 + 0.5;
-        wave = Math.max(0, Math.min(1, wave));
-        var eased = wave * wave * (3 - 2 * wave); // smoothstep
-        var level = 0.10 + 0.90 * eased;
-        var barH = h * level;
-        var top = h - barH;
-
-        // degradê em 3 tons do tema: base → meio (rosa) → topo (azul)
-        var grad = ctx.createLinearGradient(left, h, left, top);
-        grad.addColorStop(0, dim);
-        if (mid) {
-          grad.addColorStop(0.55, window.Themes.hexA(mid.slice(0, 7), 200));
-          grad.addColorStop(1, strong);
+        ctx.globalAlpha = inten;
+        ctx.fillStyle = color;
+        if (lit > 0.02) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 6 * inten;
         } else {
-          grad.addColorStop(0.5, window.Themes.hexA(strong.slice(0, 7), 140));
-          grad.addColorStop(1, strong);
+          ctx.shadowBlur = 0;
         }
-        ctx.fillStyle = grad;
-        roundRect(ctx, left, top, barW, barH, radius);
-        ctx.fill();
-
-        // cap aceso no topo
-        ctx.fillStyle = strong;
-        var capH = Math.max(barW * 0.55, 3);
-        var capBottom = Math.min(top + capH, h);
-        roundRect(ctx, left, top, barW, capBottom - top, radius);
-        ctx.fill();
-
-        // brilho extra no topo do cap (pequeno destaque)
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        var glowH = capH * 0.35;
-        roundRect(ctx, left + barW * 0.15, top + 1, barW * 0.7, glowH, radius * 0.6);
-        ctx.fill();
+        ctx.fillRect(x, g.y, BAR_W, BAR_H);
       }
+
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
     }
 
     function frame() {
       if (!running) return;
-      var phase = ((performance.now() - startedAt) % DURATION_MS) / DURATION_MS;
+      var seconds = (performance.now() - startedAt) / 1000;
       resize();
-      draw(phase);
+      draw(seconds);
       raf = requestAnimationFrame(frame);
     }
 
@@ -132,19 +158,24 @@
       canvas.hidden = true;
     }
 
+    /* Mantém a assinatura antiga (forte, fraco, trilho, meio). */
     function setColors(strongColor, dimColor, trackCol, midColor) {
-      strong = strongColor;
-      dim = dimColor;
-      mid = midColor || '';
-      trackColor = trackCol;
+      if (strongColor) palette[0] = strongColor;
+      if (midColor) palette[1] = midColor;
+      buildColors();
       if (!running) { resize(); draw(0); }
     }
 
-    /* Tema único BLACK CYBER: base esmeralda → meio rosa → topo azul. */
     function setTheme(theme) {
       var c = (theme && theme.colors && theme.colors.length >= 3) ? theme.colors : null;
-      if (c) setColors(c[2], window.Themes.hexA(theme.accent, 51), '#FFFFFF1A', c[1]);
-      else setColors(theme.accent, window.Themes.hexA(theme.accent, 51), '#FFFFFF1A');
+      if (c) {
+        /* colors = [acento, rosa, azul] */
+        palette = [theme.accent, c[2], c[1]];
+      } else {
+        palette = ['#00E88A', '#00A3FF', '#A855F7'];
+      }
+      buildColors();
+      if (!running) { resize(); draw(0); }
     }
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -165,8 +196,6 @@
   }
 
   window.VuMeter = {
-    BAR_COUNT: BAR_COUNT,
-    DURATION_MS: DURATION_MS,
     attach: attach
   };
 })();

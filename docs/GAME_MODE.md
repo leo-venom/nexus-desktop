@@ -1,7 +1,18 @@
-# GAME_MODE — diretriz oficial do modo jogo
+# ⚠️ OBSOLETO — GAME_MODE.md (v2.13.0)
+
+**Este documento refere-se à arquitetura de modos (jogo/desenho/chat) REMOVIDA em v2.14.0.**
+
+> **Substituído por:** [`DIRECTIVE.md`](DIRECTIVE.md) — diretriz unificada sem modos.
+
+---
+
+# GAME_MODE — diretriz oficial do modo jogo (histórico v2.13.0)
 
 **Gerado do código em execução** (`web/js/html-builder.js`) por `docs/gerar_game_mode.js` ·
 NEXUS GAME v2.13.0 · 2026-10-22. Não edite à mão: rode o gerador.
+
+> **AVISO:** O `GAME_DIRECTIVE`, `detectMode`, `wantsTextures`, `gameScopeNote`, `gameLightingNote`
+> e exports relacionados foram **removidos** em v2.14.0. Este documento não reflete o código atual.
 
 O modo é escolhido por `Html.detectMode(command)` — 🎮 `game`, 🎨 `drawing`, 💬 `chat`.
 Este documento descreve **apenas** o modo jogo. Comandos de jogo recebem:
@@ -47,7 +58,7 @@ gameLightingNote + PALETA (a IA escolhe 3 cores) + mediaBlock(media)
 
 O bloco `@@NX_TEX_BEGIN@@ … @@NX_TEX_END@@` entra **somente quando o pedido cita textura/material**
 (`Html.wantsTextures`). Sem textura, `TEXTURE_OFF_DIRECTIVE` ocupa o lugar dele.
-A cauda (`13 SONS` + `CHECK FINAL`) entra **sempre**.
+A cauda (`SONS` + `CHECK FINAL`) entra **sempre**.
 
 | Parte | Chars |
 |---|---|
@@ -56,7 +67,7 @@ A cauda (`13 SONS` + `CHECK FINAL`) entra **sempre**.
 | API (3D/three.js) | 1.236 |
 | REGRA DE 3D SIMPLES | 887 |
 | ANIMAÇÃO DE TEXTURA | 409 |
-| 13 SONS WEBAUDIO REALISTAS — ARQUITETURA COMPLETA | 2.990 |
+| SONS — MÚSICA ELABORADA + EFEITOS (RECEITAS) | 3.900 |
 | CHECK FINAL — passe por cada item; se algum falhar, conserte antes de entregar | 557 |
 | ENTREGUE APENAS O HTML. | 25 |
 
@@ -254,35 +265,31 @@ ANIMAÇÃO DE TEXTURA:
 - Piscar/brilho: variar material.emissiveIntensity com Math.sin(time * freq) no loop.
 
 
-13 SONS WEBAUDIO REALISTAS — ARQUITETURA COMPLETA:
+SONS FUTURISTAS — MÚSICA ELABORADA + EFEITOS (RECEITAS):
 
-AudioContext compartilhado, criado no primeiro clique/interação do usuário. Função única playSom(tipo):
+AudioContext compartilhado, criado no primeiro gesto do usuário. GainNode master 0.15–0.3 + DynamicsCompressorNode leve; mute na tecla M.
 
-var actx = null;
-function initAudio() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); }
+MÚSICA DE FUNDO ELABORADA (obrigatória em todo jogo): trilha em 4 camadas com scheduler de 16 passos (setInterval 25 ms + lookahead 0.1 s agendando em actx.currentTime).
+1. BAIXO: sawtooth na raiz do acorde (55-110Hz) em colcheias + BiquadFilter lowpass com envelope (cutoff 200→900Hz em 0.05s, decay 0.25s).
+2. ARP: square em semicolcheias percorrendo a tríade do acorde 2 oitavas acima (220-880Hz) + delay (feedback 0.35, tempo 3/16 do BPM), gain 0.12.
+3. PAD: 2-3 sawtooth detuned (±7 cents) segurando o acorde inteiro, lowpass 600-1200Hz modulado por LFO lento (0.1Hz), gain 0.08.
+4. BATERIA: kick = sine 120→45Hz em 0.1s (2× por compasso); snare = ruído + bandpass 1.8kHz decay 0.12s; hihat = ruído + highpass 7kHz decay 0.03s em colcheias.
+Harmonia: progressão de 4 compassos em menor natural (i–VI–III–VII ou i–iv–v–VI), BPM 90-120. A intensidade sobe com o nível (adicionar camadas, abrir corte de filtro), nunca trocar tudo de uma vez.
 
-function playSom(tipo) {
-  initAudio();
-  var p = SOM_PARAMS[tipo]; if (!p) return;
-  // criar OscillatorNode(s) ou AudioBuffer (ruído branco), GainNode(s), BiquadFilterNode
-  // conectar: source → gain → filter → destination (ou cadeias múltiplas)
-  // configurar frequência, tipo de onda, ganho, cutoff conforme o tipo
-  // start(actx.currentTime) + stop(actx.currentTime + duração)
-}
-
-1. MÚSICA DE FUNDO (background): Osciladores em escala pentatônica/blues (notas: 262, 294, 330, 392, 440, 523 Hz) + LFO vibrato modulando frequência ±5 cents + BiquadFilterNode lowpass 800-2000Hz. Música ACELERA com o nível (aumentar frequência do LFO, diminuir cutoff do filtro).
-2. TIRO/LASER: Oscilador 800→100Hz descendente em 0.15s (linearRampToValueAtTime) + GainNode decay rápido (setValueAtTime 0.3, exponentialRampToValueAtTime 0.001 em 0.15s). Variação aleatória ±5% na frequência inicial. Tipo: square ou sawtooth.
-3. EXPLOSÃO: AudioBuffer de ruído branco (Math.random() * 2 - 1, 0.5s sample rate) + GainNode decay 0.5s + BiquadFilterNode lowpass 2000→100Hz descendente. Camada extra: OscillatorNode 40-60Hz (sine) sub grave com decay 0.3s.
-4. IMPACTO/COLISÃO: AudioBuffer ruído curto 0.08s + OscillatorNode grave 80-120Hz (triangle) decay rápido. Impacto metálico: + OscillatorNode 2000-4000Hz (sine) decay 0.02s (ring metálico).
-5. MOTOR/ENGINE: Dois OscillatorNode 100Hz+200Hz (sawtooth) com detune sutil (detune: 5-15 cents) + BiquadFilterNode bandpass (freq 300-800, Q 1-3). Frequência varia com velocidade.
-6. PASSOS: AudioBuffer ruído 0.05s + BiquadFilterNode lowpass 500Hz + OscillatorNode grave 60Hz (sine). Repetir em intervalo pela velocidade. VARIAR a cada passo.
-7. VENTO/AMBIENTE: AudioBuffer ruído contínuo + BiquadFilterNode lowpass 300-800Hz com gain 0.02-0.05. LFO (OscillatorNode 0.1-0.5Hz) modulando cutoff para variação suave.
-8. POWER-UP/COLETA: Dois OscillatorNode ascendentes: 400→800Hz + 600→1200Hz em 0.2s (sine). Attack 0.01s, decay 0.2s. BiquadFilterNode lowpass sweep 500→3000Hz.
-9. GAME OVER: OscillatorNode descendente 400→50Hz em 1.5s (triangle ou sawtooth) + ruído grave decay longo. ESCALA descendente de 3-4 notas (400→300→200→50Hz, cada nota 0.3s).
-10. HIT/DANO: AudioBuffer ruído 0.05s + OscillatorNode 300→80Hz descendente 0.1s. GainNode com spike (attack 0s, decay 0.1s).
-11. MENU HOVER/CLICK: OscillatorNode 0.03s, 600-800Hz (sine), attack 0s decay 0.03s. Click: dois OscillatorNode simultâneos (600+800Hz).
-12. LEVEL COMPLETE/JINGLE: Escala ascendente C-E-G-C (262→330→392→523 Hz) com acorde básico de fundo (C major: 262+330+392). Cada nota 0.15-0.2s. Fade out 0.5s.
-13. MOEDA/PONTO: OscillatorNode 800→1600Hz ascendente 0.1s (sine). Two-tone: 800Hz 0.05s + 1200Hz 0.05s.
+EFEITOS (6-20 linhas de WebAudio cada):
+1. TIRO/LASER: sawtooth 900→120Hz em 0.12s + transiente de ruído 10ms + delay curto (feedback 0.2); variação de ±5% na freq inicial a cada tiro.
+2. EXPLOSÃO: 3 camadas — sub sine 60→30Hz (0.4s), ruído com lowpass sweep 2500→120Hz (0.6s) e cauda grave (0.8s, gain 0.15); WaveShaper leve para peso.
+3. IMPACTO/COLISÃO: ruído de 30ms + sine 100→60Hz + ring metálico (3 osciladores inarmônicos 2-4kHz, decay 0.08s).
+4. PULO: sine 220→520Hz em 0.18s com vibrato leve (LFO 8Hz) e ataque rápido.
+5. MOEDA/COLETA: sino FM (carrier 880Hz, ratio 3.5, índice de modulação decaindo) two-tone 880→1320Hz, decay 0.25s.
+6. POWER-UP: arp ascendente de 5 notas pentatônicas em square + shimmer na oitava acima (triangle) + filter sweep 400→4000Hz.
+7. LEVEL UP/VITÓRIA: fanfarra de 3-4 notas maiores em sawtooth com tríade de apoio + reverb curto + shimmer final.
+8. DANO/HIT: ruído de 50ms + saw 300→80Hz em 0.1s com distorção leve no ataque.
+9. GAME OVER: acorde menor detuned em tape-stop (pitch ×1→×0.4 em 1.2s) + ruído grave decaído.
+10. MOTOR: 2 sawtooth detuned (70-180Hz) + bandpass Q=2 + LFO de amplitude; a frequência segue a velocidade.
+11. PASSOS: ruído de 40ms + lowpass 300-700Hz variando por passo + thump grave de 60Hz; nenhum passo igual ao anterior.
+12. VENTO/AMBIENTE: ruído rosa + lowpass 300-900Hz modulado por LFO 0.1-0.5Hz, gain 0.02-0.05.
+13. UI/CLICK: blip suave (triangle 600-800Hz, 30ms, ataque zero); hover usa metade do gain.
 
 CHECK FINAL — passe por cada item; se algum falhar, conserte antes de entregar:
 - Documento fechado (</body></html>), <script> todos balanceados, nenhum erro no primeiro frame?

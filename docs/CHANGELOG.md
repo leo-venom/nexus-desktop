@@ -1,5 +1,165 @@
 # Changelog — NEXUS GAME
 
+## v2.15.1 — 2026-10-23
+
+### Corrigido
+- Validação estrita de nomes e contenção de caminhos nas APIs Node e Python; `..`, nomes reservados, symlinks e destinos fora de `salvos/` são rejeitados.
+- Operações de salvar, renomear, duplicar, excluir e restaurar exigem origem local válida; o proxy valida DNS, redirecionamentos e endereços resolvidos.
+- Assets são validados antes da escrita, limitados a 6 MB por arquivo e 20 MB por projeto, e são reorganizados em `assets/images`, `assets/sounds` ou `assets/generated`.
+- Harness de testes deixou de executar gravação/restauração/exclusão automaticamente; os testes agora são manuais e predominantemente somente leitura.
+- Salvamento reabre corretamente documentos com `<base>` existente e não duplica a tag.
+
+## v2.15.0 — 2026-10-23
+
+### Adicionado
+- **88 texturas NxTex** (+20 novas: diamante, jade, opala, ardosia, arenito, galvanizado, enferrujado_azul, palha, linho, escamas, hexagonal, ondas, mandala, caleidoscopio, cosmo, sangue, labirinto, floral, geometrico, iridescente). Todas com PBR (RELEVO + ACABAMENTO) e sinônimos em pt-BR/inglês.
+- **Projetos em pasta própria** — cada salvo vira `salvos/<nome>/` com `index.html` + `assets/` + `meta.json`.
+- **Backup automático** — a cada save, a versão anterior vai pra `_backups/<timestamp>/` com assets. API para listar e restaurar.
+- **API REST** — `/_api/saves/<nome>` (POST/GET/DELETE) + `/backups` + `/_backups/<ts>/restore`.
+- **Ctrl+Z funcional em tempo real** — shim do iframe encaminha chamada `undoGen` pro shell. Funciona dentro do jogo sem entrar em modo edição.
+- **Salvar direto** — se projeto já aberto, SALVAR sobrescreve sem perguntar. Reset cria projeto novo.
+- **REGRA 7** — "Só o que foi pedido" (sem extras, sem cards decorativos).
+- **REGRA 6 reformulada** — jogo em tela cheia (100vw × 100dvh), barras de texto de 5px (topo + fundo) em vez de laterais/molduras, controles teclado/mouse obrigatórios.
+- **Test harness** — `web/test-harness.html` com 20+ testes automatizados (API, Ctrl+Z, save, JS modules, DIRECTIVE, texturas).
+
+### Alterado
+- **DIRECTIVE reescrito** — consolidado de 920 para 825 linhas. Blocos NEON/MATERIAIS/GELATINA compactados em referência rápida. Lista de texturas substituída por `NxTex.names()` (88 texturas).
+- **REGRA 1** — exceção explícita para px ≤5px (barras, bordas). Removido "mouse não existe no celular" (conflito com REGRA 6).
+- **`lastOpenName` preservado entre gerações** — não zera mais ao gerar modificação em cima de projeto aberto.
+- **Cor do tema** — rosa `#FF2D95` → roxo `#A855F7` (consistente com NxTex).
+- **iframe** — `inset:0` (sem margem de 20px). Tela cheia real.
+- **`store.js`** — migrado de File System Access + IndexedDB para API REST.
+- **`serve.py` + `server.js`** — adicionada API de projetos + backup automático.
+
+### Removido
+- File System Access + IndexedDB do salvamento (substituído por API REST).
+- Diálogo de nome ao salvar (salvamento é silencioso — sobrescreve ou cria com nome do prompt).
+- Lista exaustiva de 88 texturas no DIRECTIVE (~1 KB economizado).
+- `BASE_PROMPT` em inglês (não usado desde a unificação do DIRECTIVE).
+
+### Adicionado
+- **REGRA 5 — todo jogo nasce com sons futuristas** (ordem do Leo, 2026-10-22). Quando a
+  página é jogo (2D/3D, qualquer gênero), o áudio não é opcional: trilha de fundo em loop
+  sutil (0.15–0.3) + efeitos nos eventos (tiro, explosão, pulo, coleta, level up, game over)
+  em WebAudio puro, estilo cyber (saw/square + ruído filtrado, envelopes rápidos). A Regra 4
+  ("texturas e sons somente sob pedido") passa a valer integralmente **só para páginas que não
+  são jogo** — nada muda nelas. AudioContext no primeiro gesto, mute (tecla M/bolha no HUD),
+  sem arquivos/base64 e sem custo de fps (REGRA 2). `html-builder.js` DIRECTIVE + REGRAS_DEFINITIVAS §14.
+
+### Alterado (arquitetura unificada — ordem do Leo, 2026-10-21)
+- **Módulo único de prompt, sem modos** (jogo / desenho / objeto / chat removidos). O modelo
+  decide o que a página é; restam **quatro regras**: (1) enquadrar tudo na tela em qualquer
+  resolução; (2) desempenho máximo no three.js; (3) iluminação bonita; (4) texturas e sons
+  somente sob pedido.
+- **`GAME_DIRECTIVE`, `DRAWING_DIRECTIVE`, `CHAT_DIRECTIVE`, `TEXTURE_OFF_DIRECTIVE` removidos**
+  (~48 KB de prompt). Substituídos por **`DIRECTIVE` única** (IDENTIDADE, CONTRATO DE SAÍDA,
+  REGRA 1–4, COMO DECIDIR) + helper `paletaRef(theme)` (referência, não obrigação).
+- **`detectMode`, `wantsTextures`, `gameScopeNote`, `drawingScopeNote`, `chatScopeNote`,
+  `gameLightingNote`, `isGameCommand`, `isDrawingCommand`, `isChatCommand` removidos** do
+  `html-builder.js` (exportados e internos). `html-builder.js`: **1.401 → 757 linhas**.
+- **`systemPrompt` módulo único** (1 linha): `DIRECTIVE + paletaRef + detailDirective + mediaBlock`.
+  Assinatura mantida (`command`, `doc` por compatibilidade; documento atual via `userPrompt`).
+- **`Html.lint(html)`** — agora **1 argumento** (sem `mode`); checagens só gerais (truncado,
+  addon/CDN three, stub). Removidos cheques específicos de jogo (noLoop, noResize, textwall).
+- **`repararQualidade`** guarda só `editing` (sem `modo === 'chat'`).
+- **`app.js`**: removida `var modo = Html.detectMode(prompt)`; `lint(out.doc)` sem 2º arg.
+
+### Adicionado
+- **CUBO GELATINOSO — forma com arestas arredondadas (NxTex 1.3.0)** — `NxTex.gelGeo(w,h,d,opts)`
+  gera a geometria de gel por superelipsoide (`BoxGeometry` subdividido + projeção + normais
+  recalculadas): padrão `seg 12, n 4.2, inchar 0.86` (cubo estufado, ~1.014 vértices);
+  `{n:3.2}` deixa mais goma, `{inchar:0.8}` mais gordo, `{seg:16}` mais fino.
+  Motivo medido: `BoxGeometry` cru + `transmission` lê como bloco de resina (aresta viva);
+  a mesma peça arredondada + conteúdo suspenso lê como gelatina.
+  Bloco GELATINA ganhou 4 regras: forma (nunca box sem subdivisão), conteúdo suspenso com contraste,
+  quina iluminada com key 1.8–2.4/exposição ~1.0 (gel satura e estoura o topo) e limites
+  (1 corpo + até 10 objetos internos; wobble de vértices só se pedirem "tremendo" — 0,52 ms/frame
+  medido, contra 0,2 ms em 600 frames do squash por scale).
+  Análise: `docs/ANALISE_CUBO_GELATINOSO.md`.
+- **GELATINA E CORPOS TRANSLÚCIDOS (NxTex 1.2.0)** — a REGRA 2 deixou de proibir `transmission`
+  em absoluto: agora é permitida **só** para corpo translúcido pedido (gelatina, gel, slime, gosma,
+  gelo, resina, vidro grosso, água), no máximo 2 materiais Physical, `transmission ≤ 0.98`,
+  `thickness ≤ 1.5`, `ior 1.30–1.45`, `clearcoat ≤ 0.6`, `attenuationDistance ≥ 2.5`.
+  Novo bloco **GELATINA E CORPOS TRANSLÚCIDOS** na DIRECTIVE (receita + `depthWrite:false` +
+  `renderOrder` + casca BackSide + squash/stretch + lista de proibições). Novo helper
+  `NxTex.gel(material|null, cor, opts)` já calibrado, que clampa `attenuationDistance` em 2.5 e
+  reaproveita material existente.
+  - Motivo medido: `opacity 0.45` = acrílico tingido (listras do fundo saem retas); `transmission`
+    0.95–0.98 refrata de verdade (listras encurvam dentro da esfera) e roda no iframe sandbox sem
+    erro nem tela preta. `attenuationDistance 1.2` escurecia o gel → por isso o piso de 2.5.
+  - `Html.lint()` num documento de gel = 0 falhas (o reparo de qualidade não mexe nele).
+- **RELEVO REALISTA NAS TEXTURAS (NxTex 1.1.0)** — `nx-textures.js`: normal map gerado por Sobel
+  a partir da luminância, cacheado (`NxTex.normal`, `NxTex.normalCanvas`), mais `NxTex.pbr(material,
+  nome, opts)` que liga cor + `normalMap`/`normalScale` + `bumpMap` opcional e aplica
+  `roughness`/`metalness` coerentes por família (`NxTex.acabamento`), e `three(nome, rx, ry)` agora
+  respeita repetição. Tabelas: 44 texturas com força de relevo e acabamento próprios (pedra 9/0.86,
+  metal 3/0.28+0.92, ouro 2/0.18+1.0, vidro 2/0.08). Custo medido: ~21 ms por textura @256 na
+  primeira vez, cache depois; 85 KB @128 / 341 KB @256 por mapa. Sem addon e sem CDN — o build
+  local do three r160 já tem `normalMap`/`bumpMap`/`roughnessMap`/`aoMap` no core.
+  - `DIRECTIVE` ganhou o bloco **RELEVO** (usar `NxTex.pbr` em vez de `material.map`; proibido
+    `displacementMap`; um material por textura).
+  - `inlineTextures()` passou de `cache: 'force-cache'` para `'no-cache'` — com cache antigo o
+    arquivo salvo inlinava um pack sem `pbr`/`normal` e o jogo salvo quebrava.
+  - Verificado em cena WebGL: esfera `map` só = chapada; `pbr` em pedra/tijolo/metal mostra relevo
+    reagindo à luz (screenshot inspecionado).
+- **SISTEMA ANTI-ERRO (loop de autocorreção)** — `app.js`: depois de entregar o documento, o app
+  espera a telemetria do iframe (`ANTI_ERR_WAIT_MS = 4300`, cobre o watchdog de canvas em 4000 ms),
+  lê `frameErrors` **daquele render** (token `frameErrToken`) e, havendo erro real, manda ao modelo
+  um **ANTI-ERROR REPORT** com o documento completo + a lista de erros (`[error:linha]`,
+  `[blank]`, `[promise]`, `[console]`, `[resource]`) pedindo a correção da causa raiz.
+  Renderiza o documento corrigido e repete até **`ANTI_ERR_MAX = 2`** rodadas.
+  - Nunca roda na prévia parcial; respeita ESC/cancelamento; tokens da correção entram no CONSUMO.
+  - Sucesso: status `✓ KB • anti-erro OK (n)` + toast. Limite: status `⚠ n erro(s) na página`,
+    relatório preservado para o próximo pedido. Correção inválida (sem documento ou com erro de
+    sintaxe) mantém a página atual.
+  - Testado com endpoint mock: 1 gerar + 1 corrigir = 2 chamadas; modo "sempre quebrado" para em
+    3 chamadas (sem loop infinito).
+- **`DIRECTIVE` completa em pt-BR** (sem backticks, sem `${}`) com:
+  - IDENTIDADE: construtor de páginas HTML criativas; sem catálogo de tipos.
+  - CONTRATO DE SAÍDA: HTML puro, single-file, CSS/JS inline; CDNs liberadas **exceto**
+    three.js → `vendor/three/three.min.js` (UMD, global `THREE`, offline); sem addons,
+    import map, `type="module"`; nunca perguntar/recusar.
+  - REGRA 1 — ENQUADRAMENTO: `html,body{margin:0;padding:0;height:100%;overflow:hidden}`;
+    raiz `position:fixed;inset:0;width:100vw;height:100vh;height:100dvh`; unidades relativas;
+    `resize`/`orientationchange`/`ResizeObserver`; 3D: `setPixelRatio(min(dpr,1.5))`,
+    `setSize(W,H,false)`, reenquadrar por FOV/distância; caber em 320×480 e 2560×1080;
+    `env(safe-area-inset-*)`; toque ≥44×44 px; sem `overflow:auto` na raiz.
+  - REGRA 2 — DESEMPENHO: 1 cena/renderer/rAF/AudioContext; `{antialias:true,
+    powerPreference:'high-performance', alpha:false, stencil:false, depth:true}`;
+    `SRGBColorSpace` + `ACESFilmicToneMapping`; `PCFSoftShadowMap`, **1 luz com sombra**,
+    `mapSize 1024`, `bias -0.0005`, `normalBias 0.02`; `dt=min(delta,0.25)` + acumulador 1/60;
+    zero alocação no loop; geometria/material compartilhados; `InstancedMesh`; ≤60 draw calls
+    / ~80k tri / ~300 partículas; proibido post-processing (bloom/SSAO/DOF);
+    `CanvasTexture` ≤256 px, anisotropy 4; FPS adaptativo silencioso; `dispose()` ao reconstruir.
+  - REGRA 3 — ILUMINAÇÃO: IBL via `PMREMGenerator.fromScene(miniCena, 0.04)` →
+    `scene.environment`; 3 pontos (key 1.2–2.0 c/ sombra, fill frio 0.25–0.7, rim/back 0.6–1.2);
+    PBR coerente; gradiente de fundo; `scene.fog` na cor do fundo; emissive pulsante;
+    sombra de contato `CanvasTexture` radial multiply; 2D com direcional + vinheta.
+  - REGRA 4 — TEXTURAS E SONS SÓ SOB PEDIDO: sem pedido → proibido `NxTex`,
+    `createPattern`, `CanvasTexture`, ruído, `AudioContext`; com pedido → pack `window.NxTex`
+    (44 texturas: concreto, madeira, mármore, tijolo, metal, grama, terra, areia, pedra,
+    tecido, papel, asfalto, água, nuvem, fogo, musgo, ferrugem, ouro, carbono, xadrez,
+    listras, grade, ruído, gradiente) + `fuzzyMatch`; som só com gesto (AudioContext no
+    1º click/keydown/pointerdown, sem autoplay, oscilador/ruído); nunca base64.
+  - COMO DECIDIR: decidir em silêncio o que impressiona; mínimo de código, máximo acabamento;
+    "parecer feito por um estúdio".
+- **`paletaRef(theme)`** — se tema tem `background`: `"- fundo <bg> · superfície <surface> · destaque <accent> · texto <text>"` + linha "Use estas cores quando combinarem com o pedido; se o pedido pedir outro estilo, outra cor ou outra atmosfera, siga o pedido e ignore esta lista."
+
+### Corrigido
+- **Lint/game-mode leakage**: `detectMode` e keys mortas removidas de `window.Html`.
+- **`repararQualidade` em edição**: guarda só `editing`, evita regenerar sobre página do usuário.
+- **`lint` sem `mode`**: elimina path morto de `isGame` (removido).
+- **Splice cirúrgico por âncoras de string** (não número de linha) — reprodutível.
+
+### Documentação
+- `REGRAS_DEFINITIVAS.md` reescrita para arquitetura unificada.
+- `ESTADO_ATUAL.md` atualizada (versão 2.14.0, HEAD `d5e5a0f`, html-builder 757 l., sem modos).
+- `GAME_MODE.md` + `gerar_game_mode.js`: obsoletos (dependiam de `GAME_DIRECTIVE` removido);
+  substituir por `DIRECTIVE.md` (pendente) ou remover.
+
+
+# Changelog — NEXUS GAME
+
 ## v2.13.0 — 2026-10-21
 
 ### Corrigido (Electron — desempenho)

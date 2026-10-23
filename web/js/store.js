@@ -1,40 +1,34 @@
 /* ============================================================
- * store.js — port de Store.kt: páginas salvas em HTML.
- * Desktop: File System Access API (pasta escolhida pelo usuário,
- * handle salvo no IndexedDB). Fallback: IndexedDB + download.
+ * store.js — Projetos salvos em pasta própria via API REST.
+ *
+ * Cada projeto = pasta em salvos/<nome>/:
+ *   index.html     ← jogo/página
+ *   assets/        ← mídia (sons, imagens, modelos)
+ *   meta.json      ← prompt, data, stats
+ *
+ * API: /_api/saves/<nome> (GET list, POST salvar, DELETE)
+ *      /_api/saves/<nome>/index.html (GET)
+ *      /_api/saves/<nome>/assets/<path> (GET)
  * ============================================================ */
 (function () {
   'use strict';
 
-  var FOLDER = 'nexus77';
+  var API_BASE = '/_api/saves';
   var EXT = '.html';
-  var DB_NAME = 'nexus77';
-  var DB_VERSION = 1;
 
-  var _encoder = (typeof TextEncoder !== 'undefined') ? new TextEncoder() : null;
+  /* ---------- sanitização ---------- */
 
-  function utf8Bytes(s) {
-    if (_encoder) return _encoder.encode(s).length;
-    var n = 0;
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charCodeAt(i);
-      if (c < 0x80) n += 1;
-      else if (c < 0x800) n += 2;
-      else if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }
-      else n += 3;
-    }
-    return n;
-  }
-
-  /* Normaliza o nome digitado num arquivo .html seguro (igual ao Kotlin). */
-  function fileName(raw) {
+  function sanitizeName(raw) {
     var s = String(raw == null ? '' : raw).trim();
     if (s.toLowerCase().slice(-EXT.length) === EXT) s = s.slice(0, -EXT.length);
-    s = s.replace(/[\\/:*?"<>|\r\n\t]+/g, '-').trim().replace(/^\.+/, '').replace(/\.+$/, '');
-    if (!s) s = 'pagina';
+    s = s.replace(/[^\p{L}\p{N} _().-]+/gu, '-').replace(/\.{2,}/g, '-').trim().replace(/^\.+|\.+$/g, '');
+    if (!s) s = 'projeto';
     if (s.length > 80) s = s.slice(0, 80);
-    return s + EXT;
+    if (['assets', '_backups', 'index.html', 'meta.json'].indexOf(s.toLowerCase()) >= 0) s = 'projeto-' + s;
+    return s;
   }
+
+  /* ---------- helpers ---------- */
 
   function sizeLabel(bytes) {
     bytes = Number(bytes) || 0;
@@ -52,207 +46,292 @@
     return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
-  /* Linha secundária do card: tamanho + data. */
   function meta(item) {
     return sizeLabel(item.size) + ' · ' + dateLabel(item.modified);
   }
 
-  /* ---------- IndexedDB ---------- */
+  /* ---------- API REST ---------- */
 
-  function idbOpen() {
-    return new Promise(function (resolve, reject) {
-      if (!window.indexedDB) return reject(new Error('IndexedDB indisponível'));
-      var req = window.indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = function () {
-        var db = req.result;
-        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
-        if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'name' });
-      };
-      req.onsuccess = function () { resolve(req.result); };
-      req.onerror = function () { reject(req.error || new Error('falha ao abrir IndexedDB')); };
-    });
-  }
-
-  function idbTx(store, mode, fn) {
-    return idbOpen().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        var tx = db.transaction(store, mode);
-        var os = tx.objectStore(store);
-        var req;
-        try { req = fn(os); } catch (e) { reject(e); return; }
-        tx.oncomplete = function () { db.close(); resolve(req ? req.result : undefined); };
-        tx.onerror = function () { db.close(); reject(tx.error || new Error('falha no IndexedDB')); };
-        tx.onabort = function () { db.close(); reject(tx.error || new Error('transação cancelada')); };
-      });
-    });
-  }
-
-  function idbGet(store, key) {
-    return idbTx(store, 'readonly', function (os) { return os.get(key); });
-  }
-  function idbPut(store, value, key) {
-    return idbTx(store, 'readwrite', function (os) { return os.put(value, key); });
-  }
-  function idbDelete(store, key) {
-    return idbTx(store, 'readwrite', function (os) { return os.delete(key); });
-  }
-  function idbAll(store) {
-    return idbTx(store, 'readonly', function (os) { return os.getAll(); });
-  }
-
-  /* ---------- File System Access ---------- */
-
-  function supportsFolder() {
-    return typeof window.showDirectoryPicker === 'function';
-  }
-
-  /* Handle da pasta escolhida (persistido no IndexedDB). */
-  function getDirHandle() {
-    return idbGet('meta', 'dir').then(function (h) { return h || null; }).catch(function () { return null; });
-  }
-
-  /* Pede acesso à pasta (precisa ser chamado a partir de um clique). */
-  function ensureDir() {
-    return getDirHandle().then(function (h) {
-      if (!h) return null;
-      if (typeof h.queryPermission !== 'function') return h;
-      return h.queryPermission({ mode: 'readwrite' }).then(function (p) {
-        if (p === 'granted') return h;
-        return h.requestPermission({ mode: 'readwrite' }).then(function (p2) {
-          return p2 === 'granted' ? h : null;
-        });
-      }).catch(function () { return null; });
-    });
-  }
-
-  /* Abre o seletor de pasta e guarda o handle. */
-  function pickFolder() {
-    if (!supportsFolder()) {
-      return Promise.reject(new Error('pasta local indisponível neste navegador'));
+  function api(path, method, body) {
+    var url = API_BASE + path;
+    var requestMethod = method || 'GET';
+    var opts = {
+      method: requestMethod,
+      headers: { 'Accept': 'application/json' },
+    };
+    if (requestMethod === 'POST' || requestMethod === 'DELETE') {
+      /* O servidor local usa este cabeçalho para reconhecer o shell mesmo
+         quando Electron não envia Origin/Sec-Fetch-Site em fetch same-origin. */
+      opts.headers['X-Nexus-Local-Request'] = '1';
     }
-    return window.showDirectoryPicker({ mode: 'readwrite' }).then(function (h) {
-      return idbPut('meta', h, 'dir').then(function () { return h; });
+    if (body != null) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return { error: r.statusText }; }).then(function (e) { throw new Error(e.error || r.statusText); });
+      return r.json();
     });
   }
 
-  /* Nome da pasta escolhida (ou null se nenhuma). */
-  function folderLabel() {
-    return getDirHandle().then(function (h) { return h ? String(h.name || FOLDER) : null; });
-  }
-
-  /* ---------- download (fallback sem FSA) ---------- */
-
-  function download(name, html) {
-    try {
-      var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    } catch (e) {
-      /* ignora (ambiente sem DOM) */
-    }
+  function fetchHtml(path) {
+    return fetch(API_BASE + path, {
+      method: 'GET',
+      headers: { 'Accept': 'text/html' },
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.statusText);
+      return r.text();
+    });
   }
 
   /* ---------- API pública ---------- */
 
-  /* Grava o HTML (sobrescreve o mesmo nome). Resolve com o nome final. */
-  function save(name, html) {
-    var data = String(html == null ? '' : html);
-    var now = Date.now();
-    var size = utf8Bytes(data);
-    return ensureDir().then(function (dir) {
-      if (dir) {
-        return dir.getFileHandle(name, { create: true })
-          .then(function (fh) { return fh.createWritable(); })
-          .then(function (w) {
-            return w.write(data).then(function () { return w.close(); });
-          })
-          .then(function () { return name; });
-      }
-      return idbPut('files', { name: name, html: data, size: size, modified: now })
-        .then(function () { download(name, data); return name; });
+  /* Salva o HTML e os arquivos de mídia recolhidos do documento. */
+  function save(name, html, prompt, assets) {
+    var safe = sanitizeName(name);
+    var body = {
+      html: html,
+      prompt: prompt || '',
+      date: new Date().toISOString(),
+    };
+    if (assets && Object.keys(assets).length) {
+      body.assets = assets;
+    }
+    return api('/' + encodeURIComponent(safe), 'POST', body).then(function (r) {
+      if (r.ok) return safe;
+      throw new Error(r.error || 'falha ao salvar');
     });
   }
 
-  /* Lista as páginas salvas (mais recentes primeiro). */
-  function list() {
-    return ensureDir().then(function (dir) {
-      if (dir) {
-        var out = [];
-        function step(it) {
-          return it.next().then(function (r) {
-            if (r.done) return out;
-            var name = r.value[0];
-            var handle = r.value[1];
-            if (handle && handle.kind === 'file' && name.toLowerCase().slice(-EXT.length) === EXT) {
-              return handle.getFile().then(function (f) {
-                out.push({ name: name, size: f.size, modified: f.lastModified });
-                return step(it);
-              });
-            }
-            return step(it);
+  /* Mapeia media local para assets/images, assets/sounds ou assets/generated,
+     atualizando os caminhos no HTML guardado. */
+  var ASSET_RE = /(?:imagens|sons|assets)\/[A-Za-z0-9._\/%+~@-]+/gi;
+  var ASSET_MAX_FILE = 6 * 1024 * 1024;
+  var ASSET_MAX_TOTAL = 20 * 1024 * 1024;
+
+  function assetDestination(sourcePath) {
+    if (sourcePath.indexOf('assets/') === 0) {
+      return sourcePath.split('/').map(function (part) {
+        try { return decodeURIComponent(part); } catch (e) { return part; }
+      }).join('/');
+    }
+    var prefix = sourcePath.indexOf('imagens/') === 0 ? 'assets/images/' :
+      (sourcePath.indexOf('sons/') === 0 ? 'assets/sounds/' : 'assets/generated/');
+    var tail = sourcePath.replace(/^(?:imagens|sons|assets)\//, '');
+    return prefix + tail.split('/').map(function (part) {
+      try { return decodeURIComponent(part); }
+      catch (e) { return part; }
+    }).join('/');
+  }
+
+  function blobDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(fr.result); };
+      fr.onerror = function () { reject(new Error('falha ao ler asset')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  function extractAssetsFromHtml(html, projectName) {
+    if (!html) return Promise.resolve({});
+    var matches = new Set();
+    var m;
+    ASSET_RE.lastIndex = 0;
+    while ((m = ASSET_RE.exec(html)) !== null) {
+      matches.add(m[0]);
+    }
+    if (!matches.size) return Promise.resolve({ assets: {}, html: String(html) });
+    var promises = [];
+    var keys = [];
+    matches.forEach(function (sourcePath) {
+      var destination = assetDestination(sourcePath);
+      keys.push({ source: sourcePath, destination: destination });
+      var encodedPath = sourcePath.split('/').map(function (part) {
+        try { return encodeURIComponent(decodeURIComponent(part)); }
+        catch (e) { return encodeURIComponent(part); }
+      }).join('/');
+      var localPath = sourcePath.indexOf('assets/') === 0 && projectName
+        ? API_BASE + '/' + encodeURIComponent(sanitizeName(projectName)) + '/' + encodedPath
+        : '/' + encodedPath;
+      promises.push(
+        fetch(localPath, { cache: 'no-cache' }).then(function (r) {
+          if (!r.ok && sourcePath.indexOf('assets/') === 0 && projectName) {
+            return fetch('/' + encodedPath, { cache: 'no-cache' });
+          }
+          return r;
+        }).then(function (r) {
+          if (!r.ok) throw new Error('asset nao encontrado: ' + sourcePath);
+          return r.blob();
+        }).then(function (blob) {
+          if (blob.size > ASSET_MAX_FILE) throw new Error('asset excede 6 MB: ' + sourcePath);
+          return blobDataUrl(blob).then(function (dataUrl) {
+            return { dataUrl: dataUrl, bytes: blob.size };
           });
-        }
-        return step(dir.entries()).then(function (arr) {
-          return arr.sort(function (a, b) { return b.modified - a.modified; });
-        });
+        })
+      );
+    });
+    return Promise.all(promises.map(function (promise) {
+      return promise.catch(function (error) {
+        /* Uma referência opcional quebrada não deve impedir o salvamento do
+           documento inteiro; ela permanece no HTML para diagnóstico. */
+        try { console.warn('[nexus] asset não incorporado:', error.message || error); } catch (e) {}
+        return null;
+      });
+    })).then(function (dataUris) {
+      var assets = {};
+      var totalBytes = 0;
+      var transformed = String(html);
+      for (var i = 0; i < keys.length; i++) {
+        if (!dataUris[i]) continue;
+        totalBytes += dataUris[i].bytes;
+        if (totalBytes > ASSET_MAX_TOTAL) throw new Error('assets do projeto excedem 20 MB');
+        assets[keys[i].destination] = dataUris[i].dataUrl;
+        var escaped = keys[i].source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        transformed = transformed.replace(new RegExp(escaped, 'g'), keys[i].destination);
       }
-      return idbAll('files').then(function (rows) {
-        return (rows || []).map(function (r) {
-          return { name: r.name, size: r.size, modified: r.modified };
-        }).sort(function (a, b) { return b.modified - a.modified; });
+      return { assets: assets, html: transformed };
+    });
+  }
+
+  /* Salva com extração automática de assets do HTML. */
+  function saveWithAssets(name, html, prompt) {
+    var safe = sanitizeName(name);
+    return extractAssetsFromHtml(html, safe).then(function (result) {
+      return save(safe, result.html, prompt, result.assets);
+    });
+  }
+
+  function inlineProjectAssets(name, html) {
+    var safe = sanitizeName(name);
+    var source = String(html == null ? '' : html);
+    var expression = /assets\/[A-Za-z0-9._/%+~@-]+/g;
+    var refs = [];
+    var seen = Object.create(null);
+    var match;
+    while ((match = expression.exec(source)) !== null) {
+      var path = match[0];
+      if (path.split('/').some(function (part) { return part === '.' || part === '..'; })) continue;
+      if (!seen[path]) { seen[path] = true; refs.push(path); }
+    }
+    if (!refs.length) return Promise.resolve(source);
+    var total = 0;
+    return refs.reduce(function (chain, relative) {
+      return chain.then(function (result) {
+        return readAsset(safe, relative).then(function (blob) {
+          if (!blob) throw new Error('asset nao encontrado: ' + relative);
+          total += blob.size;
+          if (total > ASSET_MAX_TOTAL) throw new Error('assets do projeto excedem 20 MB');
+          return blobDataUrl(blob).then(function (dataUrl) {
+            var escaped = relative.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return result.replace(new RegExp(escaped, 'g'), dataUrl);
+          });
+        });
+      });
+    }, Promise.resolve(source));
+  }
+
+  /* Lista os projetos (mais recentes primeiro). */
+  function list() {
+    return api('', 'GET').then(function (arr) {
+      return (arr || []).map(function (p) {
+        return { name: p.name, size: p.size, modified: p.modified, prompt: p.prompt || '' };
       });
     });
   }
 
-  /* Lê uma página salva (null se não existir). */
+  /* Lê o index.html de um projeto. */
   function read(name) {
-    return ensureDir().then(function (dir) {
-      if (dir) {
-        return dir.getFileHandle(name).then(function (fh) {
-          return fh.getFile();
-        }).then(function (f) {
-          return f.text();
-        }).catch(function () {
-          return null;
-        });
-      }
-      return idbGet('files', name).then(function (row) { return row ? row.html : null; });
+    var safe = sanitizeName(name);
+    return fetchHtml('/' + encodeURIComponent(safe) + '/index.html').catch(function () { return null; });
+  }
+
+  /* Lê um asset. */
+  function readAsset(name, assetPath) {
+    var safe = sanitizeName(name);
+    var relative = String(assetPath || '').replace(/^\/+/, '');
+    var url = API_BASE + '/' + encodeURIComponent(safe) + '/' + relative.split('/').map(encodeURIComponent).join('/');
+    return fetch(url, { method: 'GET' }).then(function (r) {
+      if (!r.ok) return null;
+      return r.blob();
     });
   }
 
-  /* Remove uma página salva; true se algo foi removido. */
-  function remove(name) {
-    return ensureDir().then(function (dir) {
-      if (dir) {
-        return dir.removeEntry(name).then(function () { return true; }).catch(function () { return false; });
-      }
-      return idbGet('files', name).then(function (row) {
-        if (!row) return false;
-        return idbDelete('files', name).then(function () { return true; });
+  /* Gera a URL base para servir assets de um projeto aberto.
+     Usada como <base href="..."> no iframe. */
+  function projectBaseUrl(name) {
+    return API_BASE + '/' + encodeURIComponent(sanitizeName(name)) + '/';
+  }
+
+  /* Lista backups de um projeto. */
+  function listBackups(name) {
+    var safe = sanitizeName(name);
+    return api('/' + encodeURIComponent(safe) + '/backups', 'GET').then(function (arr) {
+      return (arr || []).map(function (b) {
+        return { timestamp: b.timestamp, modified: b.modified, size: b.size };
       });
+    });
+  }
+
+  /* Lê o index.html de um backup específico. */
+  function readBackup(name, timestamp) {
+    var safe = sanitizeName(name);
+    return fetchHtml('/' + encodeURIComponent(safe) + '/_backups/' + encodeURIComponent(timestamp) + '/index.html').catch(function () { return null; });
+  }
+
+  /* Restaura um backup. */
+  function restoreBackup(name, timestamp) {
+    var safe = sanitizeName(name);
+    return api('/' + encodeURIComponent(safe) + '/_backups/' + encodeURIComponent(timestamp) + '/restore', 'POST').then(function (r) {
+      if (r.ok) return r;
+      throw new Error(r.error || 'falha ao restaurar');
+    });
+  }
+  function remove(name) {
+    var safe = sanitizeName(name);
+    return api('/' + encodeURIComponent(safe), 'DELETE').then(function (r) {
+      if (r.ok) return true;
+      throw new Error(r.error || 'falha ao remover');
+    }).catch(function () { return false; });
+  }
+
+  function rename(name, newName) {
+    var safe = sanitizeName(name);
+    var novo = sanitizeName(newName);
+    return api('/' + encodeURIComponent(safe) + '/rename', 'POST', { name: novo }).then(function (r) {
+      if (r.ok) return r.name;
+      throw new Error(r.error || 'falha ao renomear');
+    });
+  }
+
+  function duplicate(name) {
+    var safe = sanitizeName(name);
+    return api('/' + encodeURIComponent(safe) + '/duplicate', 'POST').then(function (r) {
+      if (r.ok) return r.name;
+      throw new Error(r.error || 'falha ao duplicar');
     });
   }
 
   window.Store = {
-    FOLDER: FOLDER,
     EXT: EXT,
-    fileName: fileName,
+    sanitizeName: sanitizeName,
     sizeLabel: sizeLabel,
     dateLabel: dateLabel,
     meta: meta,
-    supportsFolder: supportsFolder,
-    pickFolder: pickFolder,
-    folderLabel: folderLabel,
     save: save,
+    saveWithAssets: saveWithAssets,
+    extractAssetsFromHtml: extractAssetsFromHtml,
+    inlineProjectAssets: inlineProjectAssets,
     list: list,
     read: read,
+    readAsset: readAsset,
+    projectBaseUrl: projectBaseUrl,
     'delete': remove,
-    remove: remove
+    listBackups: listBackups,
+    readBackup: readBackup,
+    restoreBackup: restoreBackup,
+    rename: rename,
+    duplicate: duplicate,
+    remove: remove,
   };
 })();

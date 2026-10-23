@@ -1,0 +1,334 @@
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Objeto Transparente</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+body {
+  background: radial-gradient(ellipse at 50% 30%, #1a1a2e 0%, #0f0f1e 100%);
+}
+#container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+</style>
+</head>
+<body>
+<div id="container"></div>
+<script src="vendor/three/three.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  const container = document.getElementById('container');
+  let W = container.clientWidth;
+  let H = container.clientHeight;
+
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: true, 
+    powerPreference: 'high-performance',
+    alpha: false,
+    stencil: false,
+    depth: true
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(W, H, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Scene
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0f0f1e, 8, 20);
+
+  // Camera
+  const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+  camera.position.set(0, 2, 6);
+  camera.lookAt(0, 0, 0);
+
+  // Environment (PMREM for realistic reflections)
+  const envScene = new THREE.Scene();
+  const envGeo = new THREE.SphereGeometry(50, 16, 16);
+  const envMat = new THREE.MeshBasicMaterial({ 
+    side: THREE.BackSide,
+    color: 0x1a1a2e
+  });
+  const envMesh = new THREE.Mesh(envGeo, envMat);
+  envScene.add(envMesh);
+
+  const light1 = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 0.1),
+    new THREE.MeshBasicMaterial({ color: 0x6688ff })
+  );
+  light1.position.set(-8, 10, -8);
+  envScene.add(light1);
+
+  const light2 = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 1.5, 0.1),
+    new THREE.MeshBasicMaterial({ color: 0xff88aa })
+  );
+  light2.position.set(8, 8, 8);
+  envScene.add(light2);
+
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
+  const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+  scene.environment = envMap;
+  pmremGenerator.dispose();
+  envGeo.dispose();
+  envMat.dispose();
+
+  // Lights
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+  keyLight.position.set(3, 6, 4);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.width = 1024;
+  keyLight.shadow.mapSize.height = 1024;
+  keyLight.shadow.camera.left = -5;
+  keyLight.shadow.camera.right = 5;
+  keyLight.shadow.camera.top = 5;
+  keyLight.shadow.camera.bottom = -5;
+  keyLight.shadow.camera.near = 0.5;
+  keyLight.shadow.camera.far = 20;
+  keyLight.shadow.bias = -0.0005;
+  keyLight.shadow.normalBias = 0.02;
+  scene.add(keyLight);
+
+  const fillLight = new THREE.DirectionalLight(0x88ccff, 0.5);
+  fillLight.position.set(-4, 3, -2);
+  scene.add(fillLight);
+
+  const rimLight = new THREE.DirectionalLight(0xff88cc, 0.8);
+  rimLight.position.set(-2, 2, -5);
+  scene.add(rimLight);
+
+  const ambient = new THREE.AmbientLight(0x334455, 0.3);
+  scene.add(ambient);
+
+  // Glass Material (transparent object)
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xaaeeff,
+    transmission: 0.95,
+    thickness: 1.2,
+    roughness: 0.08,
+    metalness: 0,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.1,
+    ior: 1.38,
+    attenuationDistance: 2.8,
+    attenuationColor: 0xaaeeff,
+    side: THREE.FrontSide,
+    transparent: true,
+    depthWrite: false
+  });
+
+  // Geometry: rounded cube for glass
+  function createRoundedBox(w, h, d, r, segs) {
+    const shape = new THREE.Shape();
+    const hw = w * 0.5 - r;
+    const hh = h * 0.5 - r;
+    shape.moveTo(-hw, -hh + r);
+    shape.lineTo(-hw, hh - r);
+    shape.quadraticCurveTo(-hw, hh, -hw + r, hh);
+    shape.lineTo(hw - r, hh);
+    shape.quadraticCurveTo(hw, hh, hw, hh - r);
+    shape.lineTo(hw, -hh + r);
+    shape.quadraticCurveTo(hw, -hh, hw - r, -hh);
+    shape.lineTo(-hw + r, -hh);
+    shape.quadraticCurveTo(-hw, -hh, -hw, -hh + r);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: d,
+      bevelEnabled: true,
+      bevelThickness: r,
+      bevelSize: r,
+      bevelSegments: segs
+    });
+    geo.center();
+    return geo;
+  }
+
+  const glassGeo = createRoundedBox(1.8, 1.8, 1.8, 0.25, 8);
+  const glassMesh = new THREE.Mesh(glassGeo, glassMat);
+  glassMesh.position.y = 1.2;
+  glassMesh.castShadow = false;
+  glassMesh.receiveShadow = false;
+  glassMesh.renderOrder = 1;
+  scene.add(glassMesh);
+
+  // Inner object (sphere with metallic material)
+  const innerGeo = new THREE.SphereGeometry(0.5, 32, 32);
+  const innerMat = new THREE.MeshStandardMaterial({
+    color: 0xffaa44,
+    metalness: 0.9,
+    roughness: 0.15,
+    emissive: 0xffaa44,
+    emissiveIntensity: 0.15
+  });
+  const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+  innerMesh.castShadow = true;
+  innerMesh.receiveShadow = true;
+  glassMesh.add(innerMesh);
+
+  // Floor
+  const floorGeo = new THREE.PlaneGeometry(20, 20);
+  const floorMat = new THREE.MeshStandardMaterial({ 
+    color: 0x1a1a2e,
+    roughness: 0.9,
+    metalness: 0
+  });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // Contact shadow (fake shadow under glass)
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = 128;
+  shadowCanvas.height = 128;
+  const sctx = shadowCanvas.getContext('2d');
+  const grad = sctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(0,0,0,0.5)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.2)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0, 0, 128, 128);
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    map: shadowTex,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.MultiplyBlending,
+    depthWrite: false
+  });
+  const shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), shadowMat);
+  shadowMesh.rotation.x = -Math.PI / 2;
+  shadowMesh.position.y = 0.01;
+  scene.add(shadowMesh);
+
+  // Animation
+  const clock = new THREE.Clock();
+  let pointerDown = false;
+  let pointerX = 0;
+  let pointerY = 0;
+  let targetRotY = 0;
+  let targetRotX = 0;
+  let currentRotY = 0;
+  let currentRotX = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.25);
+    const t = clock.getElapsedTime();
+
+    // Wobble effect
+    const wobbleX = 0.04 * Math.sin(t * 2.5);
+    const wobbleY = 0.04 * Math.cos(t * 3.2);
+    glassMesh.scale.set(
+      1 + wobbleX,
+      1 - wobbleX * 0.5,
+      1 + wobbleY
+    );
+
+    // Rotate inner sphere
+    innerMesh.rotation.y = t * 0.5;
+    innerMesh.rotation.x = Math.sin(t * 0.7) * 0.3;
+
+    // Camera orbit
+    currentRotY += (targetRotY - currentRotY) * 5 * dt;
+    currentRotX += (targetRotX - currentRotX) * 5 * dt;
+    const radius = 6;
+    camera.position.x = Math.sin(currentRotY) * Math.cos(currentRotX) * radius;
+    camera.position.y = Math.sin(currentRotX) * radius + 2;
+    camera.position.z = Math.cos(currentRotY) * Math.cos(currentRotX) * radius;
+    camera.lookAt(0, 1.2, 0);
+
+    // Emissive pulse
+    innerMat.emissiveIntensity = 0.1 + 0.05 * Math.sin(t * 4);
+
+    renderer.render(scene, camera);
+  }
+
+  // Pointer interaction
+  function onPointerDown(e) {
+    pointerDown = true;
+    pointerX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    pointerY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+  }
+  function onPointerMove(e) {
+    if (!pointerDown) return;
+    const x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    const y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+    const dx = x - pointerX;
+    const dy = y - pointerY;
+    targetRotY += dx * 0.01;
+    targetRotX -= dy * 0.01;
+    targetRotX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, targetRotX));
+    pointerX = x;
+    pointerY = y;
+  }
+  function onPointerUp() {
+    pointerDown = false;
+  }
+  container.addEventListener('pointerdown', onPointerDown);
+  container.addEventListener('pointermove', onPointerMove);
+  container.addEventListener('pointerup', onPointerUp);
+  container.addEventListener('pointerleave', onPointerUp);
+  container.addEventListener('touchstart', onPointerDown, { passive: true });
+  container.addEventListener('touchmove', onPointerMove, { passive: true });
+  container.addEventListener('touchend', onPointerUp);
+
+  // Wheel zoom
+  function onWheel(e) {
+    e.preventDefault();
+    const delta = e.deltaY * 0.001;
+    camera.position.multiplyScalar(1 + delta);
+    const dist = camera.position.length();
+    if (dist < 3) camera.position.setLength(3);
+    if (dist > 12) camera.position.setLength(12);
+  }
+  container.addEventListener('wheel', onWheel, { passive: false });
+
+  // Resize
+  function onResize() {
+    W = container.clientWidth;
+    H = container.clientHeight;
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    renderer.setSize(W, H, false);
+  }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+
+  // Visibility
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clock.stop();
+    } else {
+      clock.start();
+    }
+  });
+
+  animate();
+})();
+</script>
+</body>
+</html>

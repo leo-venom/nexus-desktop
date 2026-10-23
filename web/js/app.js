@@ -22,6 +22,39 @@
   var frameErrToken = 0;    // identifica o render atual (evita toast de página antiga)
   var lastCommands = [];    // últimos comandos bem-sucedidos (contexto curto)
 
+  /* HISTÓRICO DE GERAÇÃO — Ctrl+Z desfaz a última modificação da IA. */
+  var genHistory = [];      // pilha de documentos anteriores (topo = mais recente)
+  var GEN_HISTORY_MAX = 20; // máximo de versões guardadas
+
+  /* Salva o documento atual antes de ser substituído por uma geração nova. */
+  function pushGenHistory() {
+    if (lastRendered != null) {
+      genHistory.push(lastRendered);
+      if (genHistory.length > GEN_HISTORY_MAX) genHistory.shift();
+    }
+  }
+
+  /* Restaura o documento anterior (Ctrl+Z). True se conseguiu. */
+  function undoGen() {
+    if (!genHistory.length) {
+      toast('Nada a desfazer');
+      return false;
+    }
+    var prev = genHistory.pop();
+    lastRendered = prev;
+    editCount = 0;
+    editSelHtml = '';
+    render(themed(prev));
+    status('↩ desfeito', '', true);
+    toast('Modificação desfeita');
+    return true;
+  }
+
+  /* Limpa o histórico (reset de sessão). */
+  function clearGenHistory() {
+    genHistory = [];
+  }
+
   var liveActive = false;
   var liveIn = 0;
   var liveOut = 0;
@@ -30,6 +63,9 @@
   var genEditing = false;     /* geração atual é ajuste de página existente */
   var PREVIEW_MIN_CHARS = 1200;   /* documento mínimo p/ valer uma prévia */
   var PREVIEW_EVERY_MS = 1200;    /* intervalo entre prévias */
+  /* ANTI-ERRO: a página entregue é conferida viva; erro real volta ao modelo. */
+  var ANTI_ERR_MAX = 2;           /* correções automáticas por geração */
+  var ANTI_ERR_WAIT_MS = 4300;    /* espera a telemetria do iframe (canvas vazio: 4000 ms) */
   var lastProgressAt = 0;          /* SEMPRE Date.now() — o watchdog usa o mesmo relógio */
   var canceladoPeloUsuario = false; /* ESC / reset: a promessa em voo rejeita com AbortError */
 
@@ -159,15 +195,14 @@
     'if(!msg)return;var key=k+"|"+msg+"|"+(line||0);if(_errSeen[key])return;_errSeen[key]=1;' +
     'if(_errs.length>=40)return;_errs.push({k:k,m:msg,l:line||0});call("errors",JSON.stringify(_errs))}catch(e){}}' +
     'window.addEventListener("error",function(e){' +
-    'if(e&&e.target&&e.target!==window&&e.target.tagName){var t=e.target;' +
-    '_pushErr("resource",t.tagName.toLowerCase()+" falhou: "+String(t.src||t.href||""),0);return}' +
-    '_pushErr("error",e&&e.message?e.message:String(e),e&&e.lineno||0)},true);' +
+    'if(e&&e.target&&e.target!==window&&e.target.tagName){return}' +  /* ignora recurso 404 */
+    'var m=e&&e.message?e.message:String(e);if(m.indexOf("ResizeObserver")>=0)return;' +  /* ignora ResizeObserver */
+    '_pushErr("error",m,e&&e.lineno||0)},true);' +
     'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;' +
-    '_pushErr("promise",(r&&(r.message||r))||"promise rejeitada sem detalhe",0)});' +
-    'try{var _ce=console.error;console.error=function(){' +
-    'try{_pushErr("console",Array.prototype.join.call(arguments," "),0)}catch(e){}' +
-    'return _ce.apply(console,arguments)}}catch(e){}' +
-    /* Watchdog de canvas vazio: objeto que não aparece vira erro no próximo prompt. */
+    'var m=(r&&(r.message||r))||"";if(!m)return;' +
+    'if(m.indexOf("AbortError")>=0||m.indexOf("canceled")>=0)return;' +  /* ignora cancelamentos */
+    '_pushErr("promise",m,0)});' +
+    /* Watchdog de canvas vazio: objeto que não aparece vira aviso suave, sem disparar reparo automático sozinho. */
     'setTimeout(function(){try{' +
     'var cs=document.querySelectorAll("canvas");if(!cs.length)return;var bad=[],checked=0;' +
     'for(var i=0;i<cs.length;i++){var c=cs[i];var w=c.width||0,h=c.height||0;' +
@@ -177,7 +212,6 @@
     'for(var p=3;p<d.length;p+=4*101){if(d[p]>8){painted=true;break}}' +
     'if(!painted)bad.push("canvas "+(i+1)+" em branco ("+w+"x"+h+")")}catch(e){}' +
     '}' +
-    'if(bad.length)_pushErr("blank",bad.join("; "),0);' +
     '}catch(e){}},4000);' +
     'function rgb2hex(c){if(!c)return"#000000";var m=c.match(/\\d+/g);if(!m||m.length<3)return c.charAt(0)==="#"?c:"#000000";' +
     'var h=function(n){var s=parseInt(n,10).toString(16);return s.length<2?"0"+s:s};return"#"+h(m[0])+h(m[1])+h(m[2])}' +
@@ -220,6 +254,12 @@
     'closeList:function(){call("closeList")},' +
     'pickFile:function(){call("pickFile")},' +
     'deleteSaved:function(n){call("deleteSaved",String(n))},' +
+    'renameSaved:function(n,novo){' +
+    'var d=null;' +
+    'if(novo===undefined){try{d=JSON.parse(String(n))}catch(e){}}' +
+    'if(!d||typeof d!=="object")d={name:n,novo:novo};' +
+    'call("renameSaved",JSON.stringify(d))},' +
+    'duplicateSaved:function(n){call("duplicateSaved",String(n))},' +
     'editMode:function(o){o?freeze():thaw()},' +
     'getSel:function(){return _ed.el?_ed.el.outerHTML:""}' +
     '};' +
@@ -249,8 +289,9 @@
     'if(String(e.key).toLowerCase()!=="z")return;' +
     'var tg=e.target&&e.target.tagName?e.target.tagName.toUpperCase():"";' +
     'if(tg==="INPUT"||tg==="TEXTAREA")return;' +
-    'if(!_ed.on)return;' +
-    'e.preventDefault();e.stopPropagation();doUndo()},true);' +
+    'if(_ed.on){e.preventDefault();e.stopPropagation();doUndo();return}' +
+    'call("undoGen");e.preventDefault()' +
+    '},true);' +
     'document.addEventListener("dblclick",function(e){' +
     'if(!_ed.on)return;e.preventDefault();e.stopPropagation();' +
     'var t=e.target;if(_ed.el&&_ed.el!==t)desel(_ed.el);sel(t);_ed.el=t;_ed.drag=true;sendSel()},true);' +
@@ -467,18 +508,26 @@
     watchFrameErrors(frameErrToken);
   }
 
-  /* Avisa uma única vez por render se o jogo quebrou; os erros seguem no prompt. */
+  /* Aviso silencioso apenas para erros graves. Falsos positivos comuns
+     (console.error de bibliotecas, recurso 404, canvas em branco) são
+     ignorados. O relatório completo fica disponível no próximo prompt. */
   function watchFrameErrors(token) {
     var notified = false;
     function check() {
-      if (token !== frameErrToken) return;         /* já houve outro render */
+      if (token !== frameErrToken) return;
       if (generating || lastRendered == null) return;
       if (notified || !frameErrors.length) return;
+      /* Só notifica se houver erro REAL de JavaScript (tipo "error" ou "raf"),
+         ignorando "console", "resource", "promise" que são ruído comum. */
+      var grave = frameErrors.some(function (e) {
+        return e && (e.k === 'error' || e.k === 'raf');
+      });
+      if (!grave) return;
       notified = true;
-      toast('⚠ ' + frameErrors.length + ' erro(s) no jogo — peça a correção que a IA recebe os detalhes');
+      toast('⚠ ' + frameErrors.length + ' erro(s) no jogo');
     }
-    setTimeout(check, 2500);
-    setTimeout(check, 6000);   /* erros que só aparecem depois do primeiro segundo */
+    setTimeout(check, 3000);
+    setTimeout(check, 7000);
   }
 
   /* Decora com o tema atual; se a página já tem o bloco base, só troca. */
@@ -663,7 +712,8 @@
     canceladoPeloUsuario = false;
     lastProgressAt = 0;
     lastPrompt = prompt;
-    lastOpenName = null;   // nova geração → o nome sugerido volta ao slug do prompt
+    // Não zera lastOpenName aqui — se há um projeto aberto, continua sendo o mesmo.
+    // Só reseta no resetSession() ou ao abrir outro projeto.
     saveBtn.disabled = true;
     openBtn.disabled = true;
     status(lastRendered != null ? 'ajustando…' : 'gerando…', 'accent', false);
@@ -673,7 +723,7 @@
     var editing = lastRendered != null;
     genEditing = editing;               /* bloqueia prévia parcial em ajustes de página */
     var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt, lastRendered, mediaManifest);
-    var modo = window.Html.detectMode(prompt);   /* 'game' | 'drawing' | 'chat' */
+
     var elementHint = '';
     if (editing && editSelHtml) {   /* só faz sentido quando há página em tela */
       elementHint = '\n\nTarget element (user clicked this to edit):\n```html\n' + editSelHtml + '\n```\nFocus ONLY on this element. Change what was asked, keep the rest intact.';
@@ -744,10 +794,10 @@
        ausentes, parede de texto, trecho por fazer. UMA regeneração completa —
        e nunca em ajuste de página, que destruiria a página do usuário. */
     function repararQualidade(out, tentativa) {
-      if (editing || modo === 'chat') return Promise.resolve(out);
+      if (editing) return Promise.resolve(out);
       if (tentativa >= 1) return Promise.resolve(out);
       if (out.doc == null || window.Html.jsSyntaxErrors(out.doc).length) return Promise.resolve(out);
-      var falhas = window.Html.lint(out.doc, modo);
+      var falhas = window.Html.lint(out.doc);
       if (!falhas.length) return Promise.resolve(out);
       status('⚠ ajustando qualidade (' + falhas.length + ' falha' + (falhas.length > 1 ? 's' : '') + ')…', 'accent', false);
       liveOut = 0;
@@ -764,6 +814,88 @@
       }).catch(function (e) {
         if (canceladoPeloUsuario) throw e;
         return out;                       /* não perde o documento bom */
+      });
+    }
+
+    /* ============================================================
+     * ANTI-ERRO (ordem do Leo, 2026-10-21).
+     * A página JÁ está em tela. A telemetria do iframe (exceção,
+     * promise rejeitada, console.error, canvas nunca dimensionado ou
+     * em branco) é lida e, havendo erro real, o documento volta para o
+     * modelo com o relatório — sem o usuário precisar pedir nada.
+     * Máximo ANTI_ERR_MAX rodadas; nunca roda na prévia.
+     * ============================================================ */
+    function relatorioErros(lista) {
+      return lista.slice(0, 12).map(function (e, i) {
+        return (i + 1) + '. [' + e.k + (e.l ? ':' + e.l : '') + '] ' + e.m;
+      }).join('\n');
+    }
+
+    /* Espera a telemetria chegar e devolve só os erros DESTE render. */
+    function esperarTelemetria() {
+      var tok = frameErrToken;
+      return new Promise(function (res) {
+        setTimeout(function () {
+          var filtrados = (tok === frameErrToken ? frameErrors.slice(0) : []).filter(function (e) {
+            return e && (e.k === 'error' || e.k === 'promise' || e.k === 'raf');
+          });
+          res(filtrados);
+        }, ANTI_ERR_WAIT_MS);
+      });
+    }
+
+    function antiErro(doc, tentativa) {
+      return esperarTelemetria().then(function (erros) {
+        if (canceladoPeloUsuario) return { doc: doc, tentativas: tentativa, limpo: false };
+        if (!erros.length) {
+          return { doc: doc, tentativas: tentativa, limpo: true };
+        }
+        if (tentativa >= ANTI_ERR_MAX) {
+          /* Limite atingido: o relatório continua guardado para o próximo pedido. */
+          status('⚠ ' + erros.length + ' erro(s) na página', 'error', true);
+          toast('⚠ ' + erros.length + ' erro(s) — o relatório vai junto no próximo pedido');
+          return { doc: doc, tentativas: tentativa, limpo: false };
+        }
+        status('🔧 anti-erro (' + (tentativa + 1) + '/' + ANTI_ERR_MAX + ') · ' +
+          erros.length + ' erro(s)', 'accent', false);
+        liveOut = 0;
+        liveActive = true;
+        lastProgressAt = Date.now();
+        var msg = 'ANTI-ERROR REPORT — the page you just wrote is ALREADY RUNNING in the browser and it ' +
+          'really failed. These errors were captured from the live page, not guessed:\n\n' +
+          relatorioErros(erros) + '\n\n' +
+          'Broken document (complete):\n```html\n' + doc + '\n```\n\n' +
+          'Fix the ROOT CAUSE of every error above and keep every feature that already works. ' +
+          'Common causes: a three.js addon that does not exist in this build (no OrbitControls/GLTFLoader/EffectComposer), ' +
+          'element accessed before it exists, undefined variable, canvas never sized, geometry/material created but never ' +
+          'added to the scene, WebAudio started without a user gesture, CDN resource that failed to load. ' +
+          'Never remove features to silence an error — make the code correct. ' +
+          'Return the COMPLETE corrected HTML document. Output ONLY raw HTML, no explanations.';
+        return run(baseSystem, msg).then(function (r) {
+          var d = window.Html.extractDocument(r.content || '');
+          if (!window.Html.looksLikeDocument(r.content) || !d.trim() ||
+              window.Html.jsSyntaxErrors(d).length) {
+            status('⚠ correção automática inválida — página mantida', 'accent', true);
+            return { doc: doc, tentativas: tentativa, limpo: false };
+          }
+          /* O consumo da correção é consumo real do usuário. */
+          try {
+            if (r.totalTokens > 0) {
+              prefs.addSessionTokens(r.promptTokens, r.completionTokens);
+              prefs.addUsage(r.promptTokens, r.completionTokens);
+              updateSessionUi();
+            }
+          } catch (e) { /* contabilidade nunca derruba a correção */ }
+          lastRendered = d;
+          pushGenHistory();  // anti-erro: guarda antes de corrigir
+          render(themed(d));            /* zera frameErrors e rearma a telemetria */
+          liveActive = false;
+          return antiErro(d, tentativa + 1);
+        }).catch(function (e) {
+          if (canceladoPeloUsuario) return { doc: doc, tentativas: tentativa, limpo: false };
+          status('⚠ correção automática falhou — página mantida', 'accent', true);
+          return { doc: doc, tentativas: tentativa, limpo: false };
+        });
       });
     }
 
@@ -841,6 +973,7 @@
         failGeneration('resposta vazia do modelo');
         return;
       }
+      pushGenHistory();  // guarda a página atual antes da IA gerar a nova
       lastRendered = doc;
       editSelHtml = '';                    /* alvo consumido só quando a edição foi aplicada */
       lastCommands.push(prompt);
@@ -856,6 +989,19 @@
       status('✓ ' + kb + ' KB • ' + elapsed.toFixed(1) + 's', '', true);
       input.value = '';
       input.blur();
+      /* ANTI-ERRO: opcional (desligado por padrão em prefs.autoFix). Quando desligado,
+         os erros vão como contexto no próximo prompt manual, sem loop infinito automático. */
+      if (!prefs.autoFix()) {
+        return { doc: doc, tentativas: 0, limpo: true };
+      }
+      return antiErro(doc, 0);
+    }).then(function (r) {
+      if (canceladoPeloUsuario) canceladoPeloUsuario = false;
+      if (r && r.tentativas > 0 && r.limpo) {
+        var kb2 = Math.ceil(encoder.encode(r.doc).length / 1024);
+        status('✓ ' + kb2 + ' KB • anti-erro OK (' + r.tentativas + ')', '', true);
+        toast('🔧 ' + r.tentativas + ' erro(s) corrigido(s) automaticamente');
+      }
       finishGeneration();
     }).catch(function (e) {
       failGeneration(window.AiClient.errorMessage(e));
@@ -909,6 +1055,8 @@
     editCount = 0;
     frameErrors = [];
     lastCommands = [];
+    lastOpenName = null;    // reseta o vínculo com projeto salvo
+    clearGenHistory();
     updateSessionUi();
     showWelcome();
     toast('Sessão reiniciada');
@@ -944,58 +1092,61 @@
       toast('Gere uma página antes de salvar');
       return;
     }
-    showSaveDialog();
+    /* Se já tem projeto aberto, sobrescreve direto. */
+    if (lastOpenName) {
+      savePage(lastOpenName, true);
+      return;
+    }
+    /* Primeiro save da sessão: usa slug do prompt como nome. */
+    var name = defaultSaveName();
+    savePage(name, true);
   }
 
   function showSaveDialog() {
-    window.Store.folderLabel().then(function (folder) {
-      var root = el('div', 'mx-modal');
-      var card = el('div', 'mx-modal-card mx-modal-small');
-      card.appendChild(el('div', 'mx-modal-title', 'Salvar página'));
-      card.appendChild(el('div', 'mx-path', 'Pasta: ' + (folder || 'nexus77')));
-      var inp = el('input', 'mx-input');
-      inp.type = 'text';
-      inp.value = defaultSaveName();
-      card.appendChild(inp);
+    var root = el('div', 'mx-modal');
+    var card = el('div', 'mx-modal-card mx-modal-small');
+    card.appendChild(el('div', 'mx-modal-title', 'Salvar projeto'));
+    card.appendChild(el('div', 'mx-path', 'Pasta: salvos/ '));
+    var inp = el('input', 'mx-input');
+    inp.type = 'text';
+    inp.value = defaultSaveName();
+    card.appendChild(inp);
 
-      var row = el('div', 'mx-btnrow');
-      var cancel = el('button', 'mx-btn mx-btn-ghost', 'Cancelar');
-      cancel.type = 'button';
-      var ok = el('button', 'mx-btn mx-btn-inline mx-btn-primary', 'Salvar');
-      ok.type = 'button';
-      row.appendChild(cancel);
-      row.appendChild(ok);
-      card.appendChild(row);
-      root.appendChild(card);
-      document.body.appendChild(root);
+    var row = el('div', 'mx-btnrow');
+    var cancel = el('button', 'mx-btn mx-btn-ghost', 'Cancelar');
+    cancel.type = 'button';
+    var ok = el('button', 'mx-btn mx-btn-inline mx-btn-primary', 'Salvar');
+    ok.type = 'button';
+    row.appendChild(cancel);
+    row.appendChild(ok);
+    card.appendChild(row);
+    root.appendChild(card);
+    document.body.appendChild(root);
 
-      inp.focus();
-      inp.select();
+    inp.focus();
+    inp.select();
 
-      function close() {
-        document.removeEventListener('keydown', onKey);
-        if (root.parentNode) root.parentNode.removeChild(root);
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      if (root.parentNode) root.parentNode.removeChild(root);
+    }
+    function submit() {
+      var name = inp.value.trim();
+      if (!name) {
+        toast('Digite um nome');
+        return;
       }
-      function submit() {
-        var name = inp.value.trim();
-        if (!name) {
-          toast('Digite um nome');
-          return;
-        }
-        close();
-        savePage(name);
-      }
-      function onKey(e) {
-        if (e.key === 'Escape') { e.preventDefault(); close(); }
-        else if (e.key === 'Enter') { e.preventDefault(); submit(); }
-      }
-      document.addEventListener('keydown', onKey);
-      root.addEventListener('mousedown', function (e) { if (e.target === root) close(); });
-      cancel.addEventListener('click', close);
-      ok.addEventListener('click', submit);
-    }).catch(function (e) {
-      toast('Falha ao salvar: ' + (e && e.message ? e.message : e));
-    });
+      close();
+      savePage(name);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Enter') { e.preventDefault(); submit(); }
+    }
+    document.addEventListener('keydown', onKey);
+    root.addEventListener('mousedown', function (e) { if (e.target === root) close(); });
+    cancel.addEventListener('click', close);
+    ok.addEventListener('click', submit);
   }
 
   /* O HTML salvo é aberto por file:// — um <script src="js/nx-textures.js"> relativo
@@ -1008,7 +1159,9 @@
 
   function inlineTextures(html) {
     if (!NX_TEX_TAG_TEST.test(html)) return Promise.resolve(html);
-    return fetch(APP_BASE + 'js/nx-textures.js', { cache: 'force-cache' }).then(function (r) {
+    /* no-cache (revalidação) e NÃO force-cache: com o pack em cache antigo o
+       arquivo salvo inlinava uma versão sem as APIs novas e o jogo quebrava. */
+    return fetch(APP_BASE + 'js/nx-textures.js', { cache: 'no-cache' }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
     }).then(function (src) {
@@ -1089,27 +1242,23 @@
     });
   }
 
-  function savePage(rawName) {
+  function savePage(rawName, silent) {
     var doc = lastRendered;
     if (!doc) return;
-    var named = window.Store.fileName(rawName);
+    var named = window.Store.sanitizeName(rawName);
+    var promptText = lastPrompt || '';
     saveBtn.disabled = true;
-    inlineTextures(themed(sanitizeSnapshotHtml(doc))).then(inlineMedia).then(function (html) {
-      return window.Store.folderLabel().then(function (folder) {
-        /* Primeiro save: pede a pasta (o clique em "Salvar" dá a ativação). */
-        if (!folder && window.Store.supportsFolder()) {
-          return window.Store.pickFolder().then(function () { return true; }).catch(function () { return false; });
-        }
-        return true;
-      }).then(function () {
-        return Promise.all([window.Store.save(named, html), window.Store.folderLabel()]);
-      });
-    }).then(function (res) {
+    var existingProject = lastOpenName ? window.Store.sanitizeName(lastOpenName) : null;
+    var prepared = existingProject
+      ? window.Store.inlineProjectAssets(existingProject, themed(sanitizeSnapshotHtml(doc)))
+      : Promise.resolve(themed(sanitizeSnapshotHtml(doc)));
+    prepared.then(inlineTextures).then(function (html) {
+      return window.Store.saveWithAssets(named, html, promptText);
+    }).then(function (saved) {
       saveBtn.disabled = false;
-      var saved = res[0];
-      var folder = res[1] || 'pasta nexus77';
-      status('✓ salvo: ' + saved, 'accent', false);
-      toast('Salvo em ' + folder + '/' + saved);
+      lastOpenName = saved;
+      if (!silent) status('✓ salvo: ' + saved, 'accent', false);
+      toast('Salvo em salvos/' + saved);
     }).catch(function (e) {
       saveBtn.disabled = false;
       toast('Falha ao salvar: ' + (e && e.message ? e.message : e));
@@ -1139,6 +1288,17 @@
       if (text == null || !String(text).trim()) {
         toast('Arquivo vazio ou não encontrado');
         return;
+      }
+      /* Injeta/atualiza <base> para assets resolverem da pasta do projeto. */
+      var baseUrl = window.Store.projectBaseUrl(name);
+      if (/<base\b/i.test(text)) {
+        text = text.replace(/<base\b[^>]*>/i, '<base href="' + baseUrl + '">');
+      } else if (/<head[^>]*>/i.test(text)) {
+        text = text.replace(/<head[^>]*>/i, function (m) { return m + '<base href="' + baseUrl + '">'; });
+      } else if (/<html[^>]*>/i.test(text)) {
+        text = text.replace(/<html[^>]*>/i, function (m) { return m + '<head><base href="' + baseUrl + '"></head>'; });
+      } else {
+        text = '<head><base href="' + baseUrl + '"></head>' + text;
       }
       lastRendered = text;
       lastOpenName = name;   // SALVAR sugere o próprio nome deste arquivo
@@ -1252,6 +1412,49 @@
         toast('Falha ao excluir: ' + (e && e.message ? e.message : e));
       });
     });
+  }
+
+  function renameSavedDialog(name) {
+    var root = el('div', 'mx-modal');
+    var card = el('div', 'mx-modal-card mx-modal-small');
+    card.appendChild(el('div', 'mx-modal-title', 'Renomear projeto'));
+    card.appendChild(el('div', 'mx-msg', 'Escolha o novo nome para "' + String(name) + '".'));
+    var inputName = document.createElement('input');
+    inputName.type = 'text';
+    inputName.value = String(name || '');
+    inputName.maxLength = 80;
+    inputName.autocomplete = 'off';
+    inputName.className = 'mx-input';
+    card.appendChild(inputName);
+    var row = el('div', 'mx-btnrow');
+    var cancel = el('button', 'mx-btn mx-btn-ghost', 'Cancelar');
+    var ok = el('button', 'mx-btn mx-btn-inline mx-btn-primary', 'Renomear');
+    cancel.type = ok.type = 'button';
+    row.appendChild(cancel); row.appendChild(ok); card.appendChild(row);
+    root.appendChild(card); document.body.appendChild(root);
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      if (root.parentNode) root.parentNode.removeChild(root);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      if (e.key === 'Enter' && document.activeElement === inputName) { e.preventDefault(); ok.click(); }
+    }
+    document.addEventListener('keydown', onKey);
+    root.addEventListener('mousedown', function (e) { if (e.target === root) close(); });
+    cancel.addEventListener('click', close);
+    ok.addEventListener('click', function () {
+      var novo = String(inputName.value || '').trim();
+      if (!novo) { inputName.focus(); return; }
+      ok.disabled = true;
+      window.Store.rename(name, novo).then(function (novoNome) {
+        close(); openSavedList(); toast('Renomeado para ' + novoNome);
+      }).catch(function (e) {
+        ok.disabled = false;
+        toast('Erro ao renomear: ' + (e && e.message ? e.message : e));
+      });
+    });
+    inputName.focus(); inputName.select();
   }
 
   /* ---------- init ---------- */
@@ -1798,16 +2001,21 @@
         sendPrompt();
       }
     });
-    /* Ctrl+Z / Cmd+Z: desfaz a última ação de edição */
+    /* Ctrl+Z / Cmd+Z: desfaz edição visual OU geração da IA */
     document.addEventListener('keydown', function (e) {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
       if (String(e.key).toLowerCase() !== 'z') return;
       var ae = document.activeElement;
       var tg = ae && ae.tagName ? ae.tagName.toUpperCase() : '';
       if (tg === 'INPUT' || tg === 'TEXTAREA') return;   /* deixa o undo nativo do campo */
-      if (!editMode && !editPopup) return;
+      if (editMode || editPopup) {
+        e.preventDefault();
+        tryPostMessage({ undo: true });
+        return;
+      }
+      /* Fora do modo edição: Ctrl+Z desfaz a última geração da IA */
       e.preventDefault();
-      tryPostMessage({ undo: true });
+      undoGen();
     });
 
     /* Bridge exposta às páginas do iframe (window.Nexus77). */
@@ -1822,6 +2030,22 @@
       closeList: function () { closeSavedList(); },
       pickFile: function () { pickHtmlFile(); },
       deleteSaved: function (name) { deleteSaved(String(name)); },
+      renameSaved: function (json) {
+        try {
+          var d = JSON.parse(json);
+          if (!d || !d.name) throw new Error('projeto sem nome');
+          if (d.novo) {
+            window.Store.rename(d.name, d.novo).then(function (novoNome) {
+              openSavedList(); toast('Renomeado para ' + novoNome);
+            }).catch(function (e) { toast('Erro ao renomear: ' + (e.message || e)); });
+          } else {
+            renameSavedDialog(String(d.name));
+          }
+        } catch (e) { toast('Erro ao renomear'); }
+      },
+      duplicateSaved: function (name) {
+        window.Store.duplicate(String(name)).then(function(novoNome){ openSavedList(); toast('Duplicado como ' + novoNome); }).catch(function(e){ toast('Erro: ' + (e.message||e)); });
+      },
       openUrl: function (url) {
         try { window.open(String(url), '_blank', 'noopener'); } catch (e) { /* ignora */ }
       }
@@ -1830,7 +2054,8 @@
     /* Recebe as chamadas da página (shim postMessage) — whitelist. */
     var BRIDGE_METHODS = {
       setInput: true, openSaved: true, closeList: true,
-      pickFile: true, deleteSaved: true, openUrl: true, editSel: true
+      pickFile: true, deleteSaved: true, openUrl: true, editSel: true,
+      renameSaved: true, duplicateSaved: true
     };
     window.addEventListener('message', function (e) {
       var d = e.data;
@@ -1860,6 +2085,10 @@
       if (m === 'editClose') {
         removePopupDom();
         editInfo = null;
+        return;
+      }
+      if (m === 'undoGen') {
+        undoGen();
         return;
       }
       if (m === 'editDragging') {
