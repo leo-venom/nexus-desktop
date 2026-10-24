@@ -175,11 +175,10 @@ iframe.srcdoc → PÁGINA HTML + anti-erro opcional
 
 ## 7. Pendências operacionais
 
-- O trabalho da v3.0.0 + v3.0.1 foi commitado em 2026-10-24. Os 3 projetos de teste em
-  `salvos/` ficaram fora do commit (permanecem não rastreados).
+- O trabalho da v3.0.0 + v3.0.1 foi commitado em 2026-10-24. Projetos de teste em
+  `salvos/` (ex.: `cobras-10-vidas`, `luz-do-dia-com-nuvems`, `tema-cyber`, `tetris-3d`)
+  permanecem não rastreados.
 - `desktop/node_modules` (298 MB) permanece dentro do Vault (ignorado pelo git); afeta
   indexação/backup do Obsidian.
 - `salvos/*/_backups/` de projetos antigos estão rastreados no git (14 arquivos); novos projetos não.
-- As 3 pastas não rastreadas em `salvos/` (`cobras-10-vidas`, `luz-do-dia-com-nuvems`,
-  `tema-cyber`) são projetos de teste — decidir se entram no git ou saem.
 - Tags git param em `v2.13.0`; falta criar a tag `v3.0.1` no commit atual.
