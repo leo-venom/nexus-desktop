@@ -17,10 +17,13 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
 <div id="summary">Pronto</div><div id="log" aria-live="polite"></div>
 <script src="js/themes.js"></script>
 <script src="js/prefs.js"></script>
+<script src="js/library-selector.js"></script>
 <script src="js/html-builder.js"></script>
 <script src="js/ai-client.js"></script>
 <script src="js/store.js"></script>
-<script src="js/nx-textures.js"></script>
+<script src="js/nx-materials.js"></script>
+<script src="js/nx-shaders.js"></script>
+<script src="js/nx-loaders.js"></script>
 <script>
 (function () {
   'use strict';
@@ -30,7 +33,7 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
   function test(name, fn) { return { name: name, fn: fn }; }
   var tests = [
     test('Módulos do app carregados', function () {
-      ['Prefs', 'Themes', 'Html', 'AiClient', 'Store', 'NxTex'].forEach(function (key) { assert(window[key], key + ' indisponível'); });
+      ['Prefs', 'Themes', 'LibrarySelector', 'Html', 'AiClient', 'Store', 'NxMat', 'NxShader', 'NxLoad'].forEach(function (key) { assert(window[key], key + ' indisponível'); });
     }),
     test('Store.sanitizeName', function () {
       var fn = window.Store.sanitizeName;
@@ -45,15 +48,28 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
       assert(typeof Store.saveWithAssets === 'function', 'saveWithAssets');
       assert(typeof Store.extractAssetsFromHtml === 'function', 'extractAssetsFromHtml');
     }),
-    test('Diretiva contém regras e caminhos atuais', function () {
+    test('Diretiva contém as 7 regras e o layout canônico', function () {
       var directive = String(Html.DIRECTIVE || '');
       for (var i = 1; i <= 7; i++) assert(directive.indexOf('REGRA ' + i) >= 0, 'REGRA ' + i);
+      assert(directive.indexOf('REGRA 6 — JOGO EM TELA CHEIA, BARRA 15px') >= 0, 'REGRA 6 com barra de 15px');
       assert(directive.indexOf('assets/') >= 0, 'convenção assets/');
+      assert(!/BARRAS 5px/.test(directive), 'título antigo de 5px ainda presente');
     }),
-    test('NxTex lista as texturas distribuídas', function () {
-      var names = NxTex.names();
-      assert(Array.isArray(names) && names.length >= 88, 'quantidade inesperada: ' + (names && names.length));
-      assert(names.indexOf('diamante') >= 0, 'diamante ausente');
+    test('NxMat lista os 22 materiais PBR', function () {
+      var names = NxMat.names();
+      assert(Array.isArray(names) && names.length === 22, 'quantidade inesperada: ' + (names && names.length));
+      assert(names.indexOf('metal_dourado') >= 0, 'metal_dourado ausente');
+    }),
+    test('NxShader lista os shaders e os chunks', function () {
+      var names = NxShader.names();
+      assert(Array.isArray(names) && names.length >= 28, 'quantidade inesperada: ' + (names && names.length));
+      assert(names.indexOf('holograma') >= 0, 'holograma ausente');
+      assert(NxShader.chunks().length === 7, 'chunks inesperados');
+    }),
+    test('LibrarySelector expõe o catálogo de 24 bibliotecas', function () {
+      var total = Object.keys(LibrarySelector.LIBRARIES).length;
+      assert(total === 24, 'quantidade inesperada: ' + total);
+      assert(LibrarySelector.LIBRARIES.three && LibrarySelector.LIBRARIES.shaderGLSL, 'entradas essenciais ausentes');
     }),
     test('API de projetos responde somente leitura', async function () {
       var response = await fetch('/_api/saves', { method: 'GET', cache: 'no-store' });

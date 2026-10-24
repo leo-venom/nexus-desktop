@@ -1,5 +1,8 @@
 # Análise de viabilidade — trocar o motor HTML/three.js por Godot/GDScript
 
+> ⚠️ **DOCUMENTO HISTÓRICO (v2.13.0)** — a decisão do Leo em 2026-10-21 foi manter o motor
+> HTML/three.js. O veredito continua válido na v3.0.1; números de versão são da época.
+
 Data: 2026-10-21 · Base: NEXUS GAME v2.13.0 (commit d5e5a0f, árvore local com docs modificados)
 
 ## Veredito curto

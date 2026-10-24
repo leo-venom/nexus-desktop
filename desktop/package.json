@@ -1,7 +1,7 @@
 {
   "name": "nexus-game",
   "productName": "NEXUS GAME",
-  "version": "2.15.1",
+  "version": "3.0.1",
   "private": true,
   "description": "NEXUS GAME — gerador de jogos HTML completos com IA, rodando em Chromium embutido",
   "main": "main.js",

@@ -2,7 +2,9 @@
 __pycache__/
 .env
 *.log
+*.bak-*
 /tmp/
 .DS_Store
 node_modules/
 desktop/node_modules/
+web/_tmp_t/

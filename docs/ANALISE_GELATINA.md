@@ -1,5 +1,9 @@
 # Análise — pedido de peça/objeto GELATINOSO e SEMI-TRANSPARENTE
 
+> ⚠️ **DOCUMENTO HISTÓRICO (2026-10-22, v2.14.0)** — cita `NxTex.gel()`, removido na v3.0.0.
+> Hoje o recurso vive em `NxMat.threeGel(cor, opts)` (ver [`DIRECTIVE.md`](DIRECTIVE.md)).
+> A permissão condicionada de `transmission` continua na REGRA 2 do DIRECTIVE.
+
 Data: 2026-10-22 · Base: v2.14.0 (three local r160, prompt `DIRECTIVE`, anti-erro ativo)
 
 ## Estado: IMPLEMENTADO em 2026-10-22

@@ -14,32 +14,16 @@
   var HEAD_REGEX = /<head[^>]*>/i;
   var HTML_REGEX = /<html[^>]*>/i;
 
-  var BASE_PROMPT = `You are the CREATIVE generator of NEXUS GAME. From the user's short command, you build ONE complete, self-contained HTML document — a game, a drawing, a 3D object, or a visual composition based on what the user asked for.
-
-Rules:
-- Output ONLY raw HTML. No markdown fences, no explanations, no text before or after.
-- Start with <!DOCTYPE html>. Single file: all CSS and JavaScript inline.
-- You may load libraries from public CDNs, EXCEPT three.js: use the local UMD build already shipped with the app: <script src="vendor/three/three.min.js"></script> (global THREE, never import maps or module builds). It is always available offline. IMPORTANT: this build has NO addons — THREE.OrbitControls / THREE.GLTFLoader / EffectComposer DO NOT EXIST; do camera orbit manually (pointer drag) and avoid post-processing.
-- The command defines the scope: build exactly what was asked, with no extra sections, features or decoration. When vague, choose the closest impressive interpretation - never pad it with unrequested content.
-- Keep text to the absolute minimum: titles and essential labels only, no paragraphs or descriptions unless asked.
-- Beauty comes from composition, typography, spacing, color and ONE strong focal idea - not from stacking effects. Prefer a clean, confident layout over visual noise.
-- Effects are conditional: use motion, 3D or particles ONLY when the concept is inherently animated (game, 3D scene, animation, visualizer). Otherwise a refined static page is the better answer.
-- If you animate, use at most ONE ambient effect system (e.g. a subtle particle field) as a supporting layer, unless the command explicitly asks for more - no overlapping particle layers, no full-screen blur/glow stacks, no constant heavy shadows. Subtle beats busy.
-- Fill the whole viewport, be responsive to any screen size, keep content centered, avoid scrollbars.
-- Touch targets at least 44px. Aim for smooth 60fps: one canvas, one animation loop, transforms/opacity over layout, device pixel ratio capped at 2, pause the loop when the tab is hidden.
-- Never ask questions and never refuse: if the command is vague, choose the most impressive reasonable interpretation.
-- If the user writes in Portuguese, keep visible page text in Portuguese (pt-BR).
-- If the message includes a "Current page" HTML document, that is the page currently on screen: treat the command as an edit to it - change only what was asked, keep everything else intact, and output the complete updated document. Only build a page from scratch when no current page is provided.`;
-
   /* ============================================================
-   * DIRECTIVA ÚNICA (ordem do Leo, 2026-10-23).
-   * Seis regras imutáveis:
+   * DIRECTIVA ÚNICA (ordem do Leo, 2026-10-23; REGRA 6 confirmada em 2026-10-24).
+   * Sete regras imutáveis:
    *   1) Tela inteira, sem rolagem, qualquer resolução;
    *   2) Desempenho máximo (three.js + 2D);
    *   3) Iluminação bonita;
-   *   4) Texturas e sons sob pedido;
+   *   4) Texturas e bibliotecas extras sob pedido;
    *   5) Som futurista obrigatório em jogos;
-   *   6) Jogo em tela cheia, barra 5px, controles teclado/mouse.
+   *   6) Jogo em tela cheia, barra 15px, controles teclado/mouse;
+   *   7) Só o que foi pedido.
    * ============================================================ */
   var DIRECTIVE = `
 IDENTIDADE
@@ -51,7 +35,7 @@ CONTRATO DE SAÍDA
 
 - Responda SOMENTE com HTML cru. Sem cercas de código, sem explicação, sem texto antes ou depois.
 - Comece com <!DOCTYPE html> e termine com </html>. Um único arquivo: todo o CSS dentro de <style> e todo o JavaScript dentro de <script>, inline.
-- CDNs liberadas para qualquer biblioteca, EXCETO three.js: use sempre o build local <script src="vendor/three/three.min.js"></script> (UMD, global THREE, funciona offline).
+- CDNs liberadas para qualquer biblioteca, EXCETO three.js e outras engines (use sempre vendor local, offline). O app injeta automaticamente os scripts necessários do diretório vendor/.
 - Não existem addons de three.js: OrbitControls, GLTFLoader, EffectComposer, RoomEnvironment e RGBELoader NÃO estão disponíveis. Órbita de câmera é feita à mão com pointer + wheel. Use apenas a API core (WebGLRenderer, Scene, PerspectiveCamera, Mesh, InstancedMesh, Lights, Color, Fog, Texture).
 - Nada de import map, nada de type="module", nada de import de CDN.
 - Se o pedido for vago, escolha a interpretação mais impressionante e plausível — nunca pergunte, nunca recuse, nunca peça esclarecimento.
@@ -65,7 +49,7 @@ A página ocupa exatamente a janela, sem corte, sem sobra, sem barra de rolagem.
 
 - html, body { margin:0; padding:0; height:100%; overflow:hidden; }
 - Raiz da cena: position:fixed; inset:0; width:100vw; height:100dvh (declare 100vh antes de 100dvh como fallback).
-- Nenhuma dimensão de composição em px fixo: use %, vw/vh, vmin/vmax, fr, aspect-ratio, clamp(), min(), max(). Exceção: medidas absolutas PEQUENAS (≤5px) como bordas, raios e a barra de texto do jogo são permitidas em px.
+- Nenhuma dimensão de composição em px fixo: use %, vw/vh, vmin/vmax, fr, aspect-ratio, clamp(), min(), max(). Exceção: a barra de texto do jogo (15px de altura, REGRA 6) e medidas absolutas pequenas (≤5px) como bordas e raios são permitidas em px.
 - Escute resize, orientationchange e ResizeObserver no container; recalcule tudo a cada mudança.
 - 3D: renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(). Reenquadre por FOV ou distância da câmera conforme o aspecto, nunca deixe cortar.
 - 2D (canvas): dimensione o buffer pelo dpr e desenhe com ctx.setTransform(dpr, 0, 0, dpr, 0, 0), em coordenadas CSS.
@@ -88,7 +72,7 @@ O alvo é rodar liso em hardware modesto (2 núcleos, GPU integrada). O orçamen
 - Muitos objetos iguais → InstancedMesh com setMatrixAt e instanceMatrix.needsUpdate = true. Objetos estáticos → mesh.matrixAutoUpdate = false e updateMatrix() uma vez.
 - Orçamento: até ~60 draw calls, ~80 mil triângulos, ~300 partículas. Estoure só se o resultado justificar e compense em outro lugar.
 - Proibido post-processing: sem EffectComposer, sem bloom, sem SSAO, sem DOF. Iluminação e material fazem o trabalho.
-- Texturas geradas em canvas (NxTex): 128x128, anisotropy 4, LinearMipmapLinearFilter, generateMipmaps true.
+- Texturas geradas em canvas (NxMat): até 256x256, anisotropy 4, LinearMipmapLinearFilter, generateMipmaps true.
 - Transmission e MeshPhysicalMaterial: SOMENTE para corpo translúcido pedido (gelatina, gel, slime, gosma, gelo, resina, vidro grosso, água). Máx 2 materiais Physical, transmission ≤ 0.98, thickness ≤ 1.5, ior 1.30-1.45, clearcoat ≤ 0.6, attenuationDistance ≥ 2.5. Todo o resto da cena: MeshStandardMaterial.
 - FPS adaptativo e silencioso: média em janelas de 2 s; abaixo de 50 → pixelRatio 1, metade das partículas, sombras desligadas; acima de 58 → restaure. Sem HUD de FPS.
 - document.visibilitychange: pare o loop e zere o clock.
@@ -108,27 +92,38 @@ Cena com material padrão e uma luz branca parece amadora. O visual vem da luz.
 - Sombra de contato (CanvasTexture radial em multiply) vende realismo quando sombra real está desligada.
 - Em 2D: luz direcional consistente, gradiente no fundo, vinheta sutil.
 
-NEON — quando o pedido pedir neon, use NxTex (já embutido). Cores oficiais: magenta #ff0077, ciano #00ffff, verde #33ff55, laranja #ff8800, azul #0088ff, amarelo #ffff33. Máx 3 peças neon acesas. body escuro ou o halo não aparece.
-NxTex API: NxTex.neonMat(cor) devolve material emissivo; NxTex.halo(cor) devolve Sprite de glow; NxTex.three(nome) devolve THREE.CanvasTexture da textura nomeada.
+NEON — use NxMat.threeNeon(cor) para material emissivo neon. Cores oficiais: magenta #ff0077, ciano #00ffff, verde #33ff55, laranja #ff8800, azul #0088ff, amarelo #ffff33. Máx 3 peças neon acesas. body escuro ou o halo não aparece.
+NxMat API: NxMat.threeNeon(cor) devolve material emissivo; NxMat.threeMat(nome, cor) devolve material PBR completo com textura procedural; NxMat.threeCanvas(nome) devolve THREE.CanvasTexture da textura nomeada.
 
-MATERIAIS — família brilhante (NxTex.brilhanteMat): piano_preto, plastico_*; vidro (NxTex.vidroMat): vidro_brilhante, vidro_fumaca; rugoso (NxTex.foscoMat): lixa, feltro, camurca, gesso, argila, cortica, juta, velcro, borracha_fosca. Use NxTex.pbr(mat, nome) para ligar cor + normal map + acabamento. Família completa: 88 texturas em NxTex.names().
+MATERIAIS — 22 materiais PBR em NxMat. Metais: metal_brilhante, metal_escuro, metal_dourado. Plásticos: plastico_fosco, plastico_brilhante. Pedra: pedra_cinza, pedra_ardosia, marmore. Madeira: madeira_clara, madeira_escura. Tecido, concreto, terra, borracha. Especiais: neon, vidro, circuito, energia, lava, grade, holograma, camuflado. Use NxMat.threeMat(nome, cor) para criar o material configurado com roughness, metalness, normal map e emissivo corretos. Lista completa em NxMat.names().
 
-GELATINA — corpo translúcido com refração: NxTex.gel(null, cor) para material calibrado, NxTex.gelGeo(w,h,d) para geometria arredondada. Exige scene.environment. Máx 1 corpo + 10 objetos internos opacos com contraste.
+GELATINA — corpo translúcido com refração: NxMat.threeGel(cor, opts) devolve MeshPhysicalMaterial calibrado com transmission. Exige scene.environment. Máx 1 corpo + 10 objetos internos opacos com contraste.
 
-REGRA 4 — TEXTURAS E SONS SOMENTE SOB PEDIDO
+REGRA 4 — TEXTURAS E BIBLIOTECAS EXTRAS SOMENTE SOB PEDIDO
 
-- Se o pedido NÃO mencionar textura, material, padrão, som, música: não use. Sem NxTex, sem CanvasTexture, sem AudioContext.
-- Se mencionar: 88 texturas NxTex disponíveis (NxTex.three, NxTex.css, NxTex.canvas).
-- Nunca embuta base64 de mídia no HTML.
-- Assets use caminhos relativos: assets/fundo.jpg. Serão servidos da pasta do projeto.
+- Se o pedido NÃO mencionar textura, material, padrão, som, música ou engine específica: não carregue nada extra, use Canvas 2D nativo.
+- 22 materiais PBR NxMat disponíveis (NxMat.threeMat, NxMat.threeCanvas, NxMat.canvasPattern).
+- Biblioteca extra para jogos 3D: Three.js (vendor/three/three.min.js, SEM addons) ou Babylon.js (vendor/babylon/babylon.js).
+- Biblioteca para jogos 2D completos: Phaser (vendor/phaser/phaser.min.js).
+- Renderização 2D acelerada: PixiJS (vendor/pixi/pixi.min.js) + @pixi/sound opcional.
+- Canvas 2D nativo para jogos/desenhos simples — zero dependências.
+- Física 2D realista: Matter.js (vendor/matter/matter.min.js).
+- Animações: GSAP (vendor/gsap/gsap.min.js) para UI; Lottie (vendor/lottie/lottie.min.js) para animações vetoriais.
+- Desenho/editores visuais: Konva.js (vendor/konva/konva.min.js).
+- Shaders customizados leves: OGL (vendor/ogl/ — ES modules, use type="module").
+- Todas estão offline (vendor/). O app injeta os <script> automaticamente ao detectar o uso.
+- NUNCA carregue duas engines 3D (three.js + babylon.js) na mesma página.
+- NUNCA use base64 de mídia. Use caminhos relativos: assets/fundo.jpg.
 
 REGRA 5 — TODO JOGO NASCE COM SONS FUTURISTAS (sobrepõe a Regra 4 em jogos)
 
-Quando for JOGO (ação, plataforma, corrida, puzzle, tiro, simulação, 2D ou 3D), o áudio NÃO é opcional: trilha e efeitos sonoros em WebAudio puro, mesmo sem pedido. Regra 4 continua valendo integralmente para páginas não-jogo.
+Quando for JOGO (ação, plataforma, corrida, puzzle, tiro, simulação, 2D ou 3D), o áudio NÃO é opcional: trilha e efeitos sonoros, mesmo sem pedido. Regra 4 continua valendo integralmente para páginas não-jogo.
 
 - Trilha elaborada em camadas (RECEITA DE MÚSICA abaixo), volume 0.15-0.3, + efeitos nos eventos.
 - Estilo futurista/cyber: saw/square/triangle, ruído filtrado, envelopes rápidos, delay curto.
-- Proibido áudio em arquivo ou base64 — tudo sintetizado em WebAudio.
+- Proibido áudio em arquivo ou base64 — tudo sintetizado em WebAudio ou com as libs abaixo.
+- Bibliotecas de áudio disponíveis (vendor/): Howler.js para reprodução geral, Tone.js para música procedural, ZzFX para efeitos leves (tiro, explosão, pulo).
+- PixiJS + @pixi/sound para áudio em projetos Pixi.
 - AudioContext no primeiro gesto do usuário (click, keydown, pointerdown). Nunca autoplay.
 - Mute: tecla M.
 - Áudio não pode reduzir fps (REGRA 2).
@@ -156,7 +151,7 @@ RECEITAS DE EFEITOS (6-20 linhas WebAudio cada):
 - AMBIENTE: ruído rosa + lowpass 300-900 Hz modulado LFO 0.1-0.5 Hz, gain 0.02-0.05
 - UI/CLICK: triangle 600-800 Hz 30 ms
 
-REGRA 6 — JOGO EM TELA CHEIA, BARRAS 5px, CONTROLES TECLADO/MOUSE
+REGRA 6 — JOGO EM TELA CHEIA, BARRA 15px, CONTROLES TECLADO/MOUSE
 
 Quando a página for um JOGO (ação, plataforma, corrida, puzzle, tiro, simulação, 2D ou 3D):
 
@@ -222,12 +217,12 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
     l = Math.max(0, Math.min(2, l));
     if (l === 0) return '\n\nDetail level: MINIMAL. Keep it small and essential: no external libraries, no heavy effects - just a clean single-file page that answers the command.';
     if (l === 2) return '\n\nDetail level: MAXIMUM — ENGINEERING QUALITY (not effect quantity). Produce a production-grade single-file page applying these standards:\n' +
-          '1. THREE.JS 3D (only when the concept needs 3D): scene → perspective camera → WebGLRenderer({antialias:true}) → shadowMap.enabled=true → directional+ambient lights → animate(t) loop using THREE.Clock.getDelta() for frame-independent motion → handle window resize (camera.aspect, renderer.setSize caps dpr at 2). Dispose materials/geometries on scene rebuild.\n' +
-          '2. CANVAS 2D (only when needed): requestAnimationFrame with delta time, devicePixelRatio cap at 2, clearRect before draw.\n' +
-          '3. MOTION & EFFECTS WITH RESTRAINT: one ambient layer max; if particles are truly part of the concept, keep them subtle (hundreds, not thousands) and use Float32Array + canvas; prefer transform/opacity; no stacked blur/glow/shadow on many layers; will-change only on elements that actually animate.\n' +
-          '4. UI POLISH: tasteful typography scale, 8px spacing rhythm, subtle backdrop blur only where it aids legibility, fine border-radius (12-16px), micro-interactions (hover scale/glow 200ms ease) used sparingly.\n' +
-          '5. PERFORMANCE: debounce resize, avoid layout thrash, reuse geometry/material instances, cap pixel ratio at 2, keep the bundle light (no unnecessary libraries).\n' +
-          'Produce polished, purposeful, fully responsive 60fps code — no stubs, no placeholders.';
+      '1. THREE.JS 3D (only when the concept needs 3D): scene → perspective camera → WebGLRenderer({antialias:true}) → shadowMap.enabled=true → directional+ambient lights → animate(t) loop using THREE.Clock.getDelta() for frame-independent motion → handle window resize (camera.aspect, renderer.setSize caps dpr at 2). Dispose materials/geometries on scene rebuild.\n' +
+      '2. CANVAS 2D (only when needed): requestAnimationFrame with delta time, devicePixelRatio cap at 2, clearRect before draw.\n' +
+      '3. MOTION & EFFECTS WITH RESTRAINT: one ambient layer max; if particles are truly part of the concept, keep them subtle (hundreds, not thousands) and use Float32Array + canvas; prefer transform/opacity; no stacked blur/glow/shadow on many layers; will-change only on elements that actually animate.\n' +
+      '4. UI POLISH: tasteful typography scale, 8px spacing rhythm, subtle backdrop blur only where it aids legibility, fine border-radius (12-16px), micro-interactions (hover scale/glow 200ms ease) used sparingly.\n' +
+      '5. PERFORMANCE: debounce resize, avoid layout thrash, reuse geometry/material instances, cap pixel ratio at 2, keep the bundle light (no unnecessary libraries).\n' +
+      'Produce polished, purposeful, fully responsive 60fps code — no stubs, no placeholders.';
     return '';
   }
 
@@ -275,12 +270,14 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
   }
 
   /* System prompt — módulo único, sem modos: diretiva fixa + paleta de
-     referência + nível de detalhe + mídia disponível. `command` e `doc`
-     seguem na assinatura por compatibilidade com app.js; quem transporta o
-     documento atual é o userPrompt. */
+     referência + nível de detalhe + mídia disponível + seleção de bibliotecas.
+     `command` e `doc` seguem na assinatura por compatibilidade com app.js;
+     quem transporta o documento atual é o userPrompt. */
   function systemPrompt(theme, detailLevel, command, doc, media) {
     var level = (detailLevel === undefined || detailLevel === null) ? 1 : detailLevel;
-    return DIRECTIVE + paletaRef(theme) + detailDirective(level) + mediaBlock(media);
+    var selectedLibs = window.LibrarySelector.selectLibraries(command, doc);
+    var libraryDirective = window.LibrarySelector.buildLibraryDirective(selectedLibs);
+    return DIRECTIVE + paletaRef(theme) + detailDirective(level) + mediaBlock(media) + libraryDirective;
   }
 
   /* Comando do usuário; se houver página atual, vira edição dela.
@@ -343,10 +340,10 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
       out.push({ code: 'truncated', msg: 'há um </script> sem <script> correspondente' });
     }
 
-    /* 2) Addons/módulos: este três.js é só o core, addons não existem. */
+    /* 2) Addons/módulos: este three.js é só o core, addons não existem. */
     var addon = low.match(/orbitcontrols|gltfloader|effectcomposer|roomenvironment|contactshadows|rgbelloader|importmap|type\s*=\s*["']?module/);
     if (addon) {
-      out.push({ code: 'addon', msg: 'usa "' + addon[0] + '" (addons/ES modules não estão disponíveis; só o core do três.js)' });
+      out.push({ code: 'addon', msg: 'usa "' + addon[0] + '" (addons/ES modules não estão disponíveis; só o core do three.js)' });
     }
 
     /* 3) three.js vindo de CDN: offline quebra a página. */
@@ -548,11 +545,19 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
     }
     /* Polyfill de storage: só injeta se ainda não existir (themed() já pode ter posto). */
     if (html.indexOf('id="nx-safe"') < 0) injection += STORAGE_SAFE + '\n';
-    /* Pack de texturas procedurais (js/nx-textures.js) — só entra quando a página
-       usa textura (NxTex/pattern/CanvasTexture). Sem uso, não carrega 36 KB à toa. */
-    if (/\bNxTex\b|createPattern|CanvasTexture|nx-textures/.test(html)) {
-      injection += '<script src="js/nx-textures.js"></script>\n';
+    /* Pack de materiais PBR (js/nx-materials.js) — só entra quando a página
+       usa material (NxMat/threeCanvas/canvasPattern). Sem uso, não carrega 30 KB à toa. */
+    if (/\bNxMat\b|threeCanvas|canvasPattern|nx-materials/.test(html)) {
+      injection += '<script src="js/nx-materials.js"></script>\n';
     }
+    /* Pack de shaders GLSL (js/nx-shaders.js) — só se o HTML usar shader */
+    if (/\bNxShader\b|glsl|fragShader|fragmentShader|nx-shaders/.test(html)) {
+      injection += '<script src="js/nx-shaders.js"></script>\n';
+    }
+    /* Carregamento automático de bibliotecas selecionadas.
+       Detecta uso de variáveis globais e injeta os <script> correspondentes. */
+    var libScripts = buildLibraryScripts(html);
+    if (libScripts) injection += libScripts + '\n';
     injection += '<style id="nx77-base">\n' + varsCss(theme) + '\n' + baseCss() + '\n</style>';
 
     var head = HEAD_REGEX.exec(html);
@@ -566,6 +571,79 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
       return html.substring(0, at2) + '\n<head>\n' + injection + '\n</head>' + html.substring(at2);
     }
     return '<!DOCTYPE html><html><head>\n' + injection + '\n</head><body>\n' + html + '\n</body></html>';
+  }
+
+  /* Gera tags <script> para as bibliotecas detectadas no HTML gerado pela IA.
+     Usa o catálogo do LibrarySelector (vendor local + loaders sob demanda). */
+  function buildLibraryScripts(html) {
+    var scripts = [];
+    var libs = window.LibrarySelector;
+    if (!libs) return '';
+
+    function alreadyInlined(fileName) {
+      var re = new RegExp('<script[^>]*src\\s*=\\s*["\']([^"\']*' + fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')[\"\']');
+      return re.test(html);
+    }
+    function codeMentions(word) {
+      return new RegExp('\\b' + word + '\\b').test(html);
+    }
+
+    if (codeMentions('THREE') && !alreadyInlined('three.min.js'))
+      scripts.push('<script src="vendor/three/three.min.js"></script>');
+
+    if (codeMentions('BABYLON') && !alreadyInlined('babylon.js'))
+      scripts.push('<script src="vendor/babylon/babylon.js"></script>');
+
+    if (codeMentions('OGL') && !alreadyInlined('ogl-loader.js'))
+      scripts.push('<script type="module" src="vendor/ogl/ogl-loader.js"></script>');
+
+    if (codeMentions('Phaser') && !alreadyInlined('phaser.min.js'))
+      scripts.push('<script src="vendor/phaser/phaser.min.js"></script>');
+
+    if (codeMentions('PIXI') && !alreadyInlined('pixi.min.js')) {
+      scripts.push('<script src="vendor/pixi/pixi.min.js"></script>');
+      if (codeMentions('sound') && !alreadyInlined('pixi-sound.js'))
+        scripts.push('<script src="vendor/pixi-sound/pixi-sound.js"></script>');
+    }
+
+    if (codeMentions('Konva') && !alreadyInlined('konva.min.js'))
+      scripts.push('<script src="vendor/konva/konva.min.js"></script>');
+
+    if (codeMentions('Matter') && !alreadyInlined('matter.min.js'))
+      scripts.push('<script src="vendor/matter/matter.min.js"></script>');
+
+    if (codeMentions('gsap') && !alreadyInlined('gsap.min.js'))
+      scripts.push('<script src="vendor/gsap/gsap.min.js"></script>');
+
+    if (codeMentions('lottie') && !alreadyInlined('lottie.min.js'))
+      scripts.push('<script src="vendor/lottie/lottie.min.js"></script>');
+
+    if ((codeMentions('Howler') || codeMentions('howl')) && !alreadyInlined('howler.min.js'))
+      scripts.push('<script src="vendor/howler/howler.min.js"></script>');
+
+    if (codeMentions('Tone') && !alreadyInlined('Tone.js'))
+      scripts.push('<script src="vendor/tone/Tone.js"></script>');
+
+    if ((codeMentions('ZzFX') || codeMentions('zzfx')) && !alreadyInlined('ZzFX.js'))
+      scripts.push('<script src="vendor/zzfx/ZzFX.js"></script>');
+
+    /* Yuka (IA) */
+    if (codeMentions('YUKA') && !alreadyInlined('yuka.min.js'))
+      scripts.push('<script src="vendor/yuka/yuka.min.js"></script>');
+
+    /* lil-gui (debug) */
+    if ((codeMentions('GUI') || codeMentions('lil-gui')) && !alreadyInlined('lil-gui.umd.js'))
+      scripts.push('<script src="vendor/lil-gui/lil-gui.umd.js"></script>');
+
+    /* simplex-noise (build clássico: expõe SimplexNoise / createSimplexNoise / createNoise2D|3D|4D) */
+    if (/\bSimplexNoise\b|\bcreateSimplexNoise\b|\bcreateNoise[234]D\b|\balea\b|\bbuildPermutationTable\b/.test(html) && !alreadyInlined('simplex-noise'))
+      scripts.push('<script src="vendor/simplex-noise/simplex-noise.global.js"></script>');
+
+    /* NxLoad (loaders para Rapier, Recast, postprocessing, meshBVH, spritesheet, tiled) */
+    if (/\bNxLoad\b|rapier|recast|postprocessing|MeshBVH|spritesheet|tiled/.test(html) && !alreadyInlined('nx-loaders.js'))
+      scripts.push('<script src="js/nx-loaders.js"></script>');
+
+    return scripts.length ? scripts.join('\n') : '';
   }
 
   /* Tela de apresentação: halo estático + título animado (entrada letra a letra,
@@ -610,13 +688,13 @@ body{background:url('imagens/back1.jpg') center/cover fixed no-repeat #000;font-
   animation:nx-glow 5s ease-in-out 1.4s infinite}
 .title span{display:inline-block;color:transparent;
   background-image:linear-gradient(100deg,transparent 42%,${hi} 50%,transparent 58%),
-                   linear-gradient(160deg,var(--c,${accent}) 0%,${accentSoft} 100%);
+               linear-gradient(160deg,var(--c,${accent}) 0%,${accentSoft} 100%);
   background-size:300% 100%,100% 100%;
   background-position:0% 0,0 0;
   background-repeat:no-repeat;
   -webkit-background-clip:text;background-clip:text;
   animation:nx-in .7s cubic-bezier(.22,.9,.24,1) calc(var(--i)*60ms) both,
-            nx-sheen 3.6s ease-in-out calc(1.1s + var(--i)*120ms) infinite}
+        nx-sheen 3.6s ease-in-out calc(1.1s + var(--i)*120ms) infinite}
 .title .sp{width:.34em}
 @keyframes nx-in{
   from{opacity:0;transform:translateY(.45em) scale(.9)}
@@ -691,25 +769,25 @@ p{color:${secondary};font-size:13.5px;line-height:1.6;word-break:break-word}
     if (!entries || entries.length === 0) {
       body = '<div class="empty">Nada salvo ainda.<br><span>Gere uma página e clique em <b>SALVAR</b>.</span></div>';
     } else {
-          body = '<div class="grid">' + entries.map(function (e) {
-            var n = escAttr(e.name);
-            var short = e.name.replace(/\\.html$/i, '');
-            var label = escAttr(short);
-            var tip = escAttr(short + ' — ' + e.meta);
-            return '<div class="card" data-n="' + n + '">' +
-              '<span class="tile">' +
-              '<button class="open" type="button" data-n="' + n + '" title="' + tip + '" aria-label="Abrir ' + label + '">' +
-              '<span class="glyph">&lt;/&gt;</span></button>' +
-              '<button class="del" type="button" data-n="' + n + '" title="Excluir ' + label + '" aria-label="Excluir ' + label + '">✕</button>' +
-              '</span>' +
-              '<span class="cap" title="' + tip + '">' + esc(short) + '</span>' +
-              '<span class="actions" data-n="' + n + '">' +
-              '<button class="act act-rename" type="button" data-n="' + n + '" title="Renomear">✎</button>' +
-              '<button class="act act-duplicate" type="button" data-n="' + n + '" title="Duplicar">⧉</button>' +
-              '</span>' +
-              '</div>';
-          }).join('') + '</div>';
-        }
+      body = '<div class="grid">' + entries.map(function (e) {
+        var n = escAttr(e.name);
+        var short = e.name.replace(/\\.html$/i, '');
+        var label = escAttr(short);
+        var tip = escAttr(short + ' — ' + e.meta);
+        return '<div class="card" data-n="' + n + '">' +
+          '<span class="tile">' +
+          '<button class="open" type="button" data-n="' + n + '" title="' + tip + '" aria-label="Abrir ' + label + '">' +
+          '<span class="glyph">&lt;/&gt;</span></button>' +
+          '<button class="del" type="button" data-n="' + n + '" title="Excluir ' + label + '" aria-label="Excluir ' + label + '">✕</button>' +
+          '</span>' +
+          '<span class="cap" title="' + tip + '">' + esc(short) + '</span>' +
+          '<span class="actions" data-n="' + n + '">' +
+          '<button class="act act-rename" type="button" data-n="' + n + '" title="Renomear">✎</button>' +
+          '<button class="act act-duplicate" type="button" data-n="' + n + '" title="Duplicar">⧉</button>' +
+          '</span>' +
+          '</div>';
+      }).join('') + '</div>';
+    }
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -807,7 +885,6 @@ if (grid) grid.addEventListener('click', function(ev){
 
   window.Html = {
     BASE: BASE,
-    BASE_PROMPT: BASE_PROMPT,
     EDIT_DIRECTIVE: EDIT_DIRECTIVE,
     DIRECTIVE: DIRECTIVE,
     STORAGE_SAFE: STORAGE_SAFE,
@@ -831,6 +908,10 @@ if (grid) grid.addEventListener('click', function(ev){
     escAttr: escAttr,
     jsSyntaxErrors: jsSyntaxErrors,
     lint: lint,
-    rewriteLibs: rewriteLibs
+    rewriteLibs: rewriteLibs,
+    selectLibraries: window.LibrarySelector.selectLibraries,
+    buildLibraryDirective: window.LibrarySelector.buildLibraryDirective,
+    getLibraryGlobal: window.LibrarySelector.getLibraryGlobal,
+    isLibraryLocal: window.LibrarySelector.isLibraryLocal
   };
 })();

@@ -1,5 +1,9 @@
 # Análise — "cubo gelatinoso" (Gelatinous Cube) no NEXUS GAME
 
+> ⚠️ **DOCUMENTO HISTÓRICO (2026-10-22, v2.14.0)** — cita `NxTex.gelGeo()`, removido na v3.0.0.
+> Use `NxMat.threeGel(cor, opts)` para o material; a geometria de superelipsoide deve ser
+> gerada no próprio documento. Ver [`DIRECTIVE.md`](DIRECTIVE.md) (bloco GELATINA).
+
 Data: 2026-10-22 · Base: v2.14.0 + GELATINA (NxTex 1.2.0) · teste em cena WebGL com o stack real
 
 ## Estado: IMPLEMENTADO em 2026-10-22

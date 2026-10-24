@@ -1,5 +1,9 @@
 # Mapa da UI — NEXUS GAME
 
+> ⚠️ **DOCUMENTO HISTÓRICO (pós-2.2.0)** — as referências `arquivo:linha` são da era v2.2 e
+> já não batem com o código atual (v3.0.1). Use como mapa conceitual; para números atuais,
+> consulte [`ESTADO_ATUAL.md`](ESTADO_ATUAL.md) e [`DOCUMENTACAO.md`](DOCUMENTACAO.md).
+
 Todo elemento de tela com `arquivo:linha` + âncora e o código que o controla.
 Consulte antes de mexer em qualquer UI. Linhas conferidas no working tree pós-2.2.0 (out/2026).
 

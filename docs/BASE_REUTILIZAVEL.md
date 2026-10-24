@@ -1,5 +1,9 @@
 # Base reutilizável — app WebView/shell + HTML gerado por IA (desktop)
 
+> ⚠️ **DOCUMENTO HISTÓRICO** — descrito na era v2.x (15 temas, File System Access).
+> Hoje há **1 tema** e salvamento via API REST com backups. Para a arquitetura vigente,
+> consulte [`DOCUMENTACAO.md`](DOCUMENTACAO.md) e [`ESTADO_ATUAL.md`](ESTADO_ATUAL.md).
+
 Receita validada no **NEXUS GAME** (port do NEXUS77). Serve para novos projetos em que
 uma IA gera HTML e o app apenas exibe o resultado.
 

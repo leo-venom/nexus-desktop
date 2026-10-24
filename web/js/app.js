@@ -1149,37 +1149,6 @@
     ok.addEventListener('click', submit);
   }
 
-  /* O HTML salvo é aberto por file:// — um <script src="js/nx-textures.js"> relativo
-     daria 404 e o jogo perderia window.NxTex. Inlinamos o pack no arquivo.
-     A regex é global porque o HTML gerado pela IA pode já trazer a tag além da que o
-     `decorate()` injeta: todas precisam sair e o pack entra uma única vez. */
-  var NX_TEX_TAG_SRC = '<script\\s+src=["\'](?:[^"\']*\\/)?js\\/nx-textures\\.js["\']\\s*>\\s*<\\/script>';
-  var NX_TEX_TAG = new RegExp(NX_TEX_TAG_SRC, 'gi');
-  var NX_TEX_TAG_TEST = new RegExp(NX_TEX_TAG_SRC, 'i');
-
-  function inlineTextures(html) {
-    if (!NX_TEX_TAG_TEST.test(html)) return Promise.resolve(html);
-    /* no-cache (revalidação) e NÃO force-cache: com o pack em cache antigo o
-       arquivo salvo inlinava uma versão sem as APIs novas e o jogo quebrava. */
-    return fetch(APP_BASE + 'js/nx-textures.js', { cache: 'no-cache' }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    }).then(function (src) {
-      /* `</script` dentro do fonte quebraria o inline (o pack não tem, mas garantimos). */
-      var safe = String(src).replace(/<\/script/gi, '<\\/script');
-      var inlined = false;
-      return html.replace(NX_TEX_TAG, function () {
-        if (inlined) return '';   /* tags duplicadas: o pack entra só uma vez */
-        inlined = true;
-        return '<script>\n' + safe + '\n</script>';
-      });
-    }).catch(function (e) {
-      console.warn('[nexus] não foi possível inlinar nx-textures.js:', e);
-      toast('Texturas não embutidas — o jogo salvo pode perder texturas');
-      return html.replace(NX_TEX_TAG, '');
-    });
-  }
-
   /* Limites de inline: 6 MB por arquivo, 20 MB no total. */
   var MEDIA_INLINE_MAX_FILE = 6 * 1024 * 1024;
   var MEDIA_INLINE_MAX_TOTAL = 20 * 1024 * 1024;
@@ -1252,7 +1221,7 @@
     var prepared = existingProject
       ? window.Store.inlineProjectAssets(existingProject, themed(sanitizeSnapshotHtml(doc)))
       : Promise.resolve(themed(sanitizeSnapshotHtml(doc)));
-    prepared.then(inlineTextures).then(function (html) {
+    prepared.then(function (html) {
       return window.Store.saveWithAssets(named, html, promptText);
     }).then(function (saved) {
       saveBtn.disabled = false;

@@ -1,5 +1,9 @@
 # Validação — NEXUS GAME
 
+> ⚠️ **DOCUMENTO HISTÓRICO (2026-10-18/19)** — registro da era v2.x. Números de arquivos,
+> contagens de temas e APIs citados podem estar obsoletos. A validação atual está em
+> [`ESTADO_ATUAL.md`](ESTADO_ATUAL.md) §6 e [`REGRAS_DEFINITIVAS.md`](REGRAS_DEFINITIVAS.md) §15.
+
 Registro dos testes executados em **2026-10-18** (Linux, Chromium 152 headless via
 REA/Playwright, Node 26.8.1, Python 3.14) e do shell Electron em **2026-10-19**.
 

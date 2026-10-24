@@ -1,5 +1,9 @@
 # Análise — texturas com relevo realista (normal/bump/roughness) no NEXUS GAME
 
+> ⚠️ **DOCUMENTO HISTÓRICO (2026-10-22, v2.14.0)** — cita `nx-textures.js`/`NxTex`, removidos
+> na v3.0.0. O relevo hoje é entregue pelos 22 materiais PBR de `NxMat` com normal map
+> procedural (ver [`DIRECTIVE.md`](DIRECTIVE.md)).
+
 Data: 2026-10-22 · Base: v2.14.0, three.js local r160, `nx-textures.js` (959 linhas, 44 texturas)
 
 ## Estado: IMPLEMENTADO (Nível 0 + Nível 1) em 2026-10-22

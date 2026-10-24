@@ -1,14 +1,15 @@
-# Documentação — NEXUS GAME
+# Documentação — NEXUS GAME v3.0.1
 
 Port desktop do **NEXUS77** (Android/Kotlin). O app é um shell que conversa com uma API
 estilo OpenAI e renderiza o HTML gerado pela IA em um iframe isolado.
+
+---
 
 ## 1. Visão geral
 
 ```text
 [prompt] -> app.sendPrompt()
-        -> Html.systemPrompt(theme, detailLevel, cmd, lastRendered, mediaManifest)
-           (5º arg: lista real de imagens/sons do projeto via /midia)
+        -> Html.systemPrompt(theme, detailLevel, cmd, lastRendered, media)
         -> AiClient.chat(...)            (streaming SSE; progresso em bytes)
         -> Html.extractDocument(texto)   (criação: documento completo)
            ou Html.applyEdits(doc, texto) (refino: edições cirúrgicas)
@@ -19,257 +20,253 @@ estilo OpenAI e renderiza o HTML gerado pela IA em um iframe isolado.
 O documento canônico (`lastRendered`) guarda as URLs de CDN; o rewrite para o vendor
 local acontece **somente no render**, então salvar/refinar continua portátil.
 
+---
+
 ## 2. Arquivos
 
 ### web/index.html
 Shell estático: **uma linha no topo** com marca, sessão, prompt (**Enter envia**), status,
-VU/KB, SALVAR/ABRIR e ⚙ (canto direito); `iframe#frame` ocupa o restante. Não há barra
-inferior nem botão enviar. Carrega os scripts na ordem: themes → prefs → html-builder →
-ai-client → store → vu-meter → settings → app.
+VU/KB, SALVAR/ABRIR e ⚙ (canto direito); `iframe#frame` ocupa o restante. Carrega os scripts
+na ordem: themes → prefs → library-selector → html-builder → ai-client → store → vu-meter →
+settings → app.
 
 ### web/css/app.css
 Layout do shell e dos modais. Todas as cores vêm de variáveis `--nx-*` aplicadas em
 `document.documentElement` por `app.applyTheme()`; `--mx-error` é derivado do tema.
 
 ### web/js/themes.js
-**30 temas** (20 escuros + 10 claros), com `onAccent` calculado.
-Exporta `{ALL, of, hexA}`; `hexA('#RRGGBB', alpha)` devolve
-`#RRGGBBAA` (CSS válido, alpha por último). Primeiro tema claro: índice 20
-("CLARO · rubi", `#C2185B`).
+**1 tema fixo** — `PADRÃO · BLACK CYBER` (preto `#000000`, esmeralda `#00E88A`,
+roxo `#A855F7`, azul `#00A3FF`). `of()` sempre devolve o mesmo.
 
 ### web/js/prefs.js
 Persistência em `localStorage["nexus77"]` (JSON). Chaves: `endpoint`, `apiKey`, `model`,
-`temperature`, `maxTokens`, `themeIndex`, `detailLevel`, `sessionTokens`,
-`sessionPromptTokens`, `sessionCompletionTokens`. API: `get/set/data`, `hasKey`,
-`endpoint()`, `apiKey()`, `model()`, `temperature()` (0–2), `maxTokens()` (>=0),
-`themeIndex()`, `detailLevel()` (0–2), `addSessionTokens`, `resetSessionTokens`.
+`temperature`, `maxTokens`, `sessionTokens`, `sessionPromptTokens`, `sessionCompletionTokens`,
+`usageLog`, `autoFix`.
+
+### web/js/library-selector.js
+Catálogo inteligente de **24 entradas** (20 locais/nativas + 4 CDN) divididas em categorias:
+
+| Categoria | Bibliotecas |
+|---|---|
+| **3D** | Three.js, Babylon.js, OGL, postprocessing (CDN), three-mesh-bvh (CDN) |
+| **2D Game** | Phaser, PixiJS, Canvas 2D |
+| **2D Canvas** | Konva.js |
+| **Física** | Matter.js (2D), Rapier (3D, CDN) |
+| **Animação** | GSAP, Lottie |
+| **Áudio** | Howler.js, Tone.js, ZzFX, @pixi/sound |
+| **IA / NPCs** | Yuka, Recast Navigation (CDN) |
+| **Procedural** | simplex-noise, NxShader (GLSL) |
+| **Ferramentas** | Spritesheet Loader, Tiled Map Loader |
+| **Debug** | lil-gui |
+
+Funções:
+- `selectLibraries(command, doc)` — seleciona automático por keywords (pt-BR + en)
+- `buildLibraryDirective(selected)` — gera bloco pro system prompt
+- `getLibraryFile(name)` / `getLibraryGlobal(name)` / `isLibraryLocal(name)` / `isLibraryModule(name)`
+- `resolveDeps(selected)` — resolve dependências entre libs
 
 ### web/js/html-builder.js
 Port de `Html.kt`. Exporta `window.Html`:
 
 | função | papel |
-| --- | --- |
-| `BASE_PROMPT` | regras da geração (escopo fiel ao pedido, efeitos contidos, beleza + performance) |
-| `EDIT_FRIENDLY` | diretriz de código compatível com o editor visual (ids por elemento, canvas só pro fundo, texto num único nó, sem `!important`, sem overlay full-screen, layout flex/grid) |
-| `systemPrompt(theme, level, cmd, doc, media)` | prompt + diretriz de detalhe + paleta exata + lista de mídia real; o bloco de texturas é **opt-in** (`wantsTextures(cmd, doc)`) |
-| `mediaBlock(media)` | bloco de texto em inglês (comentários PT) listando imagens/sons disponíveis; caps 60 por tipo; usado como 5º arg do systemPrompt |
-| `userPrompt(base, doc, notes)` | anexa a página atual (e erros de runtime/comandos anteriores) para edição |
-| `userPrompt(base, doc, notes)` | anexa a página atual (e erros de runtime/comandos anteriores) para edição |
+|---|---|
+| `DIRECTIVE` | bloco completo com IDENTIDADE, CONTRATO DE SAÍDA, REGRA 1-7 |
+| `systemPrompt(theme, level, cmd, doc, media)` | prompt + paleta + nível de detalhe + mídia + libs |
+| `userPrompt(base, doc, notes)` | anexa a página atual + erros/comandos anteriores |
 | `extractDocument(raw)` | remove cercas e corta até `<!doctype`/`<html` |
-| `varsCss(theme)` / `baseCss()` | bloco `<style id="nx77-base">` |
-| `decorate(html, theme)` | injeta viewport (se faltar) + CSS base |
-| `welcomePage(theme, hasKey)` | tela de apresentação animada **em CSS puro**: título letra a letra (`nx-in`, delay 60 ms), onda de brilho por span (`nx-sheen`, 120 ms, `sheenOn` escolhe a cor da faixa pela luminância, corte 0.62), glow (`nx-glow`), halo e linha — sem partículas/`requestAnimationFrame`; `prefers-reduced-motion` → letras sólidas no accent; **2.785 bytes** gerados nos 30 temas |
+| `decorate(html, theme)` | injeta viewport + storage polyfill + nx-materials.js + nx-shaders.js + nx-loaders.js + libs |
+| `buildLibraryScripts(html)` | detecta e injeta `<script>` locais das bibliotecas vendor usadas (Three.js, Babylon, Phaser, Pixi, Matter, GSAP, Konva, Lottie, Howler, Tone, ZzFX, Yuka, lil-gui, simplex-noise etc.) |
+| `welcomePage(theme, hasKey)` | tela de apresentação animada em CSS puro |
 | `errorPage(theme, title, detail)` | cartão de erro |
-| `savedListPage(theme, entries)` | lista de salvos (ponte `Nexus77.*`) |
-| `esc` / `escAttr` | escape de texto/atributo |
-| `rewriteLibs(html, base)` | CDN do three.js → `vendor/three/` |
-| `EDIT_DIRECTIVE` | instrução de edição cirúrgica (JSON `find/replace`) |
-| `applyEdits(doc, raw)` | aplica `{edits:[{find,replace}]}` em cascata (exato → CRLF → whitespace); devolve `{ok, partial, html, applied, failed}`; **teto de 200 edições por resposta** |
-| `looksLikeDocument(raw)` | detecta HTML completo (usado no fallback) |
-
-Observações de fidelidade:
-- `extractDocument` mantém o filtro `it > 0`: um `<!DOCTYPE>` na posição 0 é descartado
-  (comportamento idêntico ao Kotlin).
-- `esc` escapa só `&` e `<`; `escAttr` também escapa `"` (igual ao original).
-- A assinatura JS é `decorate(html, theme)` (no Kotlin era `decorate(theme, html)`).
+| `savedListPage(theme, entries)` | lista de salvos |
+| `applyEdits(doc, raw)` | aplica `{edits:[{find,replace}]}` com tolerância |
+| `lint(html)` | 4 checagens: truncado, addon, CDN three, stub |
+| `rewriteLibs(html, base)` | CDN three.js → vendor/three/ |
 
 ### web/js/ai-client.js
 Port de `AiClient.kt` com `fetch`:
 
-- `buildUrl(endpoint, suffix)` aceita endpoint com `/v1`, `/models` ou `/chat/completions`;
-- `chat(...)` tenta **streaming** (`stream:true` + `stream_options.include_usage`) e, se a
-  resposta for HTTP 4xx, repete **sem streaming**;
-- usa `/_proxy` do `serve.py` quando a página está em http(s); se o proxy não existir
-  (404/501) ou falhar na rede, cai no fetch direto (provedores com CORS);
-- progresso: `onProgress(bytes)` recebe o total acumulado de bytes UTF-8 de
-  `delta.content` (tamanho real do documento em formação);
-- timeouts: conexão 20 s; leitura ociosa 600 s (reset a cada chunk); `/models` 60 s;
-- erros: `AiException` com `HTTP <code>: <corpo>` ou `resposta vazia do servidor`;
-- `errorMessage(e)` extrai `error.message`/`message` do JSON ou devolve o texto (200 chars);
-- `VERSION` (`2.2.0`) — exibida no rodapé do ⚙ e no console;
-- em `file://` não há proxy possível: o erro vira uma mensagem explícita sobre CORS.
+- `chat(endpoint, key, model, temp, maxTokens, system, user, onProgress)` — streaming SSE + fallback
+- `listModels(endpoint, key)` — busca modelos da API
+- `cancel()` — aborta geração
+- Timeouts: conexão 60 s, leitura 120 s, não-streaming 300 s
+- Proxy `/_proxy` com fallback fetch direto
 
 ### web/js/store.js
-Port de `Store.kt` adaptado ao desktop:
-
-- **preferencial**: `showDirectoryPicker` (File System Access). O handle fica no IndexedDB
-  (`meta.dir`); `queryPermission`/`requestPermission` são chamados em cliques.
-- **fallback**: IndexedDB (`files`) + download `<a download>` no save.
-- `fileName(raw)` normaliza (`[\\/:*?"<>|\r\n\t]+` → `-`, trim de pontos, máx. 80 + `.html`);
-- `meta(item)` = tamanho (`B` / `KB` / `MB`) + data `dd/MM HH:mm`.
+API REST para `/_api/saves/<nome>` (POST/GET/DELETE). Backups automáticos em `_backups/<ts>/`.
 
 ### web/js/vu-meter.js
-Port de `VuMeterView.kt`: canvas 2D, 10 cubos, `gap = w*0.06`,
-`barW = (w - gap*9)/10`, raio `barW*0.42`, onda de senos com smoothstep em 1400 ms,
-trilho esmaecido + degradê + cap aceso. `attach(canvas)` devolve
-`{start, stop, setColors, setTheme, resize}`.
+Canvas 2D, 20 barras, cabeça percorrente com rastro, degradê esmeralda→azul→roxo.
 
 ### web/js/settings.js
-Modal equivalente à `SettingsActivity`: seções API / GERAÇÃO / TEMA, "ver chave",
-"Buscar modelos" (com diálogo de escolha), temperatura 0–2 (slider 0–200), nível de
-detalhe (Simples/Médio/Rico), max tokens, temas agrupados ESCUROS/CLAROS e
-"Salvar configurações". Validações: endpoint precisa começar com `http`; chave
-obrigatória para buscar modelos. `Settings.toast(msg)` é o toast global.
+Modal de configurações: API (endpoint, key, modelo), GERAÇÃO (temperatura, max tokens, auto-fix).
 
 ### web/js/app.js
-Port de `MainActivity.kt`: estado (`lastRendered`, `lastPrompt`, `generating`,
-`showingList`, contadores ao vivo), UI, fluxo de geração, sessão, salvar/abrir/excluir,
-tema e bridge. Ver `MAPA_UI.md` para as âncoras.
+Port de `MainActivity`: estado, UI, fluxo de geração, sessão, salvar/abrir/excluir,
+tema, bridge, modo edição visual, anti-erro, Ctrl+Z.
+
+### web/js/nx-materials.js
+**22 materiais PBR** com texturas processuais. API global `NxMat`:
+
+| Função | Descrição |
+|---|---|
+| `NxMat.threeMat(nome, cor)` | THREE.MeshStandardMaterial com roughness/metalness/normal/emissivo |
+| `NxMat.threeNeon(cor)` | Material emissivo neon |
+| `NxMat.threeGel(cor, opts)` | MeshPhysicalMaterial translúcido (transmission) |
+| `NxMat.threeCanvas(nome, tam)` | THREE.CanvasTexture procedural |
+| `NxMat.canvasPattern(nome, ctx)` | CanvasPattern para 2D |
+| `NxMat.canvasDataUrl(nome, tam)` | data URL da textura |
+| `NxMat.pixiTexture(nome, tam)` | PIXI.Texture |
+| `NxMat.phaserTexture(nome, tam)` | data URL para Phaser |
+| `NxMat.select(descricao)` | Seleciona materiais pela descrição |
+| `NxMat.fuzzyFind(query)` | Busca por sinônimo ou nome |
+| `NxMat.names()` / `NxMat.list()` | Lista materiais |
+| `NxMat.clearCache()` | Limpa cache de texturas |
+
+Materiais: `metal_brilhante`, `metal_escuro`, `metal_dourado`, `plastico_fosco`,
+`plastico_brilhante`, `pedra_cinza`, `pedra_ardosia`, `madeira_clara`, `madeira_escura`,
+`tecido_liso`, `concreto`, `terra`, `marmore`, `neon`, `vidro`, `circuito`, `energia`,
+`lava`, `borracha`, `grade`, `holograma`, `camuflado`.
+
+### web/js/nx-shaders.js
+**28 shaders GLSL + 7 chunks reutilizáveis**. API global `NxShader`:
+
+| Função | Descrição |
+|---|---|
+| `NxShader.get(nome)` | `{vertex, fragment}` strings |
+| `NxShader.threeMat(nome, opts)` | THREE.ShaderMaterial com uniforms |
+| `NxShader.updateTime(mat, t)` | Atualiza uniform time |
+| `NxShader.names()` | Lista os 28 shaders |
+| `NxShader.chunks()` | Lista os 7 chunks (`fbm`, `hash`, `hsv`, `noise`, `palette`, `rotate`, `voronoi`) |
+
+Shaders: `agua`, `aguaFbm`, `aurora`, `caustica`, `circuito`, `crt`, `dissolve`,
+`dissolveRuido`, `energia`, `escudo`, `estrelas`, `fogo`, `fresnel`, `galaxia`, `glitch`,
+`gradiente`, `holograma`, `lava`, `marmore`, `matrix`, `nebulosa`, `neon`, `ondas`, `plasma`,
+`terreno`, `toon`, `voronoiCells`, `warp`.
+
+### web/js/nx-loaders.js
+Loaders sob demanda. API global `NxLoad`:
+
+| Função | Descrição |
+|---|---|
+| `NxLoad.rapier()` | Carrega Rapier (física 3D WASM, CDN) |
+| `NxLoad.recast()` | Carrega Recast Navigation (pathfinding, CDN) |
+| `NxLoad.postprocessing()` | Carrega postprocessing (bloom/DOF, CDN) |
+| `NxLoad.meshBVH()` | Carrega three-mesh-bvh (raycast, CDN) |
+| `NxLoad.spritesheet(img, json)` | Decodifica spritesheet + atlas JSON |
+| `NxLoad.tiled(json)` | Carrega mapa Tiled .json |
+| `NxLoad.ready(name)` | True se já carregou |
 
 ### desktop/main.js
-Shell Electron: instância única (`requestSingleInstanceLock`; a segunda chamada foca a
-janela), janela normal sem menu, dimensionada pela **área útil da tela detectada**
-(resolução/DPI atuais; reajusta quando monitores ou métricas mudam), com
-`contextIsolation`/`sandbox` ligados e
-`nodeIntegration` desligado. F11 alterna tela cheia, F12 abre DevTools. `window.open`
-para `http(s)` é permitido em janela interna 1200×800 com as mesmas proteções; outros
-protocolos são negados. Ao sair, fecha o servidor embutido.
+Shell Electron: instância única, janela normal, F11 tela cheia, F12 DevTools.
 
 ### desktop/server.js
-Réplica do `serve.py` em Node, sem dependências: estático de `web/` com
-`Cache-Control: no-store`, `/fontes/` (JSON, `fonts.css`, arquivos) e `/_proxy`
-(streaming, repassa `Authorization`, `Content-Type`, `Accept`). `startServer(8790)` tenta
-a porta preferida e, em `EADDRINUSE`, incrementa até 20 vezes (8790→8810).
+Réplica do `serve.py` em Node: estático, `/fontes/`, `/_proxy`, `/_api/saves`.
 
 ### desktop/start.sh
-Exige `desktop/node_modules/.bin/electron` e dá `exec` nele com o diretório `desktop/`
-como app. Se faltar o binário, imprime a instrução de `npm --prefix desktop install`.
-`ELECTRON_OZONE_PLATFORM_HINT` default é `auto`.
+Exige `desktop/node_modules/.bin/electron` e executa com flags de GPU.
 
-### NEXUS-GAME.desktop
-Atalho de aplicativo (`Exec=sh -c "exec '…/desktop/start.sh' …"`) com
-`Icon=nexus-game` e `StartupWMClass=nexus-game` (WM_CLASS observado no Hyprland).
-Também está instalado em `~/.local/share/applications/` com o ícone em
-`~/.local/share/icons/hicolor/256x256/apps/`.
+---
 
 ## 3. Fluxo de geração
 
-1. `sendPrompt()` valida prompt vazio e presença de API key (abre ⚙ se faltar).
-2. Monta `system`/`user`, estima `liveIn = (bytes(system)+bytes(user))/4`.
-3. `AiClient.chat(...)` — cada chunk atualiza `kbLabel` (máx. ~16×/s) e `liveOut = bytes/4`.
-4. Sucesso: `extractDocument`; se vazio → `failGeneration("resposta vazia do modelo")`.
-5. `lastRendered = doc`; `render(themed(doc))`; status
-   `✓ N KB • X.Xs • modelo • ↑p ↓c tok` (sufixo só quando `totalTokens > 0`).
-6. Falha: status `✗ mensagem`; se não havia página, mostra `errorPage`; toast; libera UI.
+1. `sendPrompt()` valida prompt e API key
+2. `LibrarySelector.selectLibraries(prompt)` → seleciona libs ideais
+3. Monta system = `DIRECTIVE + paletaRef + detailDirective + mediaBlock + libraryDirective`
+4. `AiClient.chat(...)` — streaming SSE com progresso
+5. `extractDocument()` limpa resposta
+6. `render(themed(doc))` — rewriteLibs → injectShim → iframe.srcdoc
+7. Anti-erro opcional: telemetria → relatório → correção automática
 
-### Edição cirúrgica (refino)
+---
 
-Com `lastRendered` existente, o app usa `EDIT_DIRECTIVE` no system prompt (sobrepõe a
-regra de devolver o documento inteiro). O modelo responde:
-
-```json
-{"edits":[{"find":"<trecho exato do documento atual>","replace":"<novo trecho>"}]}
-```
-
-`Html.applyEdits` aplica os trechos em sequência sobre o documento atual (match exato;
-tolera CRLF nas duas direções). O restante da página fica **byte a byte intacto** — só o
-pedido muda (ex.: um título), sem reescrever o código todo. Limites: até 200 edições
-(a diretriz pede ≤ 8) e `find` não vazio.
-
-Fallback seguro, em ordem:
-1. patch aplicado → usa o resultado;
-2. resposta é HTML completo (`looksLikeDocument`) → usa `extractDocument`;
-3. senão → **refaz a chamada** com o prompt base (documento completo).
-
-Assim, uma edição simples não regenera a página inteira; e se o modelo não cooperar, o
-resultado continua correto.
-
-## 4. Sessão e tokens
-
-`updateSessionUi()` mostra dot (accent/erro), modelo (ou "sem API key"), barra e rótulo
-`~↑entrada ↓saída · usado/1M`. Durante a geração os valores são estimados (`~`); ao final
-`addSessionTokens(prompt, completion)` grava os exatos. `↺` zera a sessão e volta à welcome
-(bloqueado durante geração).
-
-## 5. Temas
-
-`applyTheme()` define `--nx-bg`, `--nx-surface`, `--nx-surface-alt`, `--nx-accent`,
-`--nx-accent-soft` (140), `--nx-accent-faint` (20), `--nx-text`, `--nx-secondary`,
-`--nx-on-accent` e `--mx-error`. Ao salvar configurações com tema diferente,
-`themed(lastRendered)` substitui o bloco `<style id="nx77-base">` existente (ou decora),
-sem chamar a IA.
-
-## 6. Salvar / abrir / excluir
-
-- **SALVAR**: exige página; diálogo com **nome limpo** (sem carimbo de data e sem `.html`): página aberta sugere o próprio nome; geração nova sugere o slug do último prompt (até 60 chars, fallback `pagina`); o Store anexa `.html` ao gravar.
-  No **primeiro** save, se o navegador suportar File System Access e ainda não houver pasta,
-  o seletor de pasta é aberto (cancelar cai no fallback). Grava
-  `themed(lastRendered)` na pasta escolhida (ou IndexedDB + download).
-- **ABRIR**: lista a pasta/IndexedDB e renderiza `Html.savedListPage`; o clique chama
-  `Nexus77.openSaved`, `Nexus77.deleteSaved`, `Nexus77.pickFile` (arquivo local) e
-  `Nexus77.closeList` via postMessage. `pickFile` abre um modal no shell com
-  "Escolher arquivo…" (o clique no shell garante a ativação de usuário do seletor).
-- **Excluir**: confirmação e `Store.remove`.
-
-## 7. Bridge e segurança
+## 4. Bridge e segurança
 
 O iframe usa `sandbox="allow-scripts"` (sem `allow-same-origin`): a página gerada tem
-origem opaca e **não** alcança o shell. O shim injetado em cada render define
-`window.Nexus77` e envia `{__nx:1, m, a}` por `postMessage`; o shell valida
-`e.source === frame.contentWindow` e uma whitelist antes de executar. Links externos são
-interceptados e abertos pelo shell (`openUrl`): no Electron, em janela interna; no
-navegador, em nova aba.
+origem opaca. O shim injetado define `window.Nexus77` e envia mensagens por `postMessage`;
+o shell valida `e.source === frame.contentWindow` e uma whitelist de métodos.
+No servidor, a API de saves valida nomes e contenção de caminho (sem `..`, nomes reservados
+ou symlinks), limita assets a 6 MB/arquivo e 20 MB/projeto, e o `/_proxy` resolve e fixa o
+DNS, revalida redirecionamentos (máx. 4) e bloqueia alvos internos — loopback é permitido
+de propósito para LLMs locais.
 
-## 8. Proxy local (CORS)
+---
 
-Há dois servidores equivalentes: `desktop/server.js` (Node, embutido no app Electron) e
-`serve.py` (raiz do projeto, fallback no navegador). Ambos servem `web/` e expõem
-`/_proxy?url=<alvo>` (GET/POST): repassam `Authorization`, `Content-Type` (e `Accept` no
-Node) e o corpo, e devolvem a resposta em streaming. A janela fala com
-`http://127.0.0.1:8790` (mesma origem), então não há preflight/CORS.
+## 5. Modo edição visual
 
-Motivo: a OpenAI responde ao preflight, mas o `POST /v1/chat/completions` **não** inclui
-`Access-Control-Allow-Origin` — o navegador bloqueia com "Failed to fetch". O proxy
-resolve para qualquer provedor (OpenAI, gateways, servidores locais).
+- `✎ EDITAR` congela animações, permite clicar para selecionar elemento
+- Duplo clique abre popover com controles (cor, tamanho, texto, fonte)
+- Arrasto direto para mover, bordas para redimensionar
+- Ctrl+Z desfaz (pilha de 200)
+- `✔ FINALIZAR` captura o HTML editado e descongela
 
-O `ai-client.js` tenta o proxy primeiro; se `/_proxy` não existir (404/501 — ex.:
-`python3 -m http.server`), cai no fetch direto. Funções: `proxyUrl`, `isMissingProxy`,
-`isNetworkFailure`, `withProxyFallback`.
+---
 
-Os dois servidores enviam `Cache-Control: no-store` em todas as respostas (inclusive no
-proxy): um reload sempre pega o HTML/JS atuais (evita rodar um `ai-client.js` antigo do
-cache). Ambos também servem `/fontes/`: lista em JSON as fontes de `fontes/`
-(`.ttf/.otf/.woff/.woff2`), gera `/fontes/fonts.css` (`@font-face` por arquivo) e entrega
-os arquivos — usado pelo seletor de fonte do modo edição. **Também servem `/midia`,
-`/imagens/` e `/sons/`**: lista JSON de imagens e sons reais do projeto (`imagens/` e
-`sons/` na raiz), e entrega os arquivos com CORS/CORP — a lista entra no system prompt
-via `mediaBlock` e a página gerada referencia caminhos relativos (`imagens/x.jpg`,
-`sons/y.mp3`); no `Salvar`, `inlineMedia()` embute as mídias usadas como data URI
-(limites: 6 MB/arquivo, 20 MB total).
+## 6. Servidor local
 
-## 9. Abertura, `file://` (limitação) e atalhos
+Dois servidores equivalentes:
 
-Abrir `web/index.html` direto do disco **não funciona** para provedores sem CORS:
-a origem é `null`, e a OpenAI não envia `Access-Control-Allow-Origin` no
-`POST /v1/chat/completions` → o navegador bloqueia ("Failed to fetch"). Não há como
-contornar com HTML/JS (regra de segurança do navegador).
+| Servidor | Comando | Uso |
+|---|---|---|
+| Python | `python3 serve.py` | Fallback navegador |
+| Node | `desktop/server.js` | Embutido no Electron |
 
-**App Electron (principal):** `NEXUS-GAME.desktop` (ou `./desktop/start.sh`) executa
-`desktop/main.js`, que chama `startServer()` de `desktop/server.js` no próprio processo e
-carrega a URL escolhida na janela do app. A porta preferida é 8790; se estiver ocupada,
-o servidor incrementa até 20 vezes (8791→8810) e a janela usa a porta livre. O Chromium
-embutido preserva File System Access, iframe e renderização.
+Ambos servem `web/`, `/_proxy`, `/fontes/`, `/midia`, `/_api/saves`.
 
-**Fallback no navegador:** `abrir.sh` sobe o `serve.py` se necessário e abre
-`http://127.0.0.1:8790/`. O script verifica a porta com `curl`, inicia o servidor
-destacado (`setsid`) e chama `xdg-open`. Log em `/tmp/nexus-game.log` — somente nesse
-fallback; o launcher Electron descarta a saída, então rode `./desktop/start.sh` no
-terminal para ver erros.
+---
 
-## 10. Requisitos
+## 7. Projetos salvos
 
-- **Node.js + Electron** para o app desktop. Na primeira vez em uma cópia nova, instale o
-  binário (uma vez, ~300 MB): `npm --prefix desktop install`. O `desktop/start.sh` usa
-  `desktop/node_modules/.bin/electron`.
-- Navegador moderno (Chromium, Firefox ou Safari recentes) para o fallback. File System
-  Access é exclusivo do Chromium; nos demais o fallback IndexedDB/download assume.
-- Abrir pelo atalho/`desktop/start.sh` ou, no fallback, por `abrir.sh`/`serve.py`
-  (`http://127.0.0.1:8790`). `file://` bloqueia a API (CORS) e mostra uma mensagem
-  explicativa.
+Cada salvo vira `salvos/<nome>/` com:
+- `index.html` — jogo/página
+- `meta.json` — prompt original, data
+- `assets/images`, `assets/sounds`, `assets/generated` — mídia extraída/reorganizada
+- `_backups/<timestamp>/` — backups automáticos a cada save (com assets)
 
-## 11. Validação
+Limites: **6 MB por arquivo** e **20 MB por projeto**. API REST: `/_api/saves/<nome>`
+(POST/GET/DELETE) + `/rename`, `/duplicate`, `/backups`, `/_backups/<ts>/restore`.
 
-A matriz e as evidências estão em `VALIDACAO.md`: 16 itens (2026-10-18) de sintaxe, testes
-unitários, E2E de geração e refino cirúrgico (patch + fallback), proxy/CORS, paths, bridge
-e launcher; e a seção do shell Electron (2026-10-19) com sintaxe, servidor Node, path
-traversal, launcher e janela normal.
+---
+
+## 8. Execução
+
+```bash
+# App Electron (principal)
+./desktop/start.sh
+
+# Fallback navegador
+python3 serve.py 8790
+
+# Verificar sintaxe JS
+cd web/js && for f in *.js; do node --check "$f" || echo "FALHOU: $f"; done
+```
+
+---
+
+## 9. Catálogo de bibliotecas — seleção automática
+
+A IA analisa o prompt e escolhe as libs ideais. Exemplos:
+
+| Pedido | Bibliotecas selecionadas |
+|---|---|
+| "nave 3D" | `[three]` |
+| "plataforma 2D com pulo" | `[phaser, zzfx]` |
+| "efeitos de partículas" | `[pixi, pixiSound]` |
+| "física 2D colisão" | `[phaser, matter]` |
+| "animação de logo" | `[gsap]` |
+| "música procedural" | `[howler, tone]` |
+| "tiros e explosões" | `[zzfx]` |
+| "corrida 3D com física" | `[three, rapier]` |
+| "mundo com NPCs inteligentes" | `[three, yuka]` |
+| "terreno procedural" | `[three, simplexNoise]` |
+| "spritesheet com fases Tiled" | `[phaser, spritesheetLoader, tiledLoader]` |
+| "painel de debug" | `[lilGui]` |
+
+---
+
+## 10. Limitações conhecidas
+
+1. **Validação é estática, não visual** — harness mede módulos, prompt e APIs, mas não FPS/toque/áudio reais
+2. **Áudio suspenso até primeiro gesto** — regra do navegador
+3. **Rapier, Recast, postprocessing, meshBVH dependem de CDN** (WASM/addons Three.js)
+4. **Playwright não integrado** — test runner separado pendente

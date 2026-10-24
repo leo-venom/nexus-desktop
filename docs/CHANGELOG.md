@@ -1,6 +1,106 @@
 # Changelog — NEXUS GAME
 
-## v2.15.1 — 2026-10-23
+## v3.0.1 — 2026-10-24
+
+### Corrigido — REGRA 6 canônica (decisão do Leo)
+- **Jogo em tela cheia**: 100vw × 100dvh, barra de texto de **15px** no topo, controles de
+  teclado/mouse desde o primeiro frame. Removidas todas as contradições internas:
+  - O bloco `REGRA 6` do DIRECTIVE agora se chama **“JOGO EM TELA CHEIA, BARRA 15px,
+    CONTROLES TECLADO/MOUSE”** e proíbe laterais/colunas/molduras/painéis.
+  - A exceção de px da REGRA 1 passou a citar explicitamente **a barra de 15px** (além de ≤5px).
+  - O comentário de cabeçalho do `html-builder.js` foi alinhado às sete regras.
+- **Revogados**: layout de 2026-10-22 (tela central + controles laterais + moldura 2px) e
+  barras de 5px de 2026-10-23.
+
+### Corrigido — versão e documentação
+- Versão única **3.0.1** em `desktop/package.json`, `package-lock.json`, `AiClient.VERSION`,
+  `LibrarySelector.VERSION`, README e docs. (Antes: 2.13.0/2.14.0/2.15.1/3.0.0 divergentes.)
+- `docs/DIRECTIVE.md` e `docs/REGRAS_DEFINITIVAS.md` **regenerados do código atual**: 7 regras,
+  22 materiais `NxMat`, 28 shaders + 7 chunks, 24 bibliotecas, verificação que carrega
+  `library-selector.js`. NxTex removido dos textos.
+- `docs/DOCUMENTACAO.md`: 24 entradas no catálogo, 28 shaders + 7 chunks, assinatura de
+  `systemPrompt` com 5 argumentos, sem `BASE_PROMPT`, limites de assets e nota de segurança.
+- `README.md` e `docs/ESTADO_ATUAL.md` reescritos para v3.0.1.
+- `docs/ANALISE_COMPLETA.md` reescrito como auditoria pós-correção.
+- Documentos históricos receberam banner: `VALIDACAO.md`, `MAPA_UI.md`, `BASE_REUTILIZAVEL.md`,
+  `ANALISE_GELATINA.md`, `ANALISE_CUBO_GELATINOSO.md`, `ANALISE_RELEVO.md`, `ANALISE_GODOT.md`.
+
+### Corrigido — código e testes
+- Removido `BASE_PROMPT` (template inglês morto, ~1,5 KB) do `html-builder.js` e dos exports;
+  restou apenas o `DIRECTIVE` unificado.
+- `web/test-harness.html`: não carrega mais o deletado `nx-textures.js`; passou a carregar
+  `library-selector.js` (necessário para `html-builder.js`) e testa as 7 regras, a REGRA 6 de
+  15px, NxMat (22), NxShader (28 + 7 chunks) e o catálogo (24). Bateria executada em
+  Chromium headless com servidor local: **8 PASS / 0 FAIL**.
+- `.gitignore`: adicionados `*.bak-*` e `web/_tmp_t/`.
+- Resíduos movidos para quarentena reversível em `/tmp/nexus-game-cleanup-20261024-010150`:
+  `web/_tmp_t/` (3 HTML), 3 arquivos `.bak-*`, `web/js/test-iife.js`, o `catalogo.html`
+  quebrado (apontava para `nx-textures.js` removido); as 6 pastas vendor vazias
+  (incluindo `web/vendor/rabier`, typo de `rapier`) foram removidas com `rmdir`.
+
+### Errata da v3.0.0
+- A v3.0.0 dizia “23 bibliotecas, todas com vendor local, zero CDN” e “7 shaders”. O correto:
+  **24 entradas** (20 locais/nativos + 4 CDN sob demanda — Rapier, Recast, postprocessing,
+  three-mesh-bvh) e **28 shaders + 7 chunks** no `NxShader`.
+- O catálogo ganhou a entrada **`shaderGLSL` (NxShader)**, passando de 23 para 24.
+
+## v3.0.0 — 2026-10-23
+
+### Adicionado — Catálogo expandido de bibliotecas (23 no total)
+- **14 engines/motores+ferramentas**: Three.js, Babylon.js, OGL, Phaser, PixiJS, Konva.js, Matter.js, GSAP, Lottie, Canvas 2D, Howler.js, Tone.js, ZzFX, @pixi/sound
+- **4 novas engines**: Babylon.js (~4.9 MB), OGL (modular 29 KB), Konva.js (~168 KB), Lottie (~299 KB)
+- **3 bibliotecas de áudio**: Howler.js (~36 KB), Tone.js (~342 KB), ZzFX (~7.8 KB)
+- **19 bibliotecas com vendor local (offline) + Canvas 2D nativo**; 4 dependem de CDN sob demanda (Rapier, Recast, postprocessing, three-mesh-bvh)
+
+### Adicionado — Sistema de Materiais PBR (NxMat)
+- `web/js/nx-materials.js` — 22 materiais com textura procedural + normal map:
+  - Metais: `metal_brilhante`, `metal_escuro`, `metal_dourado`
+  - Plásticos: `plastico_fosco`, `plastico_brilhante`
+  - Pedra: `pedra_cinza`, `pedra_ardosia`, `marmore`
+  - Madeira: `madeira_clara`, `madeira_escura`
+  - Construção: `concreto`, `terra`, `borracha`
+  - Especiais: `neon`, `vidro` (transmission), `circuito`, `energia`, `lava`, `grade`, `holograma`, `camuflado`
+  - Tecido: `tecido_liso`
+- API: `NxMat.threeMat(nome, cor)` → THREE.MeshStandardMaterial completo com roughness/metalness/normal/emissivo
+- API: `NxMat.threeNeon(cor)` → material emissivo neon
+- API: `NxMat.threeGel(cor)` → MeshPhysicalMaterial translúcido
+- API: `NxMat.select(descricao)` → seleciona materiais pela descrição da cena
+- API: `NxMat.fuzzyFind(query)` → busca por sinônimos pt-BR/en
+- 80+ sinônimos, cache procedural, normal map automático
+
+### Adicionado — Shaders GLSL (NxShader)
+- `web/js/nx-shaders.js` — hoje **28 shaders + 7 chunks** (a v3.0.0 nasceu com 7; expandido na v3.0.1)
+- API: `NxShader.get(nome)` → `{vertex, fragment}` para OGL/raw WebGL
+- API: `NxShader.threeMat(nome)` → THREE.ShaderMaterial com uniforms time+cor
+- API: `NxShader.updateTime(mat, t)` → atualiza clock
+
+### Removido
+- `web/js/nx-textures.js` (2365 linhas, 88 texturas antigas) — substituído por NxMat (22 materiais PBR)
+- `sons/` (teste tiro.wav + LEIA-ME) — áudio via Howler/Tone/ZzFX
+- `imagens/nexus-texturas-88.png`, `teste fundo.png` — obsoletos
+- `inlineTextures()` e variáveis `NX_TEX_TAG*` em `app.js`
+
+### Adicionado — 10 bibliotecas especializadas
+- **Yuka** (vendor/yuka/yuka.min.js, 157 KB) — IA de NPCs: perseguição, fuga, patrulha, máquina de estados
+- **simplex-noise** (vendor/simplex-noise/, 19 KB) — ruído procedural para terreno, mapas de altura
+- **lil-gui** (vendor/lil-gui/lil-gui.umd.js, 61 KB) — painel de debug (iluminação, física)
+- **NxLoad** (web/js/nx-loaders.js, 7 KB) — loaders sob demanda para Rapier (física 3D WASM), Recast (pathfinding 3D), postprocessing (bloom/DOF), three-mesh-bvh (raycast acelerado), spritesheet, Tiled maps
+- **Spritesheet Loader** (via NxLoad.spritesheet) — decodifica atlas JSON
+- **Tiled Map Loader** (via NxLoad.tiled) — carrega mapas .json do editor Tiled
+- **Rapier** (CDN, via NxLoad.rapier) — física 3D com WASM
+- **Recast Navigation** (CDN, via NxLoad.recast) — navmesh + pathfinding
+- **postprocessing** (CDN, via NxLoad.postprocessing) — bloom, DOF, vinheta para Three.js
+- **three-mesh-bvh** (CDN, via NxLoad.meshBVH) — aceleração de raycasting em geometrias complexas
+
+### Catálogo LibrarySelector expandido
+- De 14 para 23 entries (rapier, yuka, recast, postprocessing, meshBVH, simplexNoise, spritesheetLoader, tiledLoader, lilGui)
+- TYPE_TO_LIBS com 40+ novas keywords (fisica 3d, npc, pathfinding, bloom, bvh, terreno procedural, spritesheet, tiled, debug...)
+- Injeção automática via decorate() detecta NxMat, NxShader, NxLoad, YUKA, GUI, createSimplexNoise
+
+### Alterado (mínimo)
+- `web/js/html-builder.js`: DIRECTIVE atualizado — NxTex → NxMat, REGRA 4 com 22 materiais, REGRA 5 com Howler/Tone/ZzFX, injector de nx-materials.js + nx-shaders.js + nx-loaders.js
+- `web/js/app.js`: removeu inlineTextures() (~35 linhas), savePage simplificado
+- `web/js/library-selector.js`: catálogo expandido para 23 entries
 
 ### Corrigido
 - Validação estrita de nomes e contenção de caminhos nas APIs Node e Python; `..`, nomes reservados, symlinks e destinos fora de `salvos/` são rejeitados.
