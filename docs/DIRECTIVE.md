@@ -1,7 +1,7 @@
-# DIRECTIVE — Diretriz Unificada do NEXUS GAME (v3.0.1+)
+# DIRECTIVE — Diretriz Unificada do NEXUS GAME (v3.1.0+)
 
 **Gerado do código em execução** (`web/js/html-builder.js`) ·
-NEXUS GAME v3.0.1 · 2026-10-24.
+NEXUS GAME v3.1.0 · 2026-10-24.
 
 > **Nota:** Esta diretriz substitui as antigas `GAME_DIRECTIVE`, `DRAWING_DIRECTIVE`,
 > `CHAT_DIRECTIVE` e `TEXTURE_OFF_DIRECTIVE`. Não existem mais modos — o modelo
@@ -299,13 +299,13 @@ console.log('libs:',Object.keys(c.window.LibrarySelector.LIBRARIES).length); // 
 
 ---
 
-## Números de Referência (v3.0.1)
+## Números de Referência (v3.1.0)
 
 | Item | Valor |
 |------|-------|
 | `DIRECTIVE` string | **13.256 chars** (146 linhas) |
 | `systemPrompt` (tema + detail 1 + libs) | **~14.4 mil chars** |
-| `html-builder.js` | **917 linhas** |
+| `html-builder.js` | **920 linhas** |
 | Regras no DIRECTIVE | **7** |
 | `NxMat` | **22 materiais** |
 | `NxShader` | **28 shaders + 7 chunks** |

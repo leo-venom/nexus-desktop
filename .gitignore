@@ -8,3 +8,4 @@ __pycache__/
 node_modules/
 desktop/node_modules/
 web/_tmp_t/
+/imagens/nexus-ref-*

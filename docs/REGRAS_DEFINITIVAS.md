@@ -1,4 +1,4 @@
-# 🔴 REGRAS DEFINITIVAS — NEXUS GAME (v3.0.1+)
+# 🔴 REGRAS DEFINITIVAS — NEXUS GAME (v3.1.0+)
 
 **Atualizado:** 2026-10-24  
 **Fonte da verdade:** `web/js/html-builder.js` (DIRECTIVE em execução)  
@@ -34,7 +34,7 @@ Restam **sete regras imutáveis**, na ordem do DIRECTIVE:
   + `NxShader` (28 shaders + 7 chunks) + `NxLoad` (loaders sob demanda).
 - `Html.lint(html)` — **1 argumento**, só checagens gerais (truncado, addon/CDN three, stub).
 - `DIRECTIVE`: **13.256 chars / 146 linhas**; `systemPrompt` nível 1 ≈ **14,4 mil chars**.
-- Versão única em package/lock/ai-client/selector/README/docs: **3.0.1**.
+- Versão única em package/lock/ai-client/selector/README/docs: **3.1.0**.
 
 ---
 
@@ -284,7 +284,7 @@ Arquivo mantido em `imagens/back1.jpg` com **124.961 B** (1920×1080). Não reco
 
 ---
 
-## 14. SEGURANÇA E SALVAMENTO (v3.0.x)
+## 14. SEGURANÇA E SALVAMENTO (v3.1.x)
 
 - Iframe com `sandbox="allow-scripts"` (origem opaca); bridge por `postMessage` com whitelist
   e checagem de `e.source`.
@@ -294,6 +294,9 @@ Arquivo mantido em `imagens/back1.jpg` com **124.961 B** (1920×1080). Não reco
   duplicar, listar backups e restaurar.
 - **Assets:** máximo **6 MB por arquivo** e **20 MB por projeto**; validados antes da escrita;
   reorganizados em `assets/images`, `assets/sounds` ou `assets/generated`.
+- **Imagem anexada** (`POST /_api/ref-image`): exige mesma origem local ou header
+  `X-Nexus-Local-Request`; aceita só PNG/JPEG/WEBP por magic bytes; ≤6 MB decodificados;
+  grava `imagens/nexus-ref-*` com nome único, modo `0600`, `O_EXCL`/`O_NOFOLLOW`.
 - **Proxy `/_proxy` anti-SSRF:** DNS resolvido e fixado no socket, endereços validados,
   redirecionamentos revalidados (máx. **4**). Loopback é permitido **de propósito** para
   LLMs locais.
@@ -301,7 +304,47 @@ Arquivo mantido em `imagens/back1.jpg` com **124.961 B** (1920×1080). Não reco
 
 ---
 
-## 15. VERIFICAÇÃO PÓS-MANUTENÇÃO
+## 15. IMAGEM ANEXADA — RECRIAÇÃO (SEM JOGO) vs ASSET (JOGO ABERTO)
+
+### Regra permanente
+- **Sem jogo aberto** (`lastRendered == null`): a imagem é referência e **recria** a página
+  como jogo interativo (fluxo anterior, inalterado).
+- **Com jogo aberto** (`lastRendered != null`): a imagem é **asset do jogo atual** e nunca
+  uma página nova:
+  - sem texto → **fundo (background)**;
+  - pedido explícito de textura ou componente nomeado (cubo, peça, objeto, parede, nave etc.)
+    → **textura do componente**;
+  - qualquer outro texto → fundo.
+- Preservar jogo, controles, HUD de 15px e som; proibido substituir o jogo por imagem
+  estática ou recriar a imagem como página.
+- Para recriar uma imagem com jogo aberto, o usuário **reinicia a sessão (↺)** — não existe
+  segundo gatilho silencioso.
+
+### Implementação canônica
+- `NxImage.usageMode()` decide fundo/textura; `NxImage.usageBlock()` monta o bloco com o
+  caminho exato; `/imagens/…` é a **única exceção de caminho absoluto** sancionada no
+  `mediaBlock`.
+- O arquivo é enviado por `POST /_api/ref-image`, gravado em `imagens/nexus-ref-*` e usado
+  root-relative no HTML. Proibido base64, `blob:` e `file:` no documento.
+- `garantirImagemAplicada()` exige o caminho exato + pista de uso real (`url(`, `src=`,
+  `TextureLoader`, `createPattern`, `drawImage`, `.map`); se faltar, **uma** correção com
+  documento completo.
+- Salvar copia para `assets/images/` e reescreve o caminho **sem barra inicial**; assets de
+  projeto são servidos com ACAO `*` + CORP `cross-origin`.
+- O anexo só é limpo quando a imagem aparece no documento final; falha de upload,
+  cancelamento ou resposta sem imagem preservam anexo e página.
+
+### Verificação
+```bash
+grep -n "DEFAULT_GAME_IMAGE_COMMAND\|usageMode\|usageBlock" web/js/nx-image.js
+grep -n "POST /_api/ref-image\|ref-image" desktop/server.js serve.py web/js/app.js
+grep -n "EXCEPTION: a REFERENCE IMAGE" web/js/html-builder.js
+# Deve haver exceção apenas para /imagens/; nenhum outro caminho absoluto liberado.
+```
+
+---
+
+## 16. VERIFICAÇÃO PÓS-MANUTENÇÃO
 
 Sempre que editar `html-builder.js`, `prefs.js`, `ai-client.js`, `library-selector.js`,
 `serve.py` ou `desktop/server.js`, rodar:
@@ -369,21 +412,22 @@ os testes cobrem módulos, DIRECTIVE (1–7), NxMat/NxShader/NxLoad, LibrarySele
 
 ---
 
-## 16. NÚMEROS DE REFERÊNCIA (v3.0.1, medidos em 2026-10-24)
+## 17. NÚMEROS DE REFERÊNCIA (v3.1.0, medidos em 2026-10-24)
 
 | Item | Valor |
 |---|---|
-| `html-builder.js` | **917 linhas** |
-| `app.js` | **2.113 linhas** |
-| `library-selector.js` | **658 linhas** |
+| `html-builder.js` | **920 linhas** |
+| `app.js` | **2.595 linhas** |
+| `nx-image.js` | **975 linhas** |
+| `library-selector.js` | **702 linhas** |
 | `nx-materials.js` | **730 linhas** |
 | `nx-shaders.js` | **868 linhas** |
-| `nx-loaders.js` | **188 linhas** |
-| `ai-client.js` | **490 linhas** |
-| `store.js` | **337 linhas** |
+| `nx-loaders.js` | **228 linhas** |
+| `ai-client.js` | **505 linhas** |
+| `store.js` | **347 linhas** |
 | `vu-meter.js` | **201 linhas** |
-| `serve.py` | **867 linhas** |
-| `desktop/server.js` | **1.039 linhas** |
+| `serve.py` | **935 linhas** |
+| `desktop/server.js` | **1.102 linhas** |
 | `desktop/main.js` | **141 linhas** |
 | `DIRECTIVE` | **13.256 chars** (146 linhas) |
 | `systemPrompt` (detail 1) | **≈14.377 chars** |
@@ -396,7 +440,7 @@ os testes cobrem módulos, DIRECTIVE (1–7), NxMat/NxShader/NxLoad, LibrarySele
 | `maxTokens` | **65.535** |
 | Orçamento de sessão | **1.000.000** |
 | Timeouts | **60 / 120 / 300 s** |
-| Versão | **3.0.1** |
+| Versão | **3.1.0** |
 
 ---
 

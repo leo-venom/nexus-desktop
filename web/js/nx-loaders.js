@@ -22,15 +22,15 @@
   var LOADED = {};
   var PENDING = {};
 
-  /* URLs CDN para cada lib que não pode ser local */
+  /* URLs CDN para cada lib que não pode ser incluída localmente */
   var CDN = {
-    rapher: 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.13.0/rapier.esm.js',
-    recast: 'https://cdn.jsdelivr.net/npm/recast-navigation-js@0.4.0/dist/recast-navigation-js.js',
-    postprocessing: 'https://cdn.jsdelivr.net/npm/postprocessing@6.36.3/dist/postprocessing.js',
-    'three-mesh-bvh': 'https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.umd.cjs',
+    rapier: 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.13.0/rapier.es.js',
+    recast: 'https://cdn.jsdelivr.net/npm/recast-navigation@0.43.1/+esm',
+    postprocessing: 'https://cdn.jsdelivr.net/npm/postprocessing@6.36.3/build/postprocessing.js',
+    'three-mesh-bvh': 'https://unpkg.com/three-mesh-bvh@0.7.8/build/index.umd.cjs',
   };
 
-  /* Carrega um script pelo CDN */
+  /* Carrega um script clássico pelo CDN */
   function loadScript(url) {
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
@@ -41,7 +41,18 @@
     });
   }
 
+  /* Carrega um módulo ES pelo CDN (Rapier/Recast são ESM + WASM). */
+  function loadModule(url, label) {
+    return import(url).catch(function (e) {
+      throw new Error(label + ' CDN falhou: ' + (e && e.message ? e.message : e));
+    });
+  }
+
   function cdnLoad(name) {
+    if (name === 'rapier') return loadRapier();
+    if (name === 'recast') return loadRecast();
+    if (name === 'postprocessing') return loadPostprocessing();
+    if (name === 'meshBVH' || name === 'three-mesh-bvh') return loadMeshBVH();
     if (LOADED[name]) return Promise.resolve();
     if (PENDING[name]) return PENDING[name];
     var url = CDN[name];
@@ -60,60 +71,89 @@
   /* Rapier (física 3D) */
   function loadRapier() {
     if (typeof RAPIER !== 'undefined') { LOADED.rapier = true; return Promise.resolve(); }
-    /* Rapier precisa de init() WASM - carrega via CDN com compat */
-    var url = 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.13.0/rapier.esm.js';
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement('script');
-      s.type = 'module';
-      s.textContent = [
-        'import * as RAPIER from "' + url + '";',
-        'await RAPIER.init();',
-        'window.RAPIER = RAPIER;',
-        'window.dispatchEvent(new CustomEvent("rapier-ready"));',
-      ].join('\n');
-      s.onerror = function () { reject(new Error('Rapier falhou')); };
-      window.addEventListener('rapier-ready', function () { LOADED.rapier = true; resolve(); }, { once: true });
-      document.head.appendChild(s);
+    if (PENDING.rapier) return PENDING.rapier;
+    /* rapier3d-compat é ESM e precisa de init() para o WASM. */
+    PENDING.rapier = loadModule(CDN.rapier, 'Rapier').then(function (mod) {
+      return mod.init().then(function () {
+        window.RAPIER = mod;
+        LOADED.rapier = true;
+        delete PENDING.rapier;
+        try { window.dispatchEvent(new CustomEvent('rapier-ready')); } catch (_) {}
+      });
+    }).catch(function (e) {
+      delete PENDING.rapier;
+      throw e;
     });
+    return PENDING.rapier;
   }
 
   /* Recast Navigation (WASM) */
   function loadRecast() {
     if (window.RecastNavigation) { LOADED.recast = true; return Promise.resolve(); }
-    return new Promise(function (resolve, reject) {
-      var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/recast-navigation-js@0.4.0/dist/recast-navigation-js.js';
-      s.onload = function () {
-        if (window.RecastNavigation && window.RecastNavigation.isSupported()) {
-          LOADED.recast = true; resolve();
-        } else {
-          reject(new Error('Recast nao suportado neste navegador'));
-        }
-      };
-      s.onerror = function () { reject(new Error('Recast CDN falhou')); };
-      document.head.appendChild(s);
+    if (PENDING.recast) return PENDING.recast;
+    /* recast-navigation >= 0.43 é ESM; o init() carrega o WASM. */
+    PENDING.recast = loadModule(CDN.recast, 'Recast').then(function (mod) {
+      return mod.init().then(function () {
+        window.RecastNavigation = mod;
+        LOADED.recast = true;
+        delete PENDING.recast;
+      });
+    }).catch(function (e) {
+      delete PENDING.recast;
+      throw e;
     });
+    return PENDING.recast;
+  }
+
+  /* O UMD do postprocessing expõe POSTPROCESSING; cria os globais usuais. */
+  function exposePostprocessing() {
+    var pp = window.POSTPROCESSING;
+    if (!pp) return false;
+    ['EffectComposer', 'RenderPass', 'EffectPass', 'BloomEffect', 'SMAAEffect',
+      'ToneMappingEffect', 'ShaderPass', 'MaskPass', 'ClearPass', 'CopyPass'].forEach(function (name) {
+      if (typeof window[name] === 'undefined' && typeof pp[name] !== 'undefined') window[name] = pp[name];
+    });
+    return !!window.EffectComposer;
   }
 
   /* Postprocessing (Three.js addon - EffectComposer) */
   function loadPostprocessing() {
-    if (window.EffectComposer) { LOADED.postprocessing = true; return Promise.resolve(); }
+    if (exposePostprocessing()) { LOADED.postprocessing = true; return Promise.resolve(); }
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = CDN.postprocessing;
-      s.onload = function () { LOADED.postprocessing = true; resolve(); };
+      s.onload = function () {
+        if (exposePostprocessing()) { LOADED.postprocessing = true; resolve(); }
+        else reject(new Error('postprocessing CDN sem EffectComposer'));
+      };
       s.onerror = function () { reject(new Error('postprocessing CDN falhou')); };
       document.head.appendChild(s);
     });
   }
 
+  /* O UMD do three-mesh-bvh expõe MeshBVHLib; alias para o global da diretiva. */
+  function exposeMeshBVH() {
+    var lib = window.MeshBVHLib;
+    if (!lib) return false;
+    if (typeof window.MeshBVH === 'undefined' && lib.MeshBVH) window.MeshBVH = lib.MeshBVH;
+    ['computeBoundsTree', 'disposeBoundsTree', 'acceleratedRaycast',
+      'MeshBVHVisualizer', 'StaticGeometryGenerator'].forEach(function (name) {
+      if (typeof window[name] === 'undefined' && typeof lib[name] !== 'undefined') window[name] = lib[name];
+    });
+    return !!window.MeshBVH;
+  }
+
   /* three-mesh-bvh */
   function loadMeshBVH() {
-    if (window.MeshBVH) { LOADED['three-mesh-bvh'] = true; return Promise.resolve(); }
+    if (exposeMeshBVH()) { LOADED['three-mesh-bvh'] = true; return Promise.resolve(); }
+    if (!window.THREE) return Promise.reject(new Error('three-mesh-bvh requer three.js'));
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = CDN['three-mesh-bvh'];
-      s.onload = function () { LOADED['three-mesh-bvh'] = true; resolve(); };
+      s.onload = function () {
+        if (exposeMeshBVH()) { LOADED['three-mesh-bvh'] = true; resolve(); }
+        else reject(new Error('three-mesh-bvh sem MeshBVH'));
+      };
       s.onerror = function () { reject(new Error('three-mesh-bvh CDN falhou')); };
       document.head.appendChild(s);
     });

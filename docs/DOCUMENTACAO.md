@@ -1,4 +1,4 @@
-# Documentação — NEXUS GAME v3.0.1
+# Documentação — NEXUS GAME v3.1.0
 
 Port desktop do **NEXUS77** (Android/Kotlin). O app é um shell que conversa com uma API
 estilo OpenAI e renderiza o HTML gerado pela IA em um iframe isolado.
@@ -25,10 +25,12 @@ local acontece **somente no render**, então salvar/refinar continua portátil.
 ## 2. Arquivos
 
 ### web/index.html
-Shell estático: **uma linha no topo** com marca, sessão, prompt (**Enter envia**), status,
-VU/KB, SALVAR/ABRIR e ⚙ (canto direito); `iframe#frame` ocupa o restante. Carrega os scripts
-na ordem: themes → prefs → library-selector → html-builder → ai-client → store → vu-meter →
-settings → app.
+Shell estático: **uma linha no topo** com marca, sessão, prompt (**Enter envia**), chip
+`LIBS` (bibliotecas usadas pela página), status, VU/KB, SALVAR/ABRIR e ⚙ (canto direito);
+`iframe#frame` ocupa o restante. O prompt tem dois botões internos (anexar imagem à
+esquerda, reset à direita) e um cartão de referência logo abaixo. Carrega os scripts
+na ordem: themes → prefs → library-selector → html-builder → nx-image → ai-client → store →
+vu-meter → settings → app.
 
 ### web/css/app.css
 Layout do shell e dos modais. Todas as cores vêm de variáveis `--nx-*` aplicadas em
@@ -41,7 +43,8 @@ roxo `#A855F7`, azul `#00A3FF`). `of()` sempre devolve o mesmo.
 ### web/js/prefs.js
 Persistência em `localStorage["nexus77"]` (JSON). Chaves: `endpoint`, `apiKey`, `model`,
 `temperature`, `maxTokens`, `sessionTokens`, `sessionPromptTokens`, `sessionCompletionTokens`,
-`usageLog`, `autoFix`.
+`usageLog`, `autoFix`, `imageMode` (`auto` padrão ou `local`), `imageModeVersion`
+(preserva a escolha explícita de somente local) e `visualIterations` (0–2).
 
 ### web/js/library-selector.js
 Catálogo inteligente de **24 entradas** (20 locais/nativas + 4 CDN) divididas em categorias:
@@ -61,6 +64,8 @@ Catálogo inteligente de **24 entradas** (20 locais/nativas + 4 CDN) divididas e
 
 Funções:
 - `selectLibraries(command, doc)` — seleciona automático por keywords (pt-BR + en)
+- `usedLibraries(html)` — lê o HTML final e devolve as libs realmente usadas (vendor,
+  NxLoad/CDN, NxShader e Canvas 2D); alimenta o chip `#libs` da barra superior
 - `buildLibraryDirective(selected)` — gera bloco pro system prompt
 - `getLibraryFile(name)` / `getLibraryGlobal(name)` / `isLibraryLocal(name)` / `isLibraryModule(name)`
 - `resolveDeps(selected)` — resolve dependências entre libs
@@ -73,6 +78,7 @@ Port de `Html.kt`. Exporta `window.Html`:
 | `DIRECTIVE` | bloco completo com IDENTIDADE, CONTRATO DE SAÍDA, REGRA 1-7 |
 | `systemPrompt(theme, level, cmd, doc, media)` | prompt + paleta + nível de detalhe + mídia + libs |
 | `userPrompt(base, doc, notes)` | anexa a página atual + erros/comandos anteriores |
+| `mediaBlock(media)` | lista mídia local; autoriza o caminho absoluto `/imagens/…` como exceção do bloco REFERENCE IMAGE |
 | `extractDocument(raw)` | remove cercas e corta até `<!doctype`/`<html` |
 | `decorate(html, theme)` | injeta viewport + storage polyfill + nx-materials.js + nx-shaders.js + nx-loaders.js + libs |
 | `buildLibraryScripts(html)` | detecta e injeta `<script>` locais das bibliotecas vendor usadas (Three.js, Babylon, Phaser, Pixi, Matter, GSAP, Konva, Lottie, Howler, Tone, ZzFX, Yuka, lil-gui, simplex-noise etc.) |
@@ -86,7 +92,13 @@ Port de `Html.kt`. Exporta `window.Html`:
 ### web/js/ai-client.js
 Port de `AiClient.kt` com `fetch`:
 
-- `chat(endpoint, key, model, temp, maxTokens, system, user, onProgress)` — streaming SSE + fallback
+- `chat(endpoint, key, model, temp, maxTokens, system, user, onProgress, opts)` — streaming SSE
+  + fallback; `opts.image` (data URL PNG/JPEG/WEBP validado) transforma o conteúdo do usuário
+  em `[{type:'text'}, {type:'image_url'}]`; sem `opts.image`, o payload é idêntico ao anterior
+- `isImageInputError(e)` — reconhece HTTP 400/413/415/422 para acionar o fallback multimodal
+- `clampMaxTokens(model, maxTokens)` — `0` omite o limite; valores explícitos são cortados
+  nos tetos conhecidos (GPT-6 128.000, GPT-5 100.000, GPT-4.1 32.768, GPT-4o 16.384 etc.)
+  para evitar HTTP 400
 - `listModels(endpoint, key)` — busca modelos da API
 - `cancel()` — aborta geração
 - Timeouts: conexão 60 s, leitura 120 s, não-streaming 300 s
@@ -99,11 +111,36 @@ API REST para `/_api/saves/<nome>` (POST/GET/DELETE). Backups automáticos em `_
 Canvas 2D, 20 barras, cabeça percorrente com rastro, degradê esmeralda→azul→roxo.
 
 ### web/js/settings.js
-Modal de configurações: API (endpoint, key, modelo), GERAÇÃO (temperatura, max tokens, auto-fix).
+Modal de configurações: API (endpoint, key, modelo), GERAÇÃO (temperatura, max tokens,
+auto-fix) e IMAGEM DE REFERÊNCIA (automático ou somente local e correções visuais 0–2).
 
 ### web/js/app.js
 Port de `MainActivity`: estado, UI, fluxo de geração, sessão, salvar/abrir/excluir,
-tema, bridge, modo edição visual, anti-erro, Ctrl+Z.
+tema, bridge, modo edição visual, anti-erro, Ctrl+Z, anexo de imagem e comparação visual
+opcional. Com jogo aberto, o anexo passa por `uploadGameImage()` antes do prompt e vira
+asset do jogo; sem jogo, segue o fluxo de recriação. O anexo é descartado após sucesso
+confirmado, reset ou remoção; falha de upload/cancelamento e resposta sem a imagem mantêm
+o anexo disponível para nova tentativa.
+
+### web/js/nx-image.js
+Análise local da referência, sem dependência de endpoint/modelo:
+
+- `inspect(file)` — magic bytes (PNG/JPEG/WEBP), limites (12 MB, 40 MP, 10.000 px),
+  dimensões reais, miniatura e relatório
+- `analyzeSource(source, meta)` — Canvas 2D: paleta, brilho/contraste, fundo, bordas
+  Sobel, componentes, grade 3×3, simetria, linhas; `TextDetector` nativo é opcional
+- `compare(ref, cand)` — distância de paleta/grade/brilho/proporção/bordas + issues
+- `dataUrl(file)` — leitura para o modo automático
+- `usageMode(command)` — `background` por padrão; `texture` quando há palavra de textura
+  ou um componente nomeado (cubo, peça, objeto, parede, nave etc.)
+- `usageBlock(asset, {path, mode, vision})` — bloco em inglês que manda usar o caminho
+  `/imagens/…` **dentro** do jogo (fundo ou textura), proibindo recriar a imagem/base64
+- `assetForGame(asset)` — data URL pronta para upload; acima de 6 MB reencoda via canvas
+- `DEFAULT_GAME_IMAGE_COMMAND` — pedido padrão quando há jogo aberto e nenhum texto
+- `referenceBlock(asset, {vision, followup})` — relatório JSON + regras de recriação
+- `fallbackReport(meta, error)` — relatório mínimo, sem inventar detalhes
+
+A análise é aproximada e declara incertezas; não há OpenCV.js/Tesseract.js embutidos.
 
 ### web/js/nx-materials.js
 **22 materiais PBR** com texturas processuais. API global `NxMat`:
@@ -157,6 +194,12 @@ Loaders sob demanda. API global `NxLoad`:
 | `NxLoad.tiled(json)` | Carrega mapa Tiled .json |
 | `NxLoad.ready(name)` | True se já carregou |
 
+Os quatro loaders CDN usam URLs fixas verificadas: Rapier `rapier.es.js`, Recast
+`recast-navigation@0.43.1/+esm`, postprocessing `build/postprocessing.js` e three-mesh-bvh
+UMD (unpkg). O loader inicializa WASM (`init()`) e cria os globais esperados pela diretiva:
+`RAPIER`, `RecastNavigation`, `EffectComposer`/`RenderPass` e `MeshBVH`/`computeBoundsTree`.
+ZzFX usa o build clássico `vendor/zzfx/ZzFX.global.js` (expõe `zzfx`/`ZZFX`/`ZzFX`).
+
 ### desktop/main.js
 Shell Electron: instância única, janela normal, F11 tela cheia, F12 DevTools.
 
@@ -170,13 +213,23 @@ Exige `desktop/node_modules/.bin/electron` e executa com flags de GPU.
 
 ## 3. Fluxo de geração
 
-1. `sendPrompt()` valida prompt e API key
-2. `LibrarySelector.selectLibraries(prompt)` → seleciona libs ideais
-3. Monta system = `DIRECTIVE + paletaRef + detailDirective + mediaBlock + libraryDirective`
-4. `AiClient.chat(...)` — streaming SSE com progresso
-5. `extractDocument()` limpa resposta
-6. `render(themed(doc))` — rewriteLibs → injectShim → iframe.srcdoc
-7. Anti-erro opcional: telemetria → relatório → correção automática
+1. `sendPrompt()` valida prompt/API key e, se houver anexo, se a análise terminou
+2. Se **há jogo aberto** e anexo: `NxImage.usageMode(command)` decide fundo/textura e
+   `uploadGameImage()` grava a imagem em `imagens/nexus-ref-*` via `POST /_api/ref-image`;
+   falha de upload aborta a geração sem tocar na página
+3. `NxImage.usageBlock()` (jogo aberto) ou `NxImage.referenceBlock()` (sem jogo) entra no
+   prompt; no modo automático, a imagem original também é enviada ao modelo
+4. `LibrarySelector.selectLibraries(prompt)` → seleciona libs ideais
+5. Monta system = `DIRECTIVE + paletaRef + detailDirective + mediaBlock + libraryDirective`
+6. `AiClient.chat(...)` — streaming SSE com progresso; no modo automático, conteúdo multimodal
+7. `extractDocument()` limpa resposta
+8. Verificações: continuação de resposta cortada, sintaxe do JS, qualidade (`Html.lint`) e,
+   com jogo aberto, `garantirImagemAplicada()` exige o caminho exato + pista de uso; se
+   faltar, pede **uma** correção completa e só aceita HTML válido
+9. `render(themed(doc))` — rewriteLibs → injectShim → iframe.srcdoc
+10. Anti-erro opcional: telemetria → relatório → correção automática
+11. Comparação visual opcional (0–2): captura canvas → `NxImage.compare` → correção
+    (somente gerações novas, nunca em ajuste de página)
 
 ---
 
@@ -189,6 +242,16 @@ No servidor, a API de saves valida nomes e contenção de caminho (sem `..`, nom
 ou symlinks), limita assets a 6 MB/arquivo e 20 MB/projeto, e o `/_proxy` resolve e fixa o
 DNS, revalida redirecionamentos (máx. 4) e bloqueia alvos internos — loopback é permitido
 de propósito para LLMs locais.
+
+A imagem anexada é escolhida pelo seletor nativo do renderer sandbox; o app não recebe
+caminhos do sistema, não executa conteúdo da imagem e não cria IPC/preload. Sem jogo
+aberto, ela permanece em memória (miniatura + relatório) e, no modo automático, os pixels
+vão ao endpoint configurado; se ele recusar, o app usa o relatório local. No modo somente
+local, os pixels nunca saem do navegador. Com jogo aberto, a imagem é gravada no servidor
+local por `POST /_api/ref-image` (mesma origem ou header `X-Nexus-Local-Request`,
+PNG/JPEG/WEBP por magic bytes, ≤6 MB) como `imagens/nexus-ref-*`, nome único, modo `0600`
+e abertura `O_EXCL`/`O_NOFOLLOW`; o HTML usa apenas esse caminho root-relative. O save
+incorpora o arquivo em `assets/images/` do projeto.
 
 ---
 
@@ -211,7 +274,8 @@ Dois servidores equivalentes:
 | Python | `python3 serve.py` | Fallback navegador |
 | Node | `desktop/server.js` | Embutido no Electron |
 
-Ambos servem `web/`, `/_proxy`, `/fontes/`, `/midia`, `/_api/saves`.
+Ambos servem `web/`, `/_proxy`, `/fontes/`, `/midia`, `/_api/saves` e
+`POST /_api/ref-image` (upload local da imagem anexada a um jogo aberto).
 
 ---
 
@@ -225,6 +289,9 @@ Cada salvo vira `salvos/<nome>/` com:
 
 Limites: **6 MB por arquivo** e **20 MB por projeto**. API REST: `/_api/saves/<nome>`
 (POST/GET/DELETE) + `/rename`, `/duplicate`, `/backups`, `/_backups/<ts>/restore`.
+Referências root-relative `/imagens/…` ou `/sons/…` são copiadas para `assets/images/` ou
+`assets/sounds/` e reescritas sem a barra inicial, para funcionar com o `<base href>` ao
+reabrir. Assets de projeto são servidos com ACAO `*` + CORP `cross-origin` (WebGL/Canvas).
 
 ---
 
@@ -264,9 +331,65 @@ A IA analisa o prompt e escolhe as libs ideais. Exemplos:
 
 ---
 
-## 10. Limitações conhecidas
+## 10. Imagem de referência
+
+### Fluxo e estados
+O botão de clipe abre o seletor nativo. Estados visíveis no cartão: oculto (sem anexo),
+`analisando imagem…`, pronto (miniatura + nome + dimensões + tamanho), erro curto e
+removido. A imagem pode ser removida antes do envio; após sucesso confirmado, é descartada.
+Com jogo aberto, o cartão mostra `pronta · fundo por padrão; textura se pedir`.
+
+### Modos
+| Modo | O que o modelo recebe | Quando usar |
+|---|---|---|
+| **Automático** (padrão) | imagem original (fonte primária) + relatório | endpoint multimodal; melhor fidelidade |
+| **Somente local** | relatório JSON aproximado, sem pixels | modelo sem visão ou privacidade |
+
+No modo automático, HTTP 400/413/415/422 aciona **uma** nova tentativa sem imagem, com o
+relatório local; o anexo permanece e a geração não é perdida. Refinos posteriores nunca
+reenviam a imagem. Preferências antigas `local` sem `imageModeVersion = 2` migram para
+automático; depois desta versão, escolher somente local grava a versão e é preservado.
+
+### Imagem dentro do jogo atual (v3.1.0)
+Quando `lastRendered != null`, o anexo deixa de ser referência de recriação e vira **asset
+do jogo**:
+
+| Pedido | Modo | Instrução principal |
+|---|---|---|
+| vazio ou “use como fundo” | **background** | imagem atrás do gameplay (CSS/`drawImage`/`scene.background`), sem bloquear input |
+| “textura do cubo/peça/objeto” | **texture** | `createPattern`/`drawImage` (2D) ou `material.map` (3D) no componente nomeado; sem alvo, no objeto controlável |
+
+- `NxImage.usageMode(command)` decide pelo texto (palavras de textura ou alvo nomeado);
+  qualquer outro caso é fundo.
+- `uploadGameImage()` grava a imagem em `imagens/nexus-ref-<timestamp>-<rand>.<ext>` via
+  `POST /_api/ref-image` e devolve o caminho root-relative usado no prompt
+  (`NxImage.usageBlock`). O endpoint exige origem local/header, valida magic bytes e
+  limite de 6 MB; imagens maiores são reencodadas por `NxImage.assetForGame`.
+- Depois da geração, `garantirImagemAplicada()` exige o caminho exato **e** uma pista de
+  uso (`url(`, `src=`, `TextureLoader`, `createPattern`, `drawImage`, `.map`). Se faltar,
+  faz uma rodada de correção com o documento completo; se ainda assim faltar, avisa e
+  mantém o anexo.
+- O save copia o arquivo para `salvos/<nome>/assets/images/` e reescreve o caminho para
+  `assets/images/...` (sem barra inicial). O anexo só é limpo após uso confirmado; falha
+  de upload, cancelamento ou resposta sem a imagem preservam página e anexo.
+- Sem jogo aberto, nada muda: a imagem recria a página pelo fluxo de referência. Para
+  recriar com um jogo aberto, o usuário reinicia a sessão (↺).
+
+### Recriação e comparação
+A instrução padrão (somente imagem) pede uma recriação fiel e **interativa**, prioriza o
+comando do usuário e proíbe inventar detalhes ausentes. A comparação opcional (0–2)
+captura apenas o maior canvas, compara métricas com a referência e pede correção; não
+funciona para páginas puramente CSS/DOM e pode pular canvas WebGL ilegível.
+
+## 11. Limitações conhecidas
 
 1. **Validação é estática, não visual** — harness mede módulos, prompt e APIs, mas não FPS/toque/áudio reais
 2. **Áudio suspenso até primeiro gesto** — regra do navegador
 3. **Rapier, Recast, postprocessing, meshBVH dependem de CDN** (WASM/addons Three.js)
 4. **Playwright não integrado** — test runner separado pendente
+5. **Análise de imagem aproximada** — sem OCR garantido (só `TextDetector` nativo), sem
+   semântica e sem profundidade confiável; regiões/contornos são estimativas
+6. **Comparação visual cobre canvas** — páginas DOM/CSS e canvas WebGL que retornam vazio
+   não são comparadas; a correção é limitada a 2 rodadas e vem desligada
+7. **Visão depende do endpoint** — o app não garante que o modelo aceite imagens; nesse
+   caso o fallback local preserva a geração, mas perde detalhes visuais

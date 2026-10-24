@@ -96,6 +96,134 @@ body {
   border-radius: 50%;
   background: var(--nx-secondary);
 }
+/* anexo de imagem, dentro do input (canto esquerdo) */
+.attach {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nx-secondary);
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.attach svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.attach:hover:not(:disabled) {
+  color: var(--nx-accent);
+  background: var(--nx-accent-faint);
+  transform: translateY(-50%) scale(1.1);
+}
+.attach:active:not(:disabled) {
+  background: var(--nx-accent-soft);
+  color: var(--nx-on-accent);
+  transform: translateY(-50%) scale(0.92);
+}
+.attach.has {
+  color: var(--nx-accent);
+  background: var(--nx-accent-faint);
+}
+.attach:disabled { opacity: 0.45; cursor: default; }
+.attach:focus-visible, .reset:focus-visible, .imgx:focus-visible {
+  outline: 1px solid var(--nx-accent);
+  outline-offset: 1px;
+}
+
+/* cartão da imagem de referência, ancorado abaixo do input */
+.imgattach {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 45;
+  width: 250px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--nx-accent-soft);
+  border-radius: 10px;
+  background: var(--nx-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.imgattach[hidden] { display: none; }
+.imgthumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 7px;
+  border: 1px solid var(--nx-surface-alt);
+  background: var(--nx-surface-alt);
+}
+.imgmeta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 1px;
+}
+.imgname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  font-size: 10.5px;
+  font-weight: bold;
+  color: var(--nx-text);
+}
+.imgsub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: var(--nx-secondary);
+}
+.imgstate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: var(--nx-accent);
+}
+.imgstate.error { color: var(--mx-error); }
+.imgstate.busy { opacity: 0.72; animation: nx-pulse 1.1s ease-in-out infinite; }
+.imgx {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nx-secondary);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.imgx:hover:not(:disabled) { color: var(--mx-error); background: var(--nx-surface-alt); }
+.imgx:disabled { opacity: 0.4; cursor: default; }
+
 /* botão de reiniciar sessão, dentro do input (canto direito) */
 .reset {
   position: absolute;
@@ -157,6 +285,27 @@ body {
 .status.end { text-align: right; }
 .status.accent { color: var(--nx-accent); }
 .status.error { color: var(--mx-error); }
+
+/* Bibliotecas usadas pela página atual (ao lado do comando). */
+.libs {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border: 1px solid var(--nx-accent-soft);
+  border-radius: 9px;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  color: var(--nx-accent);
+  background: var(--nx-accent-faint);
+}
+.libs::before { content: 'LIBS · '; opacity: 0.6; }
+.libs[hidden] { display: none; }
 
 /* ---------- painel de consumo ---------- */
 
@@ -319,7 +468,7 @@ body {
   height: 30px;
   border: 0;
   border-radius: 15px;
-  padding: 0 30px 0 10px;
+  padding: 0 30px 0 29px;
   font-size: 12px;
   color: var(--nx-text);
   background: var(--nx-surface-alt);
@@ -455,6 +604,13 @@ body {
   cursor: pointer;
 }
 .mx-check input { accent-color: var(--nx-accent); }
+
+.mx-note {
+  padding-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--nx-secondary);
+}
 
 .mx-btn {
   display: block;

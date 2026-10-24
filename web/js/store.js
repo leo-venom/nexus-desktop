@@ -133,6 +133,17 @@
     });
   }
 
+  /* Reescreve apenas referências locais: aceita barra inicial (`/imagens/x`),
+     relativa (`imagens/x`, `./imagens/x`) e ignora URLs externas. A barra
+     inicial precisa sair para o projeto salvo funcionar com <base href>. */
+  function rewriteAssetRef(html, source, destination) {
+    var escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var expression = new RegExp('(^|[\\s"\'`=(,;:>\\[\\{])(?:\\.\\/|\\/)?' + escaped, 'g');
+    return String(html).replace(expression, function (match, prefix) {
+      return prefix + destination;
+    });
+  }
+
   function extractAssetsFromHtml(html, projectName) {
     if (!html) return Promise.resolve({});
     var matches = new Set();
@@ -187,8 +198,7 @@
         totalBytes += dataUris[i].bytes;
         if (totalBytes > ASSET_MAX_TOTAL) throw new Error('assets do projeto excedem 20 MB');
         assets[keys[i].destination] = dataUris[i].dataUrl;
-        var escaped = keys[i].source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        transformed = transformed.replace(new RegExp(escaped, 'g'), keys[i].destination);
+        transformed = rewriteAssetRef(transformed, keys[i].source, keys[i].destination);
       }
       return { assets: assets, html: transformed };
     });

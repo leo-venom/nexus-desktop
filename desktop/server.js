@@ -11,6 +11,7 @@
 
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 const dns = require('dns').promises;
 const net = require('net');
 const fs = require('fs');
@@ -36,6 +37,7 @@ const MEDIA_KINDS = {
   imagens: { dir: IMAGES_DIR, ext: IMAGE_EXT, key: 'images' },
   sons: { dir: SOUNDS_DIR, ext: SOUND_EXT, key: 'sounds' },
 };
+const REF_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -717,8 +719,7 @@ async function apiSavesSave(nome, body) {
   }
 }
 
-async function apiSavesDelete(nome) {
-  if (!validSaveName(nome)) return [{ ok: false, error: 'nome invalido' }, 400];
+async function apiSavesDelete(nome) {  if (!validSaveName(nome)) return [{ ok: false, error: 'nome invalido' }, 400];
   try {
     if (!(await ensureSavesRoot())) return [{ ok: false, error: 'raiz invalida' }, 400];
     const pasta = path.join(path.resolve(SALVOS_DIR), nome);
@@ -731,9 +732,70 @@ async function apiSavesDelete(nome) {
   }
 }
 
+/* --- Imagem de referência usada dentro do jogo aberto ---------------------
+ * A imagem anexada no input é gravada como arquivo real em imagens/ para que
+ * o HTML gerado a referencie por "/imagens/nexus-ref-…" (base64 é proibido
+ * pelo DIRECTIVE e blob: não atravessa o iframe sandbox). */
+function sniffRefImage(bytes) {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 &&
+      bytes[2] === 0x4E && bytes[3] === 0x47 && bytes[4] === 0x0D &&
+      bytes[5] === 0x0A && bytes[6] === 0x1A && bytes[7] === 0x0A) {
+    return { ext: '.png', mime: 'image/png' };
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return { ext: '.jpg', mime: 'image/jpeg' };
+  }
+  if (bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' &&
+      bytes.toString('ascii', 8, 12) === 'WEBP') {
+    return { ext: '.webp', mime: 'image/webp' };
+  }
+  return null;
+}
+
+async function apiRefImage(body) {
+  const raw = body && typeof body.data === 'string' ? body.data : '';
+  if (!raw) return [{ ok: false, error: 'imagem ausente' }, 400];
+  const encoded = raw.includes(',') ? raw.slice(raw.indexOf(',') + 1) : raw;
+  if (!encoded || encoded.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    return [{ ok: false, error: 'imagem base64 invalida' }, 400];
+  }
+  const bytes = Buffer.from(encoded, 'base64');
+  if (!bytes.length) return [{ ok: false, error: 'imagem base64 invalida' }, 400];
+  if (bytes.length > REF_IMAGE_MAX_BYTES) return [{ ok: false, error: 'imagem excede 6 MB' }, 413];
+  const kind = sniffRefImage(bytes);
+  if (!kind) return [{ ok: false, error: 'formato invalido — use PNG, JPG ou WEBP' }, 400];
+  try {
+    const dirStat = await fsp.lstat(IMAGES_DIR).catch(() => null);
+    if (dirStat && (dirStat.isSymbolicLink() || !dirStat.isDirectory())) {
+      return [{ ok: false, error: 'pasta imagens invalida' }, 500];
+    }
+    if (!dirStat) await fsp.mkdir(IMAGES_DIR, { recursive: true });
+    const name = 'nexus-ref-' + Date.now() + '-' + crypto.randomBytes(6).toString('hex') + kind.ext;
+    const full = path.join(IMAGES_DIR, name);
+    const handle = await fsp.open(full,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW || 0),
+      0o600);
+    try { await handle.writeFile(bytes); } finally { await handle.close(); }
+    return [{ ok: true, path: '/imagens/' + name, bytes: bytes.length }, 200];
+  } catch (_) {
+    return [{ ok: false, error: 'falha ao gravar imagem' }, 500];
+  }
+}
+
 async function serveApi(req, res, pathname) {
   const method = req.method;
   const parts = pathname.replace(/\/+$/, '').split('/');
+
+  if (pathname === '/_api/ref-image' && method === 'POST') {
+    if (!sameLocalOrigin(req)) return sendJson(res, { ok: false, error: 'origem nao permitida' }, 403);
+    try {
+      const body = await readBodyJson(req);
+      const [result, status] = await apiRefImage(body);
+      return sendJson(res, result, status);
+    } catch (error) {
+      return sendJson(res, { ok: false, error: error.message || 'requisicao invalida' }, error.statusCode || 400);
+    }
+  }
 
   if (pathname === '/_api/saves' && method === 'GET') {
     return sendJson(res, await apiSavesList());
@@ -821,7 +883,8 @@ async function serveApi(req, res, pathname) {
         res.writeHead(200, {
           'Content-Type': mime,
           'Content-Length': data.length,
-          'Cross-Origin-Resource-Policy': 'same-origin',
+          'Access-Control-Allow-Origin': '*',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
           'Cache-Control': 'no-store',
         });
         return res.end(data);

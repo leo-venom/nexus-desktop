@@ -7,7 +7,7 @@ interpretação mais impressionante dentro das 7 regras do DIRECTIVE.
 A interface roda em um **app Electron próprio, em janela normal**, sem barra de navegador;
 o Chromium embutido preserva iframe, renderização e WebGL.
 
-**Versão 3.0.1** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md) ·
+**Versão 3.1.0** · estado completo em [`docs/ESTADO_ATUAL.md`](docs/ESTADO_ATUAL.md) ·
 histórico em [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Recursos
@@ -47,7 +47,24 @@ histórico em [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
   tipografia, animação e simulação física.
 - Acabamento dentro do objeto/pedido — sem títulos, HUD ou painéis inventados.
 
+### Imagem dentro do jogo atual
+- Com um jogo já aberto, a imagem anexada é usada **dentro do jogo**, não recriada:
+  sem texto vira **fundo (background)**; “use essa imagem como textura do cubo/peça/objeto”
+  vira **textura do componente** (2D: `createPattern`/`drawImage`; 3D: `material.map`).
+  Jogo, controles, HUD de 15px e som continuam intactos.
+- O arquivo é enviado por `POST /_api/ref-image` para `imagens/nexus-ref-*` e usado como
+  `/imagens/…`; ao salvar, é copiado para `assets/images/` e o caminho é reescrito.
+- O anexo só é descartado quando o caminho aparece de fato no documento final. Falha de
+  upload, cancelamento ou resposta sem a imagem mantêm o anexo para nova tentativa.
+- Para **recriar** uma imagem como jogo novo com um jogo aberto, reinicie a sessão (↺).
+
 ### Geral
+- **Referência visual (sem jogo aberto)** — anexe PNG/JPEG/WEBP pelo clipe dentro do prompt;
+  thumbnail, nome, dimensões e remoção antes do envio. A imagem é validada e analisada
+  localmente (Canvas 2D, OCR nativo opcional) e vira um relatório JSON; no modo automático
+  (padrão), a imagem original também é enviada ao endpoint e, se ele recusar, o app usa o
+  relatório local. "Somente local" nunca envia os pixels. Somente imagem usa uma instrução
+  padrão de recriação interativa.
 - **1 tema único** `PADRÃO · BLACK CYBER` (preto + esmeralda/roxo/azul) — sem seletor.
 - **Prévia ao vivo** durante a geração (documento parcial renderizado a cada ~1,2 s).
 - **Proteções no app** — storage polyfill no iframe sandbox, continuação de resposta cortada,
@@ -103,7 +120,7 @@ o servidor fala com a API.
 3. Informe o **Modelo** (ou use **Buscar modelos**).
 4. **Salvar configurações**.
 
-No rodapé do ⚙ aparece a versão (`ai-client v3.0.1 · origem …`) — útil para conferir se a
+No rodapé do ⚙ aparece a versão (`ai-client v3.1.0 · origem …`) — útil para conferir se a
 janela carregou o código atual.
 
 ## Interface e sessão
@@ -111,6 +128,11 @@ janela carregou o código atual.
 - app **Electron** em janela normal que ocupa a área útil da tela (F11 alterna tela cheia;
   F12 abre DevTools), sem barra de navegador;
 - comando curto → página HTML completa renderizada no palco;
+- **imagem de referência** opcional no próprio prompt; sem jogo aberto, a imagem recria a
+  página (no modo automático, a original vai direto ao modelo e, se o endpoint recusar, o
+  app usa o relatório técnico local); com jogo aberto, a imagem é aplicada dentro do jogo
+  (fundo por padrão, textura se pedida). A opção **Somente local** nunca envia os pixels ao
+  modelo;
 - novo comando **refina** a página atual com **edição cirúrgica**: o modelo devolve só os
   trechos alterados (JSON `find/replace`) e o resto da página fica intacto — com fallback
   seguro para documento completo;
@@ -118,7 +140,8 @@ janela carregou o código atual.
 - 1 tema único (`PADRÃO · BLACK CYBER`) — a paleta da criação vem do pedido;
 - SALVAR / ABRIR / excluir projetos; cada save gera backup automático;
 - sessão com orçamento de 1M tokens e reset (`↺`);
-- `maxTokens` padrão 65.535; timeouts de conexão 60 s e leitura 120 s.
+- `maxTokens` padrão 65.535 (0 = padrão do provedor; GPT-6 Luna aceita até 128.000);
+  timeouts de conexão 60 s e leitura 120 s.
 
 ## Estrutura
 
@@ -134,7 +157,7 @@ nexus-game/
 ├── serve.py                 # servidor alternativo (fallback no navegador)
 ├── abrir.sh                 # fallback: sobe o serve.py e abre o navegador
 ├── fontes/                  # fontes locais servidas em /fontes/
-├── imagens/                 # mídia de entrada (back1.jpg etc.)
+├── imagens/                 # mídia de entrada + nexus-ref-* enviadas para jogos abertos
 ├── sons/                    # mídia de entrada
 ├── salvos/                  # projetos salvos (API REST)
 ├── web/
@@ -145,6 +168,7 @@ nexus-game/
 │   │   ├── prefs.js         # localStorage["nexus77"]
 │   │   ├── library-selector.js  # catálogo de 24 bibliotecas
 │   │   ├── html-builder.js  # DIRECTIVE, prompt, extração, decoração
+│   │   ├── nx-image.js      # validação + análise local + imagem como asset do jogo
 │   │   ├── ai-client.js     # fetch + SSE + proxy + fallback
 │   │   ├── store.js         # API REST de projetos
 │   │   ├── vu-meter.js      # medidor de 20 barras em canvas
@@ -163,20 +187,22 @@ nexus-game/
     ├── MAPA_UI.md           # âncoras de UI
     ├── BASE_REUTILIZAVEL.md # receita para novos projetos desktop
     ├── VALIDACAO.md         # matriz de testes (histórico + atual)
-    └── CHANGELOG.md         # histórico v1 → v3.0.1
+    └── CHANGELOG.md         # histórico v1 → v3.1.0
 ```
 
 ## Status
 
-**v3.0.1** (2026-10-24) — consistência de REGRA 6, versões e documentação corrigidas.
-O CHANGELOG registra as mudanças; a matriz de testes de 2026-10-18 está em
-[`docs/VALIDACAO.md`](docs/VALIDACAO.md).
+**v3.1.0** (2026-10-24) — imagem anexada usada dentro do jogo atual (fundo por padrão,
+textura sob pedido), com upload local, verificação pós-geração e persistência em
+`assets/images/` ao salvar. A v3.1.0 está implementada e testada, mas **ainda não commitada**;
+detalhes e limitações no [`docs/CHANGELOG.md`](docs/CHANGELOG.md). A matriz de testes de
+2026-10-18 está em [`docs/VALIDACAO.md`](docs/VALIDACAO.md).
 
 ## Solução de problemas
 
 | Sintoma | Causa / solução |
 | --- | --- |
-| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v3.0.1`). |
+| `Failed to fetch` | Aberto por `file://` ou servidor sem proxy. Use o atalho (Electron) ou `abrir.sh`/`serve.py`. Confira a versão no ⚙ (deve ser `v3.1.0`). |
 | Electron não abre | Falta o binário: `npm --prefix desktop install`. Rode `./desktop/start.sh` no terminal para ver o erro. |
 | `HTTP 401` / `Incorrect API key` | Chave inválida ou endpoint errado. Use **Buscar modelos** no ⚙ para testar. |
 | `HTTP 404`/`501` no `/_proxy` | O servidor não é o `serve.py`/`desktop/server.js` (ex.: `python3 -m http.server`). Troque para um deles. |
@@ -195,6 +221,17 @@ usa `postMessage` com whitelist de métodos (`setInput`, `openSaved`, `closeList
 A janela Electron carrega apenas `127.0.0.1`, com `contextIsolation`, `sandbox` e sem
 `nodeIntegration`; links externos (`http`/`https`) abrem em uma janela interna com as
 mesmas proteções, e outros protocolos são bloqueados.
+
+A imagem de referência é escolhida pelo seletor nativo e não executa conteúdo do arquivo.
+Sem jogo aberto, ela permanece em memória (miniatura + relatório) e, no modo automático
+(padrão), os pixels são enviados ao endpoint; se ele recusar, o app cai para o relatório
+local. Em **Somente local**, os pixels nunca saem do navegador. Com **jogo aberto**, a
+imagem é gravada no servidor local por `POST /_api/ref-image` (mesma origem ou header
+`X-Nexus-Local-Request`, PNG/JPEG/WEBP por magic bytes, ≤6 MB) como
+`imagens/nexus-ref-*` com nome único e modo `0600`; o HTML usa somente esse caminho
+root-relative, e o save copia o arquivo para `assets/images/` do projeto. Configurações
+antigas com `imageMode: "local"` sem versão migram para o automático; a escolha feita no
+modal atual é preservada.
 
 O proxy `/_proxy` aceita **apenas** `http`/`https` e recusa destinos em redes privadas,
 link-local e de metadata de nuvem (`10/8`, `172.16/12`, `192.168/16`, `169.254/16`,

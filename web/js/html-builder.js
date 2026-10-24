@@ -259,6 +259,7 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
     }
     out += 'How to use them:\n';
     out += '- Reference the EXACT relative path shown above. Never prefix it with "/", "http://", "file://" or an app URL, and never change the extension.\n';
+    out += '- EXCEPTION: a REFERENCE IMAGE block may provide an absolute path starting with "/imagens/". That path is app-provided and must be used exactly as written, including the leading "/".\n';
     out += '- Image as background: element.style.backgroundImage = \'url("imagens/x.jpg")\' or CSS background: url("imagens/x.jpg") center/cover no-repeat.\n';
     out += '- Image as repeating block texture: const img = new Image(); img.src = "imagens/x.jpg"; img.onload = () => { ctx.fillStyle = ctx.createPattern(img, "repeat"); }.\n';
     out += '- Sprite sheet: load with new Image() and slice it with ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh).\n';
@@ -624,16 +625,18 @@ O resultado deve parecer feito por um estúdio, não gerado por um template.
     if (codeMentions('Tone') && !alreadyInlined('Tone.js'))
       scripts.push('<script src="vendor/tone/Tone.js"></script>');
 
-    if ((codeMentions('ZzFX') || codeMentions('zzfx')) && !alreadyInlined('ZzFX.js'))
-      scripts.push('<script src="vendor/zzfx/ZzFX.js"></script>');
+    if ((codeMentions('ZzFX') || codeMentions('zzfx')) && !alreadyInlined('ZzFX.global.js'))
+      scripts.push('<script src="vendor/zzfx/ZzFX.global.js"></script>');
 
     /* Yuka (IA) */
     if (codeMentions('YUKA') && !alreadyInlined('yuka.min.js'))
       scripts.push('<script src="vendor/yuka/yuka.min.js"></script>');
 
-    /* lil-gui (debug) */
-    if ((codeMentions('GUI') || codeMentions('lil-gui')) && !alreadyInlined('lil-gui.umd.js'))
+    /* lil-gui (debug): UMD expõe lil.GUI; alias garante o global GUI da diretiva. */
+    if ((codeMentions('GUI') || codeMentions('lil-gui')) && !alreadyInlined('lil-gui.umd.js')) {
       scripts.push('<script src="vendor/lil-gui/lil-gui.umd.js"></script>');
+      scripts.push('<script>window.GUI=window.GUI||(window.lil&&window.lil.GUI);<\/script>');
+    }
 
     /* simplex-noise (build clássico: expõe SimplexNoise / createSimplexNoise / createNoise2D|3D|4D) */
     if (/\bSimplexNoise\b|\bcreateSimplexNoise\b|\bcreateNoise[234]D\b|\balea\b|\bbuildPermutationTable\b/.test(html) && !alreadyInlined('simplex-noise'))

@@ -1,5 +1,116 @@
 # Changelog — NEXUS GAME
 
+## v3.1.0 — 2026-10-24
+
+### Adicionado — imagem anexada usada DENTRO do jogo atual
+- Com um jogo aberto (`lastRendered != null`), o anexo deixa de ser referência de recriação:
+  vira **asset real do jogo**. Sem texto → **fundo (background)** por padrão; “textura do
+  cubo”, “textura da peça do tetris”, “textura do objeto” → **textura do componente nomeado**.
+  Jogo, controles, HUD de 15px e som permanecem intactos. Sem jogo aberto, o fluxo antigo
+  de recriar a imagem continua; para recriar com um jogo aberto, use **↺** (decisão explícita).
+- `NxImage 1.1.0`: `usageMode()` (fundo x textura), `usageBlock()` (caminho exato e regras
+  de uso), `assetForGame()` (reencoda para ≤6 MB quando necessário) e
+  `DEFAULT_GAME_IMAGE_COMMAND`.
+- Upload local `POST /_api/ref-image` nos dois servidores (header local ou mesma origem,
+  PNG/JPEG/WEBP validados por magic bytes, ≤6 MB, nome único em `imagens/nexus-ref-*`,
+  modo 0600). O app usa o caminho root-relative `/imagens/…` no HTML e confere depois da
+  geração se ele foi realmente aplicado; se faltar, faz **uma** rodada de correção com o
+  documento completo.
+- Salvar copia o arquivo para `salvos/<nome>/assets/images/` e reescreve a referência para
+  `assets/images/...` (sem barra inicial), funcionando offline ao reabrir. `/imagens`,
+  `/sons` e assets de projetos salvos enviam CORS `*` + CORP `cross-origin` para
+  texturas WebGL/Canvas no iframe sandbox.
+- O anexo só é limpo após a imagem ser confirmada no documento; falha de upload,
+  cancelamento ou resposta sem a imagem mantêm o anexo e a página atual.
+- `mediaBlock` autoriza explicitamente o caminho absoluto `/imagens/…` do bloco REFERENCE
+  IMAGE sem liberar caminhos absolutos em geral.
+- `.gitignore`: `/imagens/nexus-ref-*` (fotos de entrada não entram no git).
+- Testes: harness **26/0** (modo fundo/textura, caminho, reencode, reescrita de asset,
+  exceção do mediaBlock); E2E Chromium/CDP com mock SSE **31/31** (fundo sem texto, textura
+  nomeada, salvar/reabrir, sem jogo → recriação, falha de upload, cancelamento); HTTP
+  **17/17** (upload 200/400/403/413 e CORS nos dois servidores).
+
+### Adicionado — anexo de imagem no prompt
+- Botão de clipe **dentro do input existente**, antes do texto, sem sobrepor a digitação
+  (o padding esquerdo do campo foi ajustado); seletor nativo, thumbnail, nome, dimensões,
+  tamanho e botão de remover. Enter, refino e demais botões continuam iguais.
+- Formatos aceitos por **magic bytes**: PNG, JPEG e WEBP. Limites: 12 MB, 40 MP e
+  10.000 px por lado; a validação ocorre antes de analisar. A imagem permanece só em
+  memória, não é salva em `salvos/` nem enviada ao servidor local.
+- Prompt só com imagem usa a instrução padrão de recriação interativa
+  (`NxImage.DEFAULT_COMMAND`); texto + imagem preserva o comando do usuário.
+
+### Adicionado — análise local independente do modelo
+- `web/js/nx-image.js` (`NxImage 1.0.0`): validação, miniatura e análise em Canvas 2D
+  com quantização de paleta, luminância/contraste, saturação, separação de fundo,
+  bordas Sobel, componentes conexos, grade 3×3, simetria, linhas e relatório JSON com
+  incertezas. OCR só roda quando o navegador expõe `TextDetector` nativo.
+- **Não foram adicionados OpenCV.js nem Tesseract.js**: não havia dependência local
+  compatível e o custo/risco de novas integrações não se justificava. A análise é
+  aproximada e não promete compreensão semântica.
+- Modo **automático** (padrão): envia a imagem original em `image_url` multimodal para
+  melhor fidelidade; se o endpoint rejeitar entrada de imagem com HTTP 400/413/415/422,
+  o app tenta uma vez sem a imagem, usando o relatório local, sem perder a geração.
+- Modo **somente local**: o modelo recebe apenas o relatório técnico, nunca os pixels.
+  A escolha explícita é preservada por `imageModeVersion = 2`; configurações antigas
+  `imageMode: "local"` sem essa versão migram para automático.
+- No modo automático, o prompt declara a imagem como **fonte primária de fidelidade**;
+  o relatório local fica como apoio e pode estar incompleto.
+- Refinos seguintes não reenviam a imagem; usam o relatório e o documento atual.
+
+### Adicionado — comparação visual opcional
+- Configuração **Correções visuais automáticas (0–2)**, desligada por padrão. Só para
+  gerações novas com imagem anexada: captura o maior `<canvas>` (máx. 320 px), compara
+  paleta/grade/brilho/proporção/bordas e, se a diferença passar do limiar, pede uma
+  correção ao modelo. Páginas sem canvas ou com canvas vazio/ilegível são ignoradas.
+- O modo edição, o cancelamento, os projetos antigos e o fluxo normal de geração não
+  são alterados.
+
+### Segurança e limites
+- O arquivo é lido via `<input type="file">` no renderer sandbox; nenhum caminho do
+  sistema é exposto, nenhum script da imagem é executado e nenhum preload/IPC foi criado.
+- Object URLs são revogadas e miniaturas são data URLs em memória; o anexo é limpo após
+  sucesso, reset ou remoção.
+- Análise local é aproximada: sem OCR confiável, sem semântica, sem detecção de
+  profundidade além de indícios. Falha de leitura/análise mostra erro curto no cartão e
+  não bloqueia a geração de texto.
+- No modo automático, os pixels vão somente ao endpoint configurado e caem para o
+  relatório local se houver recusa; no modo somente local, nunca saem do navegador.
+
+### Corrigido — teto de saída do GPT-6
+- **`clampMaxTokens()` reconhece a família `gpt-6`** e aplica teto de **128.000 tokens**
+  (máximo de saída documentado do GPT-6 Luna). Antes, `gpt-6-luna` caía no default de
+  16.384: configurar 65.535 no modal era cortado silenciosamente. Valores `0` continuam
+  omitindo `max_tokens`; os tetos dos demais modelos não mudaram.
+- Modal de configurações: o rótulo passou a explicar **“0 = padrão do provedor”** (antes
+  dizia “sem limite”) e uma nota informa o teto do GPT-6.
+- **Não existe teto de 20–30 KB no app**: os jogos salvos variam de ~12 KB a ~118 KB e o
+  limite de bytes nunca foi aplicado ao HTML. Aumentar o teto de tokens apenas dá espaço
+  de resposta; fidelidade a uma foto depende principalmente do modo automático (imagem
+  direta) e do pedido.
+
+### Testes
+- `web/test-harness.html`: **26 PASS / 0 FAIL** (PNG/JPEG/WEBP reais, GIF recusado, limites,
+  miniatura, relatório, `referenceBlock`, `compare`, multimodal condicional, fallback de
+  erro de imagem, migração de local antigo para automático, preservação de somente local,
+  tetos de tokens por modelo — incluindo GPT-6 em 128.000 —, `usageMode`, `usageBlock`,
+  reencode para ≤6 MB, reescrita de `/imagens/…` no save e exceção do `mediaBlock`).
+- E2E Chromium/CDP com API mock: **31 PASS / 0 FAIL** — UI original, seletor, texto puro,
+  anexo/thumbnail/dimensões, texto+imagem somente local sem pixels, remoção, JPEG/WEBP
+  reais, somente imagem, formato inválido, arquivo grande, falha de análise seguida de
+  texto, modo automático, endpoint sem suporte com fallback, comparação visual, janela
+  estreita, imagem como fundo sem texto, textura nomeada, salvar/reabrir com asset,
+  recriação sem jogo, falha de upload e cancelamento durante o upload. Os HTTP 400
+  registrados no console são as rejeições multimodais deliberadas do cenário de fallback.
+- HTTP local nos dois servidores: **17 PASS / 0 FAIL** — upload válido (200), ausência do
+  header local (403), magic bytes/base64 inválidos (400), acima de 6 MB (413) e CORS de
+  `/imagens` e assets de projeto salvo.
+- Electron real (Xvfb + CDP): **4 PASS / 0 FAIL** — shell isolado, texto via proxy,
+  anexo local com miniatura e geração texto+imagem; **nenhum erro de renderer**.
+- Migração de preferência em Chromium real: **4 PASS / 0 FAIL** — `local` antigo vira
+  automático, `vision` antigo vira automático, `local + imageModeVersion 2` permanece
+  somente local e `auto` permanece automático.
+
 ## v3.0.1 — 2026-10-24
 
 ### Corrigido — REGRA 6 canônica (decisão do Leo)
@@ -11,6 +122,36 @@
   - O comentário de cabeçalho do `html-builder.js` foi alinhado às sete regras.
 - **Revogados**: layout de 2026-10-22 (tela central + controles laterais + moldura 2px) e
   barras de 5px de 2026-10-23.
+
+### Adicionado — indicador de bibliotecas usadas na barra superior
+- `web/index.html`: chip `#libs` entre o prompt e o status; exibe as bibliotecas que a página
+  em tela realmente usa (ex.: `LIBS · Three.js`).
+- `LibrarySelector.usedLibraries(html)`: analisa o HTML final e detecta scripts vendor,
+  chamadas `NxLoad` (Rapier/Recast/postprocessing/meshBVH/spritesheet/Tiled), `NxShader`
+  e Canvas 2D nativo. Retorna as chaves já ordenadas por prioridade.
+- `app.js`: o chip é atualizado em todo `render()` — geração, abrir projeto, desfazer e
+  arquivo local — e fica oculto em welcome, erro e lista de salvos. O `title`/`aria-label`
+  trazem a lista completa.
+- `web/test-harness.html`: dois testes novos (detector e presença do chip/CSS); bateria
+  agora em **11 PASS / 0 FAIL**. Validado também abrindo páginas salvas reais:
+  `tetris-3d` → Three.js; `cobras-10-vidas` → Canvas 2D.
+
+### Corrigido — integração real das 24 bibliotecas
+- Auditoria em Chromium headless confirmou o uso histórico: as páginas salvas usam apenas
+  **Three.js** ou **Canvas 2D**; as demais entradas existiam no catálogo, mas 6 integrações
+  estavam quebradas.
+- **ZzFX**: o vendor era ESM e falhava como `<script>` clássico; novo `ZzFX.global.js`
+  (8.112 B) expõe `zzfx`/`ZZFX`/`ZzFX`, e catálogo/injeção passaram a usá-lo.
+- **lil-gui**: o UMD expõe `lil.GUI`; injetado alias `window.GUI` para a diretiva.
+- **Rapier**: URL corrigida para `rapier.es.js`; o loader chama `init()` e expõe `RAPIER`.
+- **Recast**: pacote corrigido para `recast-navigation@0.43.1/+esm`; o loader chama `init()`
+  e expõe `RecastNavigation`.
+- **postprocessing**: URL corrigida para `build/postprocessing.js`; aliases de `POSTPROCESSING`
+  para `EffectComposer`, `RenderPass`, `EffectPass`, efeitos etc.
+- **three-mesh-bvh**: UMD via unpkg (o jsDelivr servia `.cjs` como `application/node` com
+  `nosniff`); aliases `MeshBVHLib` → `MeshBVH`, `computeBoundsTree`, `acceleratedRaycast`.
+- Verificação final: **24/24 bibliotecas carregam**; harness do navegador em
+  **11 PASS / 0 FAIL**.
 
 ### Corrigido — versão e documentação
 - Versão única **3.0.1** em `desktop/package.json`, `package-lock.json`, `AiClient.VERSION`,
@@ -31,7 +172,7 @@
 - `web/test-harness.html`: não carrega mais o deletado `nx-textures.js`; passou a carregar
   `library-selector.js` (necessário para `html-builder.js`) e testa as 7 regras, a REGRA 6 de
   15px, NxMat (22), NxShader (28 + 7 chunks) e o catálogo (24). Bateria executada em
-  Chromium headless com servidor local: **8 PASS / 0 FAIL**.
+  Chromium headless com servidor local: **11 PASS / 0 FAIL**.
 - `.gitignore`: adicionados `*.bak-*` e `web/_tmp_t/`.
 - Resíduos movidos para quarentena reversível em `/tmp/nexus-game-cleanup-20261024-010150`:
   `web/_tmp_t/` (3 HTML), 3 arquivos `.bak-*`, `web/js/test-iife.js`, o `catalogo.html`

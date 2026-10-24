@@ -12,11 +12,31 @@
   <div class="titlebar">
     <span class="dot" id="dot"></span>
     <div class="promptwrap">
+      <button class="attach" id="btn-image" type="button" title="Anexar imagem — fundo ou textura do jogo atual"
+              aria-label="Anexar imagem — fundo ou textura do jogo atual" aria-controls="imagefile">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3" y="4" width="18" height="16" rx="3"></rect>
+          <circle cx="9" cy="9.5" r="1.6"></circle>
+          <path d="M4 17l5-5 4 4 3-3 4 4"></path>
+        </svg>
+      </button>
       <input id="prompt" class="prompt" type="text" placeholder="Ex: jogo de nave, desenhe um castelo, logo neon, oi"
              autocomplete="off" spellcheck="false">
       <button class="reset" id="btn-reset" type="button" title="Reiniciar sessão"
               aria-label="Reiniciar sessão">↺</button>
+      <div class="imgattach" id="imgattach" hidden>
+        <img class="imgthumb" id="imgthumb" alt="Miniatura da imagem anexada">
+        <div class="imgmeta">
+          <span class="imgname" id="imgname"></span>
+          <span class="imgsub" id="imgsub"></span>
+          <span class="imgstate" id="imgstate"></span>
+        </div>
+        <button class="imgx" id="img-remove" type="button" title="Remover imagem"
+                aria-label="Remover imagem anexada">✕</button>
+      </div>
+      <input id="imagefile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
     </div>
+    <span class="libs" id="libs" hidden></span>
     <span class="status" id="status"></span>
     <canvas id="vu" class="vu" width="200" height="48"></canvas>
     <span class="kblabel" id="kb" hidden>…</span>
@@ -49,6 +69,7 @@
 <script src="js/prefs.js"></script>
 <script src="js/library-selector.js"></script>
 <script src="js/html-builder.js"></script>
+<script src="js/nx-image.js"></script>
 <script src="js/ai-client.js"></script>
 <script src="js/store.js"></script>
 <script src="js/vu-meter.js"></script>

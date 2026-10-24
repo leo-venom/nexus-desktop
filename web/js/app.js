@@ -79,10 +79,18 @@
     ['month', 'Últimos 30 dias']
   ];
 
-  var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel, previewBadge;
+  var frame, input, gearBtn, saveBtn, openBtn, statusEl, kbLabel, previewBadge, libsEl;
   var dot, resetBtn, vu;
   var usageBtn, usagePanel, usageModel, usageFill, usageSession, usageStats, usageClose;
   var editBtn, finalizeBtn;
+  var imageBtn, imageFileInput, imgAttach, imgThumb, imgName, imgSub, imgState, imgRemove;
+  var imageAsset = null;       // { file, name, mime, size, width, height, thumbnail, report }
+  var imageBusy = false;
+  var imageError = '';
+  var imagePendingName = '';
+  var imageToken = 0;          // invalida análises antigas quando o anexo muda
+  var captureSeq = 0;
+  var pendingCapture = null;
   var editMode = false;
 
   function $(id) { return document.getElementById(id); }
@@ -275,6 +283,8 @@
     'if(d.deleteEl&&_ed.el){pushUndo(_ed.el,true);var pn=_ed.el.parentNode;if(pn)pn.removeChild(_ed.el);_ed.el=null;call("editSel","{}")}' +
     'if(d.toggleDrag!==undefined){_ed.drag=d.toggleDrag}' +
     'if(d.snapshot){call("snapshot",snapshot())}' +
+    'if(d.capture){var _u=null;try{_u=frameShot()}catch(e){}' +
+    'call("capture",JSON.stringify({id:d.capture,ok:!!_u,url:_u||"",error:_u?"":"captura indisponível"}))}' +
     'if(d.drill&&_ed.lastPt){var st=pickAt(_ed.lastPt.x,_ed.lastPt.y);if(st.length){var li=st.indexOf(_ed.el);var ni=(li>=0&&li<st.length-1)?li+1:0;selectNode(st[ni],ni,st.length)}}' +
     'if(d.deselect&&_ed.el){desel(_ed.el);_ed.el=null}' +
     '});' +
@@ -346,6 +356,18 @@
     'var sh=cl.querySelector("#nx-shim");if(sh&&sh.parentNode)sh.parentNode.removeChild(sh);' +
     'var h="<!DOCTYPE html>\\n"+cl.outerHTML;' +
     'if(had)sel(had);return h}' +
+    /* Captura opcional: maior canvas visível, reduzido para comparação local. */
+    'function frameShot(){try{' +
+    'var cs=document.querySelectorAll("canvas"),best=null,bestArea=0;' +
+    'for(var i=0;i<cs.length;i++){var c=cs[i],w=c.width||0,h=c.height||0;' +
+    'if(w<8||h<8)continue;try{var r=c.getBoundingClientRect();if(r.width<8||r.height<8)continue}catch(e){}' +
+    'var a=w*h;if(a>bestArea){bestArea=a;best=c}}' +
+    'if(!best)return null;' +
+    'var sc=Math.min(1,320/Math.max(best.width,best.height));' +
+    'var cc=document.createElement("canvas");' +
+    'cc.width=Math.max(1,Math.round(best.width*sc));cc.height=Math.max(1,Math.round(best.height*sc));' +
+    'var g=cc.getContext("2d");if(!g)return null;g.drawImage(best,0,0,cc.width,cc.height);' +
+    'return cc.toDataURL("image/png")}catch(e){return null}}' +
     'var _undo=[],_uLast=0,_uEl=null;' +
     'function tw(el){var w=document.createTreeWalker(el,4,null,false);return w.nextNode()}' +
     'function pushUndo(el,force){if(!el)return;var now=Date.now();' +
@@ -495,8 +517,211 @@
     return '';
   }
 
-  function render(html) {
-    var out = window.Html.rewriteLibs(String(html == null ? '' : html), APP_BASE);
+  /* Mostra na barra superior as bibliotecas que a página em tela usa. */
+  function setLibraries(html) {
+    if (!libsEl) return;
+    var selector = window.LibrarySelector;
+    var keys = selector ? selector.usedLibraries(html) : [];
+    var names = keys.map(function (key) {
+      var lib = selector.LIBRARIES[key];
+      return lib ? lib.name : key;
+    });
+    if (!names.length) {
+      libsEl.hidden = true;
+      libsEl.textContent = '';
+      libsEl.removeAttribute('title');
+      libsEl.removeAttribute('aria-label');
+      return;
+    }
+    var label = 'Bibliotecas usadas: ' + names.join(', ');
+    libsEl.textContent = names.join(' · ');
+    libsEl.title = label;
+    libsEl.setAttribute('aria-label', label);
+    libsEl.hidden = false;
+  }
+
+  /* ---------- imagem de referência do input ---------- */
+
+  function updateImageUi() {
+    if (!imageBtn) return;
+    imageBtn.classList.toggle('has', !!imageAsset);
+    imageBtn.disabled = generating || imageBusy;
+    imgRemove.disabled = generating;
+    var visible = !!imageAsset || imageBusy || !!imageError;
+    imgAttach.hidden = !visible;
+    if (!visible) {
+      imgThumb.removeAttribute('src');
+      imgName.textContent = '';
+      imgSub.textContent = '';
+      imgState.textContent = '';
+      imgState.className = 'imgstate';
+      return;
+    }
+    var thumb = imageAsset && imageAsset.thumbnail ? imageAsset.thumbnail : '';
+    imgThumb.hidden = !thumb;
+    if (thumb) {
+      if (imgThumb.getAttribute('src') !== thumb) imgThumb.src = thumb;
+    } else {
+      imgThumb.removeAttribute('src');
+    }
+    imgName.textContent = imageAsset ? imageAsset.name : (imagePendingName || 'imagem');
+    imgSub.textContent = imageAsset
+      ? (imageAsset.width + '×' + imageAsset.height + ' · ' + imageAsset.sizeLabel)
+      : '';
+    imgState.className = 'imgstate' + (imageError ? ' error' : imageBusy ? ' busy' : '');
+    imgState.textContent = imageBusy
+      ? 'analisando imagem…'
+      : imageError || (imageAsset
+        ? (lastRendered != null
+          ? 'pronta · fundo por padrão; textura se pedir'
+          : 'análise concluída · pronta')
+        : '');
+    var hint = lastRendered != null
+      ? 'Anexar imagem — fundo do jogo por padrão; peça “textura do cubo/peça/objeto” para aplicar em um componente'
+      : 'Anexar imagem de referência para criar um jogo';
+    imageBtn.title = hint;
+    imageBtn.setAttribute('aria-label', hint);
+  }
+
+  function chooseImage(file) {
+    if (!file || generating || imageBusy) return;
+    if (!window.NxImage) {
+      imageError = 'analisador de imagem indisponível';
+      imagePendingName = file.name || 'imagem';
+      updateImageUi();
+      return;
+    }
+    var token = ++imageToken;
+    imageAsset = null;
+    imageBusy = true;
+    imageError = '';
+    imagePendingName = String(file.name || 'imagem').replace(/[\\/]/g, '-').slice(0, 120);
+    try { imageFileInput.value = ''; } catch (e) { /* ignora */ }
+    updateImageUi();
+    window.NxImage.inspect(file).then(function (asset) {
+      if (token !== imageToken) return;
+      imageBusy = false;
+      imageAsset = asset;
+      imageError = '';
+      updateImageUi();
+    }).catch(function (e) {
+      if (token !== imageToken) return;
+      imageBusy = false;
+      imageAsset = null;
+      imageError = String(e && e.message ? e.message : e || 'falha ao ler a imagem').slice(0, 110);
+      updateImageUi();
+    });
+  }
+
+  function clearImageAttachment(silent) {
+    imageToken++;
+    imageAsset = null;
+    imageBusy = false;
+    imageError = '';
+    imagePendingName = '';
+    try { imageFileInput.value = ''; } catch (e) { /* ignora */ }
+    if (imgThumb) imgThumb.removeAttribute('src');
+    updateImageUi();
+    if (!silent) toast('Imagem removida');
+  }
+
+  /* Grava a foto anexada em imagens/ e devolve o caminho root-relative usado
+     dentro do jogo. O arquivo fica em cache no próprio asset da sessão. */
+  function uploadGameImage(asset) {
+    if (!asset || !asset.file) return Promise.reject(new Error('imagem indisponível'));
+    if (asset.gameRemote && asset.gameRemote.path) return Promise.resolve(asset.gameRemote.path);
+    if (!window.NxImage || !window.NxImage.assetForGame) {
+      return Promise.reject(new Error('preparador de imagem indisponível'));
+    }
+    return window.NxImage.assetForGame(asset).then(function (dataUrl) {
+      var controller = null;
+      try { controller = new AbortController(); } catch (e) { controller = null; }
+      var timer = setTimeout(function () {
+        if (controller) controller.abort();
+      }, 15000);
+      function done() { clearTimeout(timer); }
+      return fetch('/_api/ref-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Nexus-Local-Request': '1',
+        },
+        body: JSON.stringify({ data: dataUrl }),
+        signal: controller ? controller.signal : undefined,
+      }).then(function (r) {
+        return r.json().catch(function () {
+          return { ok: false, error: r.statusText || ('HTTP ' + r.status) };
+        }).then(function (body) {
+          done();
+          if (!r.ok || !body || body.ok !== true) {
+            throw new Error((body && body.error) || ('HTTP ' + r.status));
+          }
+          var path = String(body.path || '');
+          if (!/^\/imagens\/[A-Za-z0-9._-]+$/.test(path)) throw new Error('resposta de imagem inválida');
+          asset.gameRemote = { path: path, bytes: Number(body.bytes) || 0 };
+          return path;
+        });
+      }).catch(function (e) {
+        done();
+        if (e && e.name === 'AbortError') throw new Error('tempo esgotado ao preparar a imagem');
+        throw e;
+      });
+    });
+  }
+
+  /* A imagem só conta como aplicada se o caminho exato aparece perto de um uso
+     real (CSS, src, textura three.js, pattern ou drawImage), não em comentário. */
+  function gameImageApplied(doc, path) {
+    if (!path) return true;
+    var text = String(doc == null ? '' : doc);
+    var at = text.indexOf(path);
+    while (at >= 0) {
+      var around = text.slice(Math.max(0, at - 180), Math.min(text.length, at + path.length + 180));
+      if (/url\s*\(|src\s*=|TextureLoader|createPattern|drawImage|\.map\s*=|backgroundImage|load\s*\(/.test(around)) {
+        return true;
+      }
+      at = text.indexOf(path, at + path.length);
+    }
+    return false;
+  }
+
+  /* Pede ao shim um PNG do maior canvas da página (comparação opcional). */
+  function captureFrame(timeoutMs) {
+    return new Promise(function (resolve) {
+      if (!frame || !frame.contentWindow) { resolve(null); return; }
+      var id = String(++captureSeq);
+      var timer = null;
+      function finish(value) {
+        if (!pendingCapture || pendingCapture.id !== id) return;
+        pendingCapture = null;
+        clearTimeout(timer);
+        resolve(value);
+      }
+      pendingCapture = { id: id, finish: finish };
+      timer = setTimeout(function () { finish(null); }, timeoutMs || 7000);
+      tryPostMessage({ capture: id });
+    });
+  }
+
+  function loadCapture(dataUrl) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('captura inválida')); };
+      img.src = dataUrl;
+    });
+  }
+
+  function captureUsable(report) {
+    if (!report || !report.image || !report.image.width) return false;
+    var edges = report.layout && report.layout.edgeDensity || 0;
+    var colors = report.palette ? report.palette.length : 0;
+    return !(colors <= 1 && edges < 0.002);
+  }
+
+  function render(html) {    var out = window.Html.rewriteLibs(String(html == null ? '' : html), APP_BASE);
+    setLibraries(out);
     frameErrors = [];
     frameErrToken++;
     hidePreviewBadge();                        /* documento final substitui a prévia */
@@ -688,8 +913,14 @@
     try {
       prompt = input.value.trim();
     } catch (e) { prompt = ''; }
-    if (!prompt) {
-      toast('Descreva o jogo que você quer');
+    if (imageBusy) {
+      toast('Aguarde a análise da imagem');
+      return;
+    }
+    if (!prompt && !imageAsset) {
+      toast(imageError
+        ? 'A imagem é inválida — remova ou escolha outra'
+        : 'Descreva o jogo ou anexe uma imagem');
       return;
     }
     if (!prefs.hasKey()) {
@@ -699,30 +930,61 @@
     }
 
     generating = true;
+    updateImageUi();
     armarWatchdog();
     try {
-      iniciarGeracao(prompt);
+      iniciarGeracao(prompt, imageAsset);
     } catch (e) {
       failGeneration(window.AiClient.errorMessage(e));
     }
   }
 
-  function iniciarGeracao(prompt) {
+  function iniciarGeracao(prompt, asset) {
+    asset = asset || null;
+    var editingNow = lastRendered != null;
+    var gameImage = !!(editingNow && asset);
     showingList = false;
     canceladoPeloUsuario = false;
     lastProgressAt = 0;
-    lastPrompt = prompt;
+    lastPrompt = prompt || (asset
+      ? (gameImage ? 'imagem aplicada ao jogo' : 'recriacao visual')
+      : '');
     // Não zera lastOpenName aqui — se há um projeto aberto, continua sendo o mesmo.
     // Só reseta no resetSession() ou ao abrir outro projeto.
     saveBtn.disabled = true;
     openBtn.disabled = true;
-    status(lastRendered != null ? 'ajustando…' : 'gerando…', 'accent', false);
+    status(gameImage ? 'preparando imagem…' : (editingNow ? 'ajustando…' : 'gerando…'), 'accent', false);
     setLoading(true);
     input.blur();
 
+    if (!gameImage) {
+      continuarGeracao(prompt, asset, null);
+      return;
+    }
+
+    /* Jogo aberto: a imagem vira arquivo em imagens/ antes do prompt, para o
+       modelo receber um caminho real que funciona também depois de salvar. */
+    uploadGameImage(asset).then(function (path) {
+      if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
+      continuarGeracao(prompt, asset, path);
+    }).catch(function (e) {
+      if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
+      failGeneration(window.AiClient.errorMessage(e));
+    });
+  }
+
+  function continuarGeracao(prompt, asset, imagePath) {
     var editing = lastRendered != null;
+    var gameImage = !!(editing && asset && imagePath);
+    var imageMode = gameImage ? window.NxImage.usageMode(prompt) : 'background';
+    var command = prompt || (asset
+      ? (gameImage ? window.NxImage.DEFAULT_GAME_IMAGE_COMMAND : window.NxImage.DEFAULT_COMMAND)
+      : '');
+    var commandLabel = prompt || (asset
+      ? (gameImage ? 'imagem no jogo (' + imageMode + ')' : 'recriar a imagem de referência')
+      : '');
     genEditing = editing;               /* bloqueia prévia parcial em ajustes de página */
-    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), prompt, lastRendered, mediaManifest);
+    var baseSystem = window.Html.systemPrompt(theme, prefs.detailLevel(), command, lastRendered, mediaManifest);
 
     var elementHint = '';
     if (editing && editSelHtml) {   /* só faz sentido quando há página em tela */
@@ -745,8 +1007,26 @@
         lastCommands.slice(-3).join('\n- ');
     }
 
-    var userBase = prompt + elementHint;
+    var refLocal = '';
+    var refFollow = '';
+    if (asset) {
+      if (gameImage) {
+        refLocal = '\n\n' + window.NxImage.usageBlock(asset, { path: imagePath, mode: imageMode });
+        refFollow = refLocal;
+      } else {
+        refLocal = '\n\n' + window.NxImage.referenceBlock(asset, { vision: false });
+        refFollow = '\n\n' + window.NxImage.referenceBlock(asset, { vision: false, followup: true });
+      }
+    }
+    var userBase = command + elementHint + refLocal;
     var user = window.Html.userPrompt(userBase, lastRendered, notes);
+    var userFollow = window.Html.userPrompt(command + elementHint + refFollow, lastRendered, notes);
+    var userVision = asset
+      ? window.Html.userPrompt(command + elementHint + '\n\n' + (gameImage
+          ? window.NxImage.usageBlock(asset, { path: imagePath, mode: imageMode, vision: true })
+          : window.NxImage.referenceBlock(asset, { vision: true })), lastRendered, notes)
+      : user;
+    var sendVision = !!(asset && prefs.imageMode() !== 'local' && window.NxImage);
 
     /* Força regeneração completa a cada MAX_EDITS patches para evitar degradação */
     var editOverLimit = MAX_EDITS > 0 && editing && editCount >= MAX_EDITS;
@@ -757,11 +1037,12 @@
     var system = editOverLimit ? baseSystem : editing ? baseSystem + window.Html.EDIT_DIRECTIVE : baseSystem;
     if (!editing) editCount = 0;
 
-    function run(systemPrompt, userMessage) {
-      var msg = userMessage == null ? user : userMessage;
+    function run(systemPrompt, userMessage, opts, onProg) {
+      var msg = userMessage == null ? userFollow : userMessage;
       return window.AiClient.chat(
         prefs.endpoint(), prefs.apiKey(), prefs.model(),
-        prefs.temperature(), prefs.maxTokens(), systemPrompt, msg, onGenProgress
+        prefs.temperature(), prefs.maxTokens(), systemPrompt, msg,
+        onProg || onGenProgress, opts || null
       );
     }
 
@@ -779,6 +1060,7 @@
       lastProgressAt = 0;
       var msg = 'Current page (BROKEN — JavaScript syntax error, so nothing runs and no object appears):\n```html\n' +
         out.doc + '\n```\n\nJavaScript errors found:\n' + erros.join('\n') +
+        (gameImage ? '\n\nKeep the reference image usage at ' + imagePath + ' (' + imageMode + ') intact.' : '') +
         '\n\nReturn the COMPLETE corrected HTML document: same features, nothing removed, every <script> block closed and syntactically valid. Output ONLY raw HTML, no explanations.';
       return run(baseSystem, msg).then(function (r3) {
         var doc3 = window.Html.extractDocument(r3.content || '');
@@ -811,6 +1093,43 @@
         var doc4 = window.Html.extractDocument(r4.content || '');
         if (!window.Html.looksLikeDocument(r4.content) || !doc4.trim()) return out;
         return repararQualidade({ result: r4, doc: doc4 }, tentativa + 1);
+      }).catch(function (e) {
+        if (canceladoPeloUsuario) throw e;
+        return out;                       /* não perde o documento bom */
+      });
+    }
+
+    /* UMA correção se o documento final não usa a imagem anexada. A imagem
+       precisa aparecer de verdade, não só ser mencionada. */
+    function garantirImagemAplicada(out, tentativa) {
+      if (!gameImage || out.doc == null) return Promise.resolve(out);
+      if (gameImageApplied(out.doc, imagePath) || tentativa >= 1) return Promise.resolve(out);
+      status('⚠ imagem ainda não aplicada — corrigindo…', 'accent', false);
+      liveOut = 0;
+      lastProgressAt = 0;
+      var msg = 'The updated game does NOT visibly use the attached reference image yet. ' +
+        'It MUST appear inside the game as its ' +
+        (imageMode === 'texture' ? 'texture on the requested component' : 'background') + '.\n\n' +
+        window.NxImage.usageBlock(asset, { path: imagePath, mode: imageMode }) +
+        '\n\nDocument to fix:\n```html\n' + out.doc + '\n```\n\n' +
+        'Return the COMPLETE corrected HTML document (not an edits JSON): same game, same controls and mechanics, ' +
+        'with the image path used exactly as given. Output ONLY raw HTML, no explanations.';
+      return run(baseSystem, msg).then(function (r5) {
+        var doc5 = window.Html.extractDocument(r5.content || '');
+        if (!window.Html.looksLikeDocument(r5.content) || !doc5.trim() ||
+            window.Html.jsSyntaxErrors(doc5).length) {
+          status('⚠ correção da imagem inválida — página mantida', 'accent', true);
+          return out;
+        }
+        try {
+          if (r5.totalTokens > 0) {
+            prefs.addSessionTokens(r5.promptTokens, r5.completionTokens);
+            prefs.addUsage(r5.promptTokens, r5.completionTokens);
+            updateSessionUi();
+          }
+        } catch (e) { /* contabilidade nunca derruba a correção */ }
+        if (!gameImageApplied(doc5, imagePath)) return out;
+        return { result: r5, doc: doc5 };
       }).catch(function (e) {
         if (canceladoPeloUsuario) throw e;
         return out;                       /* não perde o documento bom */
@@ -870,6 +1189,7 @@
           'element accessed before it exists, undefined variable, canvas never sized, geometry/material created but never ' +
           'added to the scene, WebAudio started without a user gesture, CDN resource that failed to load. ' +
           'Never remove features to silence an error — make the code correct. ' +
+          (gameImage ? 'Keep the reference image usage at ' + imagePath + ' (' + imageMode + ') intact. ' : '') +
           'Return the COMPLETE corrected HTML document. Output ONLY raw HTML, no explanations.';
         return run(baseSystem, msg).then(function (r) {
           var d = window.Html.extractDocument(r.content || '');
@@ -899,9 +1219,88 @@
       });
     }
 
+    /* Comparação opcional: captura o canvas da própria página e pede
+       correções mensuráveis (paleta, grade, brilho, proporção, detalhe).
+       Nunca roda em ajuste de página nem em projeto salvo. */
+    function iterarVisual(out) {
+      var limit = prefs.visualIterations();
+      if (!asset || editing || !out || !out.doc || limit <= 0) return Promise.resolve(out);
+      var current = out.doc;
+      var round = 0;
+      function step() {
+        if (round >= limit || canceladoPeloUsuario || !generating) return Promise.resolve(out);
+        return new Promise(function (resolve) { setTimeout(resolve, 1800); }).then(function () {
+          if (canceladoPeloUsuario || !generating) return { stop: true };
+          status('🔍 comparando com a referência (' + (round + 1) + '/' + limit + ')…', 'accent', false);
+          return captureFrame(7000).then(function (dataUrl) {
+            if (!dataUrl) {
+              status('⚠ comparação visual indisponível (sem canvas acessível)', 'accent', true);
+              return { stop: true };
+            }
+            return loadCapture(dataUrl).then(function (img) {
+              return window.NxImage.analyzeSource(img, {
+                name: 'render', mime: 'image/png', bytes: 0,
+                width: img.width, height: img.height
+              }).then(function (report) {
+                if (!captureUsable(report)) {
+                  status('⚠ captura do jogo vazia — comparação ignorada', 'accent', true);
+                  return { stop: true };
+                }
+                var diff = window.NxImage.compare(asset.report, report);
+                if (diff.score < 0.14) {
+                  status('✓ composição próxima da referência', '', true);
+                  return { stop: true };
+                }
+                var msg = 'VISUAL COMPARISON — the page was just rendered and its canvas captured locally. ' +
+                  'It was compared with the attached reference by low-level features, not semantic understanding.\n' +
+                  'Difference score: ' + diff.score + ' (0 = close, 1 = very different).\n' +
+                  'Metrics: ' + JSON.stringify(diff.metrics) + '\n' +
+                  'Measurable differences:\n- ' + diff.issues.join('\n- ') + '\n\n' +
+                  window.NxImage.referenceBlock(asset, { followup: true }) + '\n\n' +
+                  'Current document:\n```html\n' + current + '\n```\n\n' +
+                  'Correct the document to reduce these measurable differences while keeping ALL controls, ' +
+                  'interactions and game mechanics working. Never replace the game with a static image. ' +
+                  'Return the COMPLETE corrected HTML document. Output ONLY raw HTML, no explanations.';
+                return run(baseSystem, msg, null, marcarProgresso).then(function (r) {
+                  if (canceladoPeloUsuario) return { stop: true };
+                  var next = window.Html.extractDocument(r.content || '');
+                  if (!window.Html.looksLikeDocument(r.content) || !next.trim() ||
+                      window.Html.jsSyntaxErrors(next).length) {
+                    status('⚠ ajuste visual inválido — página mantida', 'accent', true);
+                    return { stop: true };
+                  }
+                  try {
+                    if (r.totalTokens > 0) {
+                      prefs.addSessionTokens(r.promptTokens, r.completionTokens);
+                      prefs.addUsage(r.promptTokens, r.completionTokens);
+                      updateSessionUi();
+                    }
+                  } catch (e) { /* contabilidade nunca derruba a correção */ }
+                  pushGenHistory();
+                  current = next;
+                  lastRendered = next;
+                  out.doc = next;
+                  render(themed(next));
+                  round++;
+                  status('✓ ajuste visual aplicado (' + round + '/' + limit + ')', '', true);
+                  return step();
+                }).catch(function (e) {
+                  if (canceladoPeloUsuario) return { stop: true };
+                  status('⚠ comparação visual falhou — página mantida', 'accent', true);
+                  return { stop: true };
+                });
+              });
+            });
+          });
+        });
+      }
+      return step().then(function () { return out; });
+    }
+
     var encoder = new TextEncoder();
     liveActive = true;
-    liveIn = Math.floor((encoder.encode(system).length + encoder.encode(user).length) / 4);
+    var startUser = sendVision ? userVision : user;
+    liveIn = Math.floor((encoder.encode(system).length + encoder.encode(startUser).length) / 4);
     liveOut = 0;
     lastProgressAt = 0;
     liveText = '';
@@ -909,7 +1308,27 @@
     updateSessionUi();
     var started = performance.now();
 
-    run(system).then(function (result) {
+    var primeira;
+    var renderedDoc = null;
+    if (sendVision) {
+      primeira = window.NxImage.dataUrl(asset.file, asset.mime).catch(function () { return ''; }).then(function (dataUrl) {
+        if (!dataUrl || !/^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl)) {
+          toast('Imagem não preparada — usando análise local');
+          return run(system, user);
+        }
+        return run(system, userVision, { image: dataUrl }).catch(function (e) {
+          if (canceladoPeloUsuario) throw e;
+          if (!window.AiClient.isImageInputError(e)) throw e;
+          status('⚠ modelo recusou a imagem — usando análise local…', 'accent', false);
+          toast('Modelo sem suporte a imagem — análise local usada');
+          return run(system, user);
+        });
+      });
+    } else {
+      primeira = run(system, user);
+    }
+
+    primeira.then(function (result) {
       if (editing) {
         /* Edição cirúrgica: aplica só os trechos pedidos (não reescreve a página). */
         var patched = editOverLimit ? { ok: false } : window.Html.applyEdits(lastRendered, result.content);
@@ -930,7 +1349,7 @@
         lastProgressAt = 0;
         editCount = 0;
         var retryUser = window.Html.userPrompt(
-          userBase,
+          command + elementHint + refFollow,
           lastRendered,
           (notes ? notes + '\n\n' : '') +
             'The previous response returned edits whose "find" text did not match this document. ' +
@@ -957,6 +1376,9 @@
       if (out.doc == null) return out;
       return repararQualidade(out, 0);
     }).then(function (out) {
+      if (out.doc == null) return out;
+      return garantirImagemAplicada(out, 0);
+    }).then(function (out) {
       /* Cancelado entre o fim da resposta e este callback: não renderiza nada. */
       if (canceladoPeloUsuario) { canceladoPeloUsuario = false; finishGeneration(); return; }
       var result = out.result;
@@ -973,12 +1395,16 @@
         failGeneration('resposta vazia do modelo');
         return;
       }
+      var imageAppliedInRender = !gameImage || gameImageApplied(doc, imagePath);
       pushGenHistory();  // guarda a página atual antes da IA gerar a nova
       lastRendered = doc;
       editSelHtml = '';                    /* alvo consumido só quando a edição foi aplicada */
-      lastCommands.push(prompt);
-      if (lastCommands.length > 6) lastCommands.shift();
+      if (imageAppliedInRender) {
+        lastCommands.push(commandLabel);
+        if (lastCommands.length > 6) lastCommands.shift();
+      }
       render(themed(doc));
+      renderedDoc = doc;
       var kb = Math.ceil(encoder.encode(doc).length / 1024);
       liveActive = false;
       if (result.totalTokens > 0) {
@@ -986,7 +1412,12 @@
         prefs.addUsage(result.promptTokens, result.completionTokens);
         updateSessionUi();
       }
-      status('✓ ' + kb + ' KB • ' + elapsed.toFixed(1) + 's', '', true);
+      if (gameImage && !imageAppliedInRender) {
+        status('⚠ imagem não aplicada — anexo mantido', 'accent', true);
+        toast('A imagem não foi aplicada ao jogo — anexo mantido para tentar de novo');
+      } else {
+        status('✓ ' + kb + ' KB • ' + elapsed.toFixed(1) + 's', '', true);
+      }
       input.value = '';
       input.blur();
       /* ANTI-ERRO: opcional (desligado por padrão em prefs.autoFix). Quando desligado,
@@ -996,9 +1427,27 @@
       }
       return antiErro(doc, 0);
     }).then(function (r) {
-      if (canceladoPeloUsuario) canceladoPeloUsuario = false;
-      if (r && r.tentativas > 0 && r.limpo) {
-        var kb2 = Math.ceil(encoder.encode(r.doc).length / 1024);
+      if (!r || !r.doc || editing || !asset || canceladoPeloUsuario) return r;
+      return iterarVisual(r);
+    }).then(function (r) {
+      if (canceladoPeloUsuario) {
+        canceladoPeloUsuario = false;    /* cancelado: preserva o anexo para tentar de novo */
+        finishGeneration();
+        return;
+      }
+      if (!renderedDoc) {
+        finishGeneration();
+        return;
+      }
+      var finalDoc = r && r.doc ? r.doc : renderedDoc;
+      var imageApplied = !gameImage || gameImageApplied(finalDoc, imagePath);
+      if (!gameImage || imageApplied) {
+        clearImageAttachment(true);      /* só depois de a geração dar certo */
+      }
+      if (gameImage && !imageApplied) {
+        status('⚠ imagem não aplicada — anexo mantido', 'error', true);
+      } else if (r && r.tentativas > 0 && r.limpo) {
+        var kb2 = Math.ceil(encoder.encode(finalDoc).length / 1024);
         status('✓ ' + kb2 + ' KB • anti-erro OK (' + r.tentativas + ')', '', true);
         toast('🔧 ' + r.tentativas + ' erro(s) corrigido(s) automaticamente');
       }
@@ -1029,6 +1478,7 @@
     openBtn.disabled = false;
     liveActive = false;
     hidePreviewBadge();
+    updateImageUi();
     updateSessionUi();
     setLoading(false);
   }
@@ -1057,6 +1507,7 @@
     lastCommands = [];
     lastOpenName = null;    // reseta o vínculo com projeto salvo
     clearGenHistory();
+    clearImageAttachment(true);
     updateSessionUi();
     showWelcome();
     toast('Sessão reiniciada');
@@ -1273,6 +1724,7 @@
       lastOpenName = name;   // SALVAR sugere o próprio nome deste arquivo
       showingList = false;
       render(text);
+      updateImageUi();
       status('aberto: ' + name, '', false);
     }).catch(function (e) {
       toast('Falha ao abrir: ' + (e && e.message ? e.message : e));
@@ -1887,6 +2339,7 @@
     openBtn = $('btn-open');
     statusEl = $('status');
     kbLabel = $('kb');
+    libsEl = $('libs');
     previewBadge = $('nx-preview');
     dot = $('dot');
     usageBtn = $('btn-usage');
@@ -1899,6 +2352,14 @@
     resetBtn = $('btn-reset');
     editBtn = $('btn-edit');
     finalizeBtn = $('btn-finalize');
+    imageBtn = $('btn-image');
+    imageFileInput = $('imagefile');
+    imgAttach = $('imgattach');
+    imgThumb = $('imgthumb');
+    imgName = $('imgname');
+    imgSub = $('imgsub');
+    imgState = $('imgstate');
+    imgRemove = $('img-remove');
 
     vu = window.VuMeter.attach($('vu'));
 
@@ -1912,6 +2373,17 @@
     saveBtn.addEventListener('click', requestSave);
     openBtn.addEventListener('click', openSavedList);
     resetBtn.addEventListener('click', resetSession);
+
+    imageBtn.addEventListener('click', function () {
+      if (generating || imageBusy) return;
+      try { imageFileInput.value = ''; } catch (e) { /* ignora */ }
+      imageFileInput.click();
+    });
+    imageFileInput.addEventListener('change', function () {
+      var file = imageFileInput.files && imageFileInput.files[0];
+      if (file) chooseImage(file);
+    });
+    imgRemove.addEventListener('click', function () { clearImageAttachment(false); });
 
     /* ESC cancela a geração em andamento. */
     document.addEventListener('keydown', function (e) {
@@ -2039,6 +2511,15 @@
         try { applySnapshot(d.a); } catch (err) { /* ignora */ }
         return;
       }
+      if (m === 'capture') {
+        try {
+          var cap = JSON.parse(String(d.a || '{}'));
+          if (pendingCapture && String(cap.id) === pendingCapture.id) {
+            pendingCapture.finish(cap.ok && cap.url ? String(cap.url) : null);
+          }
+        } catch (err) { /* ignora */ }
+        return;
+      }
       if (m === 'errors') {
         /* Lista cumulativa enviada pelo shim; guarda a versão mais nova e completa. */
         try {
@@ -2080,6 +2561,7 @@
 
     theme = window.Themes.of(0);
     applyTheme();
+    updateImageUi();
     showWelcome();
 
     if (window.console) {

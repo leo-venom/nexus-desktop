@@ -155,13 +155,13 @@
     zzfx: {
       name: 'ZzFX',
       category: 'audio',
-      description: 'Síntese de efeitos sonoros ultra-leve (7.8KB). Tiros, explosões, pulos, moedas, power-ups em uma linha. Perfeito para jogos.',
+      description: 'Síntese de efeitos sonoros ultra-leve (7.8KB). Tiros, explosões, pulos, moedas, power-ups em uma linha. Perfeito para jogos. Use zzfx(...) ou ZZFX.play(...).',
       keywords: ['zzfx','efeito sonoro leve','som de jogo','tiro som','explosao som','pulo som','sfx','sound effect','8bit'],
-      global: 'ZzFX',
+      global: 'zzfx',
       local: true,
-      file: 'zzfx/ZzFX.js',
+      file: 'zzfx/ZzFX.global.js',
       audio: true,
-      size: '~7.8KB'
+      size: '~8KB'
     },
     pixiSound: {
       name: '@pixi/sound',
@@ -308,7 +308,7 @@
     lilGui: {
       name: 'lil-gui',
       category: 'debug',
-      description: 'Painel de depuração para ajustar iluminação, cores, física, partículas em tempo real. Use GUI.add(). Ativado só em desenvolvimento.',
+      description: 'Painel de depuração para ajustar iluminação, cores, física, partículas em tempo real. Use new GUI(). Ativado só em desenvolvimento.',
       keywords: ['lil gui','debug','painel debug','ajuste tempo real','gui','controle deslizante','depuracao','tweak'],
       global: 'GUI',
       local: true,
@@ -479,7 +479,7 @@
     'gsap', 'lottie',
     'yuka', 'recast',
     'howler', 'tone', 'zzfx', 'pixiSound',
-    'simplexNoise', 'spritesheetLoader', 'tiledLoader',
+    'simplexNoise', 'shaderGLSL', 'spritesheetLoader', 'tiledLoader',
     'postprocessing', 'meshBVH',
     'lilGui',
     'canvas2d'
@@ -489,6 +489,49 @@
     return arr.slice().sort(function (a, b) {
       return PRIORITY.indexOf(a) - PRIORITY.indexOf(b);
     });
+  }
+
+  /* ================================================================
+   * BIBLIOTECAS REALMENTE USADAS NO HTML FINAL
+   *
+   * Diferente de selectLibraries() (que lê o pedido), esta função lê o
+   * documento já decorado: scripts vendor injetados, chamadas NxLoad
+   * (CDN sob demanda), packs embutidos e uso explícito de Canvas 2D.
+   * ================================================================ */
+  function usedLibraries(html) {
+    var doc = String(html || '');
+    if (!doc) return [];
+    var used = new Set();
+
+    /* Scripts/imports locais: vendor/<pasta>/... */
+    var reVendor = /vendor\/([a-z0-9][a-z0-9-]*)\//gi;
+    var dirs = new Set();
+    var m;
+    while ((m = reVendor.exec(doc))) {
+      if (m[1]) dirs.add(m[1].toLowerCase());
+    }
+    for (var key in LIBRARIES) {
+      var file = LIBRARIES[key].file;
+      if (file && dirs.has(file.split('/')[0])) used.add(key);
+    }
+
+    /* Loaders embutidos: só a chamada específica conta. */
+    if (/\bNxLoad\.spritesheet\b/.test(doc)) used.add('spritesheetLoader');
+    if (/\bNxLoad\.tiled\b/.test(doc)) used.add('tiledLoader');
+
+    /* Libs CDN carregadas sob demanda por NxLoad. */
+    if (/\bNxLoad\.rapier\b|\bRAPIER\b/.test(doc)) used.add('rapier');
+    if (/\bNxLoad\.recast\b|\bRecastNavigation\b/.test(doc)) used.add('recast');
+    if (/\bNxLoad\.postprocessing\b|\bEffectComposer\b|\bPOSTPROCESSING\b/.test(doc)) used.add('postprocessing');
+    if (/\bNxLoad\.meshBVH\b|\bMeshBVH\b|\bMeshBVHLib\b/.test(doc)) used.add('meshBVH');
+
+    /* NxShader é injetado pelo decorate() quando o documento o referencia. */
+    if (/\bNxShader\b/.test(doc) || /js\/nx-shaders\.js/.test(doc)) used.add('shaderGLSL');
+
+    /* Canvas 2D nativo: apenas com uso explícito do contexto 2D. */
+    if (/getContext\(\s*["']2d["']\s*[,)]/.test(doc)) used.add('canvas2d');
+
+    return sortByPriority(Array.from(used));
   }
 
   /* ================================================================
@@ -642,10 +685,11 @@
    * EXPOSIÇÃO
    * ================================================================ */
   window.LibrarySelector = {
-    VERSION: '3.0.1',
+    VERSION: '3.1.0',
     LIBRARIES: LIBRARIES,
     TYPE_TO_LIBS: TYPE_TO_LIBS,
     selectLibraries: selectLibraries,
+    usedLibraries: usedLibraries,
     getLibraryInfo: getLibraryInfo,
     getLibraryFile: getLibraryFile,
     getLibraryGlobal: getLibraryGlobal,

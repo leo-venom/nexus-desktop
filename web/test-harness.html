@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
 <title>Test Harness — NEXUS GAME</title>
 <style>
 *{box-sizing:border-box}body{margin:0;padding:24px;background:#0a0a0f;color:#eee;font:14px system-ui,sans-serif}
@@ -19,8 +20,10 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
 <script src="js/prefs.js"></script>
 <script src="js/library-selector.js"></script>
 <script src="js/html-builder.js"></script>
+<script src="js/nx-image.js"></script>
 <script src="js/ai-client.js"></script>
 <script src="js/store.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/nx-materials.js"></script>
 <script src="js/nx-shaders.js"></script>
 <script src="js/nx-loaders.js"></script>
@@ -31,6 +34,32 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
   var summary = document.getElementById('summary');
   function assert(value, message) { if (!value) throw new Error(message || 'assertion falhou'); }
   function test(name, fn) { return { name: name, fn: fn }; }
+  function makeImageFile(w, h, draw, name, type) {
+    return new Promise(function (resolve, reject) {
+      var canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      draw(ctx, w, h);
+      canvas.toBlob(function (blob) {
+        if (!blob) { reject(new Error('toBlob falhou')); return; }
+        resolve(new File([blob], name || 'ref.png', { type: type || 'image/png' }));
+      }, type || 'image/png');
+    });
+  }
+  function mockChatResponse() {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      body: null,
+      text: function () {
+        return Promise.resolve(JSON.stringify({
+          choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+        }));
+      }
+    });
+  }
   var tests = [
     test('Módulos do app carregados', function () {
       ['Prefs', 'Themes', 'LibrarySelector', 'Html', 'AiClient', 'Store', 'NxMat', 'NxShader', 'NxLoad'].forEach(function (key) { assert(window[key], key + ' indisponível'); });
@@ -70,6 +99,276 @@ h1{color:#00e88a;font-size:20px}p{color:#aaa}button{padding:9px 16px;margin:12px
       var total = Object.keys(LibrarySelector.LIBRARIES).length;
       assert(total === 24, 'quantidade inesperada: ' + total);
       assert(LibrarySelector.LIBRARIES.three && LibrarySelector.LIBRARIES.shaderGLSL, 'entradas essenciais ausentes');
+    }),
+    test('LibrarySelector detecta as bibliotecas usadas no HTML final', function () {
+      var html = '<script src="vendor/three/three.min.js"><\/script>' +
+        '<script src="vendor/gsap/gsap.min.js"><\/script>' +
+        '<script>NxLoad.rapier(); NxLoad.tiled(mapa);<\/script>';
+      var used = LibrarySelector.usedLibraries(html);
+      assert(used.indexOf('three') >= 0, 'three não detectado');
+      assert(used.indexOf('gsap') >= 0, 'gsap não detectado');
+      assert(used.indexOf('rapier') >= 0, 'rapier (CDN) não detectado');
+      assert(used.indexOf('tiledLoader') >= 0, 'tiled loader não detectado');
+      assert(used.indexOf('spritesheetLoader') < 0, 'spritesheet falso positivo');
+      assert(used.indexOf('three') < used.indexOf('gsap'), 'ordem de prioridade');
+      var canvas = LibrarySelector.usedLibraries('<canvas></canvas><script>var c = document.createElement("canvas").getContext("2d", {alpha:false});<\/script>');
+      assert(canvas.indexOf('canvas2d') >= 0, 'canvas 2d não detectado');
+      assert(LibrarySelector.usedLibraries('').length === 0, 'documento vazio');
+    }),
+    test('Barra superior tem o indicador de bibliotecas', async function () {
+      var page = await (await fetch('/index.html', { cache: 'no-store' })).text();
+      assert(/id="libs"/.test(page), '#libs ausente');
+      var css = await (await fetch('/css/app.css', { cache: 'no-store' })).text();
+      assert(/\.libs\[hidden\]/.test(css), 'regra .libs[hidden] ausente');
+    }),
+    test('Integração de ZzFX, lil-gui e NxLoad', function () {
+      var page = Html.decorate('<html><head></head><body><script>zzfx(1); new GUI(); NxLoad.meshBVH();<\/script></body></html>', Themes.of(0));
+      assert(page.indexOf('vendor/zzfx/ZzFX.global.js') >= 0, 'ZzFX global não injetado');
+      assert(page.indexOf('vendor/zzfx/ZzFX.js"') < 0, 'ZzFX ESM antigo ainda injetado');
+      assert(page.indexOf('vendor/lil-gui/lil-gui.umd.js') >= 0, 'lil-gui não injetado');
+      assert(page.indexOf('window.GUI=window.GUI') >= 0, 'alias GUI ausente');
+      assert(page.indexOf('js/nx-loaders.js') >= 0, 'NxLoad não injetado');
+    }),
+    test('NxImage valida, gera miniatura e analisa uma imagem real', async function () {
+      var file = await makeImageFile(96, 48, function (ctx, w, h) {
+        ctx.fillStyle = '#c81e3c'; ctx.fillRect(0, 0, w / 2, h);
+        ctx.fillStyle = '#1e50c8'; ctx.fillRect(w / 2, 0, w / 2, h);
+        ctx.fillStyle = '#f2f2f2'; ctx.fillRect(w * 0.4, h * 0.2, w * 0.2, h * 0.6);
+      }, 'referencia.png');
+      assert(NxImage.sniff(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0])).mime === 'image/png', 'magic bytes PNG');
+      assert(NxImage.sniff(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0])) === null, 'GIF deveria ser recusado');
+      var asset = await NxImage.inspect(file);
+      assert(asset.width === 96 && asset.height === 48, 'dimensões: ' + asset.width + 'x' + asset.height);
+      assert(asset.thumbnail.indexOf('data:image/png;base64,') === 0, 'miniatura ausente');
+      assert(asset.report.palette.length > 0, 'paleta vazia');
+      assert(asset.report.layout.grid.length === 9, 'grade 3x3');
+      assert(Array.isArray(asset.report.uncertainties) && asset.report.uncertainties.length > 0, 'incertezas ausentes');
+      assert(asset.sizeLabel && asset.name === 'referencia.png', 'metadados do anexo');
+    }),
+    test('NxImage aceita JPEG e WEBP reais', async function () {
+      var types = [
+        { mime: 'image/jpeg', name: 'referencia.jpg' },
+        { mime: 'image/webp', name: 'referencia.webp' }
+      ];
+      for (var i = 0; i < types.length; i++) {
+        var file = await makeImageFile(80, 40, function (ctx, w, h) {
+          ctx.fillStyle = '#202040'; ctx.fillRect(0, 0, w, h);
+          ctx.fillStyle = '#f0c020'; ctx.fillRect(w * 0.2, h * 0.2, w * 0.3, h * 0.6);
+        }, types[i].name, types[i].mime);
+        var asset = await NxImage.inspect(file);
+        assert(asset.mime === types[i].mime, types[i].name + ': mime ' + asset.mime);
+        assert(asset.width === 80 && asset.height === 40, types[i].name + ': dimensões ' + asset.width + 'x' + asset.height);
+        assert(asset.thumbnail.indexOf('data:image/png;base64,') === 0, types[i].name + ': miniatura ausente');
+        assert(asset.report.layout.grid.length === 9, types[i].name + ': relatório incompleto');
+        var semTipo = new File([await file.arrayBuffer()], types[i].name, { type: '' });
+        var url = await NxImage.dataUrl(semTipo, asset.mime);
+        assert(url.indexOf('data:' + types[i].mime + ';base64,') === 0, types[i].name + ': data URL sem mime normalizado');
+      }
+    }),
+    test('NxImage recusa formato inválido e arquivo grande', async function () {
+      var fake = new File([new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0])], 'falso.png', { type: 'image/png' });
+      var formatError = null;
+      try { await NxImage.inspect(fake); } catch (e) { formatError = e; }
+      assert(formatError && formatError.code === 'format', 'formato inválido não recusado');
+      var big = new File([new Uint8Array(NxImage.MAX_BYTES + 1)], 'grande.png', { type: 'image/png' });
+      var sizeError = null;
+      try { await NxImage.inspect(big); } catch (e) { sizeError = e; }
+      assert(sizeError && sizeError.code === 'size', 'arquivo grande não recusado');
+    }),
+    test('NxImage monta o bloco de referência sem fingir visão', async function () {
+      var file = await makeImageFile(40, 40, function (ctx, w, h) {
+        ctx.fillStyle = '#00e88a'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#000'; ctx.fillRect(10, 10, 20, 20);
+      }, 'bloco.png');
+      var asset = await NxImage.inspect(file);
+      var local = NxImage.referenceBlock(asset, { vision: false });
+      assert(local.indexOf('NÃO tem acesso aos pixels') >= 0, 'aviso de visão local');
+      assert(local.indexOf('```json') >= 0, 'relatório JSON');
+      assert(local.indexOf('INTERATIVA') >= 0, 'exigência de interatividade');
+      var vision = NxImage.referenceBlock(asset, { vision: true });
+      assert(vision.indexOf('imagem original está anexada') >= 0, 'modo visão');
+      assert(vision.indexOf('fonte primária de fidelidade') >= 0, 'imagem não é priorizada sobre o relatório');
+      var follow = NxImage.referenceBlock(asset, { followup: true });
+      assert(follow.indexOf('não é reenviada') >= 0, 'continuação sem reenvio');
+    }),
+    test('NxImage decide fundo x textura pelo comando', function () {
+      assert(NxImage.usageMode('') === 'background', 'sem texto → fundo');
+      assert(NxImage.usageMode('deixe o jogo mais rápido') === 'background', 'texto sem alvo → fundo');
+      assert(NxImage.usageMode('use como plano de fundo') === 'background', 'pedido de fundo');
+      assert(NxImage.usageMode('use essa imagem como textura do cubo') === 'texture', 'textura do cubo');
+      assert(NxImage.usageMode('textura da peça do tetris') === 'texture', 'peça do tetris');
+      assert(NxImage.usageMode('aplique no objeto principal') === 'texture', 'objeto nomeado');
+      assert(NxImage.usageMode('põe na parede do cenário') === 'texture', 'parede nomeada');
+    }),
+    test('NxImage.usageBlock exige o caminho real e o modo correto', function () {
+      var fake = { width: 800, height: 600, report: { image: { aspect: 1.333 }, palette: [{ hex: '#112233' }] } };
+      var bg = NxImage.usageBlock(fake, { path: '/imagens/nexus-ref-1.png', mode: 'background' });
+      assert(bg.indexOf('/imagens/nexus-ref-1.png') >= 0, 'caminho exato ausente');
+      assert(bg.indexOf('BACKGROUND MODE') >= 0, 'modo fundo ausente');
+      assert(bg.indexOf('drawImage') >= 0, 'instrução de fundo 2D ausente');
+      assert(bg.indexOf('800×600') >= 0, 'resumo da imagem ausente');
+      assert(bg.indexOf('Never inline base64') >= 0, 'proibição de base64 ausente');
+      assert(bg.indexOf('Do NOT recreate the image') >= 0, 'proibição de recriar ausente');
+      var tx = NxImage.usageBlock(fake, { path: '/imagens/nexus-ref-1.png', mode: 'texture' });
+      assert(tx.indexOf('TEXTURE MODE') >= 0, 'modo textura ausente');
+      assert(tx.indexOf('createPattern') >= 0, 'pattern 2D ausente');
+      assert(tx.indexOf('material.map') >= 0, 'material.map ausente');
+      assert(tx.indexOf('NEVER to the background') >= 0, 'textura não prioriza o componente');
+      assert(NxImage.usageBlock(fake, { path: '' }) === '', 'sem caminho deveria ser vazio');
+      assert(NxImage.usageBlock(fake, { path: '/imagens/x.png', mode: 'texture', vision: true })
+        .indexOf('attached to this message') >= 0, 'modo visão ausente');
+    }),
+    test('NxImage.assetForGame devolve data URL e reencoda acima de 6 MB', async function () {
+      var file = await makeImageFile(64, 32, function (ctx, w, h) {
+        ctx.fillStyle = '#00e88a'; ctx.fillRect(0, 0, w, h);
+      }, 'jogo.png');
+      var asset = await NxImage.inspect(file);
+      var small = await NxImage.assetForGame(asset);
+      assert(small.indexOf('data:image/png;base64,') === 0, 'imagem pequena não virou data URL');
+      asset.size = NxImage.GAME_ASSET_MAX_BYTES + 1;
+      var big = await NxImage.assetForGame(asset);
+      assert(big.indexOf('data:image/webp;base64,') === 0, 'reencode deveria usar WebP');
+      assert(big.length > 100, 'reencode vazio');
+    }),
+    test('Store reescreve /imagens sem barra e preserva URL externa', async function () {
+      var original = window.fetch;
+      window.fetch = function () {
+        return Promise.resolve({
+          ok: true,
+          blob: function () {
+            return Promise.resolve(new Blob([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], { type: 'image/png' }));
+          }
+        });
+      };
+      try {
+        var html = '<img src="/imagens/x.png"><style>body{background:url(/imagens/x.png)}</style>' +
+          '<img src="https://cdn.example/imagens/x.png">';
+        var result = await Store.extractAssetsFromHtml(html, 'teste');
+        assert(result.html.indexOf('src="assets/images/x.png"') >= 0, 'src com barra não normalizado');
+        assert(result.html.indexOf('url(assets/images/x.png)') >= 0, 'CSS com barra não normalizado');
+        assert(result.html.indexOf('https://cdn.example/imagens/x.png') >= 0, 'URL externa foi alterada');
+        assert(result.html.indexOf('/assets/images') < 0, 'barra inicial permaneceu no HTML');
+        assert(result.assets['assets/images/x.png'].indexOf('data:image/png;base64,') === 0, 'asset não incorporado');
+      } finally {
+        window.fetch = original;
+      }
+    }),
+    test('mediaBlock permite o caminho absoluto da imagem de referência', function () {
+      var sys = Html.systemPrompt(Themes.of(0), 1, 'textura do cubo', '', {
+        images: [{ file: 'a.png', name: 'a', ext: '.png', size: 1024, url: '/imagens/a.png' }],
+        sounds: []
+      });
+      assert(sys.indexOf('app-provided') >= 0, 'exceção do caminho absoluto ausente');
+      assert(sys.indexOf('/imagens/') >= 0, 'caminho /imagens/ ausente');
+    }),
+    test('NxImage compara características mensuráveis', async function () {
+      var red = await makeImageFile(64, 64, function (ctx, w, h) {
+        ctx.fillStyle = '#d02020'; ctx.fillRect(0, 0, w, h);
+      }, 'vermelho.png');
+      var blue = await makeImageFile(64, 64, function (ctx, w, h) {
+        ctx.fillStyle = '#2020d0'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#fff'; ctx.fillRect(8, 8, 20, 20);
+      }, 'azul.png');
+      var a = await NxImage.inspect(red);
+      var b = await NxImage.inspect(blue);
+      var same = NxImage.compare(a.report, a.report);
+      var diff = NxImage.compare(a.report, b.report);
+      assert(same.score === 0, 'mesma imagem deveria ter score 0: ' + same.score);
+      assert(diff.score > 0.1, 'imagens diferentes não foram distinguidas: ' + diff.score);
+      assert(diff.metrics && typeof diff.metrics.palette === 'number', 'métricas ausentes');
+      assert(diff.issues.length > 0, 'sem diferenças descritas');
+    }),
+    test('AiClient envia imagem só em conteúdo multimodal válido', async function () {
+      var original = window.fetch;
+      var bodies = [];
+      window.fetch = function (url, opts) {
+        if (opts && opts.body) bodies.push(JSON.parse(opts.body));
+        return mockChatResponse();
+      };
+      var dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+      try {
+        await AiClient.chat('http://mock.local/v1', 'k', 'm', 0.5, 1000, 'sys', 'texto', null, { image: dataUrl });
+        await AiClient.chat('http://mock.local/v1', 'k', 'm', 0.5, 1000, 'sys', 'texto');
+        await AiClient.chat('http://mock.local/v1', 'k', 'm', 0.5, 1000, 'sys', 'texto', null, { image: 'javascript:alert(1)' });
+      } finally {
+        window.fetch = original;
+      }
+      assert(bodies.length === 3, 'requisições esperadas: 3, recebidas: ' + bodies.length);
+      var parts = bodies[0].messages[1].content;
+      assert(Array.isArray(parts) && parts.length === 2, 'conteúdo multimodal ausente');
+      assert(parts[0].type === 'text' && parts[0].text === 'texto', 'parte de texto');
+      assert(parts[1].type === 'image_url' && parts[1].image_url.url === dataUrl, 'parte de imagem');
+      assert(typeof bodies[1].messages[1].content === 'string', 'texto puro foi alterado');
+      assert(typeof bodies[2].messages[1].content === 'string', 'URL de imagem inválida deveria ser ignorada');
+    }),
+    test('AiClient distingue recusa de imagem de outros erros', function () {
+      assert(AiClient.isImageInputError(new AiClient.AiException('HTTP 400: invalid content')), 'HTTP 400');
+      assert(AiClient.isImageInputError(new AiClient.AiException('HTTP 415: unsupported')), 'HTTP 415');
+      assert(!AiClient.isImageInputError(new AiClient.AiException('HTTP 500: erro')), 'HTTP 500 não é recusa');
+      assert(!AiClient.isImageInputError(new AiClient.AiException('HTTP 401: key')), 'HTTP 401 não é recusa');
+    }),
+    test('AiClient aplica o teto do GPT-6 sem afetar outros modelos', async function () {
+      assert(AiClient.clampMaxTokens('gpt-6-luna', 65535) === 65535, 'GPT-6 perdeu o valor explícito');
+      assert(AiClient.clampMaxTokens('gpt-6-luna', 200000) === 128000, 'GPT-6 não foi cortado em 128.000');
+      assert(AiClient.clampMaxTokens('gpt-4o', 65535) === 16384, 'gpt-4o mudou de teto');
+      assert(AiClient.clampMaxTokens('gemini-2.5-pro', 999999) === 65535, 'gemini mudou de teto');
+      assert(AiClient.clampMaxTokens('modelo-desconhecido', 65535) === 16384, 'teto padrão mudou');
+      assert(AiClient.clampMaxTokens('gpt-6-luna', 0) === 0, 'zero deveria omitir o limite');
+      var original = window.fetch;
+      var bodies = [];
+      window.fetch = function (url, opts) {
+        if (opts && opts.body) bodies.push(JSON.parse(opts.body));
+        return mockChatResponse();
+      };
+      try {
+        await AiClient.chat('http://mock.local/v1', 'k', 'gpt-6-luna', 0.6, 65535, 's', 'u');
+        await AiClient.chat('http://mock.local/v1', 'k', 'gpt-6-luna', 0.6, 200000, 's', 'u');
+      } finally {
+        window.fetch = original;
+      }
+      assert(bodies.length === 2, 'requisições esperadas: 2, recebidas: ' + bodies.length);
+      assert(bodies[0].max_tokens === 65535, 'corpo não enviou 65.535: ' + bodies[0].max_tokens);
+      assert(bodies[1].max_tokens === 128000, 'corpo não cortou em 128.000: ' + bodies[1].max_tokens);
+    }),
+    test('Preferências de imagem têm padrões seguros e campos no modal', function () {
+      assert(typeof Prefs.imageMode === 'function', 'imageMode');
+      assert(typeof Prefs.visualIterations === 'function', 'visualIterations');
+      assert(['auto', 'local'].indexOf(Prefs.imageMode()) >= 0, 'modo inválido');
+      var oldMode = Prefs.data.imageMode, oldVersion = Prefs.data.imageModeVersion;
+      Prefs.data.imageMode = 'local'; Prefs.data.imageModeVersion = undefined;
+      assert(Prefs.imageMode() === 'auto', 'preferência local antiga deveria migrar para automático');
+      Prefs.data.imageMode = 'local'; Prefs.data.imageModeVersion = 2;
+      assert(Prefs.imageMode() === 'local', 'escolha explícita de somente local não foi preservada');
+      Prefs.data.imageMode = oldMode; Prefs.data.imageModeVersion = oldVersion;
+      var vi = Prefs.visualIterations();
+      assert(vi === 0 || vi === 1 || vi === 2, 'iterações fora do limite: ' + vi);
+      var modal = Settings.open();
+      try {
+        assert(document.querySelector('input[name="nx-image-mode"][value="auto"]'), 'opção automática ausente');
+        assert(document.querySelector('input[name="nx-image-mode"][value="local"]'), 'opção local ausente');
+        assert(!document.querySelector('input[name="nx-image-mode"][value="vision"]'), 'opção antiga de visão ainda exposta');
+        assert(document.querySelectorAll('.mx-input[type="number"]').length >= 1, 'campo de iterações ausente');
+        var labels = Array.prototype.map.call(document.querySelectorAll('.mx-lbl'), function (n) { return n.textContent; });
+        assert(labels.indexOf('Max tokens (0 = padrão do provedor)') >= 0, 'rótulo de max tokens desatualizado');
+        var notes = Array.prototype.map.call(document.querySelectorAll('.mx-note'), function (n) { return n.textContent; }).join(' ');
+        assert(notes.indexOf('GPT-6 Luna: até 128.000') >= 0, 'nota do teto GPT-6 ausente');
+        assert(notes.indexOf('melhor fidelidade') >= 0, 'nota do envio automático da imagem ausente');
+      } finally {
+        modal.close();
+      }
+    }),
+    test('Shell preserva o input e adiciona o anexo sem sobrepor o texto', async function () {
+      var page = await (await fetch('/index.html', { cache: 'no-store' })).text();
+      assert(/id="btn-image"/.test(page), '#btn-image ausente');
+      assert(/id="imageattach"|id="imgattach"/.test(page), 'cartão do anexo ausente');
+      assert(/id="imagefile"[^>]*accept="image\/png,image\/jpeg,image\/webp/.test(page), 'accept do seletor');
+      assert(/id="prompt"[^>]*type="text"/.test(page), 'input original alterado');
+      assert(/id="btn-reset"/.test(page), 'botão de sessão original ausente');
+      assert(page.indexOf('id="btn-image"') < page.indexOf('id="prompt"'), 'botão de imagem deveria vir antes do input');
+      var css = await (await fetch('/css/app.css', { cache: 'no-store' })).text();
+      assert(/\.attach\s*\{[^}]*position:\s*absolute/.test(css), '.attach fora do input');
+      assert(/\.prompt\s*\{[^}]*padding:\s*0 30px 0 29px/.test(css), 'padding do input não reserva o botão');
+      assert(/\.imgattach\[hidden\]\s*\{\s*display:\s*none/.test(css), 'estado oculto do cartão');
     }),
     test('API de projetos responde somente leitura', async function () {
       var response = await fetch('/_api/saves', { method: 'GET', cache: 'no-store' });

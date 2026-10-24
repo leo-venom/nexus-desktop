@@ -19,6 +19,7 @@ import shutil
 import socket
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -47,6 +48,7 @@ MEDIA_KINDS = {
     "imagens": (IMAGES_DIR, IMAGE_EXT, "images"),
     "sons": (SOUNDS_DIR, SOUND_EXT, "sounds"),
 }
+REF_IMAGE_MAX_BYTES = 6 * 1024 * 1024
 PORT = int(os.environ.get("NEXUS_PORT", sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8790))
 
 def _valid_save_name(value):
@@ -330,6 +332,59 @@ def _api_saves_read(nome):
     except OSError:
         return None, 500
 
+def _sniff_ref_image(data):
+    """Return (extension, mime) for PNG/JPEG/WEBP, else None."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png", "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return ".jpg", "image/jpeg"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp", "image/webp"
+    return None
+
+def _api_ref_image(body):
+    """POST /_api/ref-image → grava a foto anexada em imagens/."""
+    if not isinstance(body, dict) or not isinstance(body.get("data"), str):
+        return {"ok": False, "error": "imagem ausente"}, 400
+    raw = body["data"]
+    encoded = raw.split(",", 1)[1] if "," in raw else raw
+    if not encoded or len(encoded) % 4 == 1:
+        return {"ok": False, "error": "imagem base64 invalida"}, 400
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return {"ok": False, "error": "imagem base64 invalida"}, 400
+    if not data:
+        return {"ok": False, "error": "imagem base64 invalida"}, 400
+    if len(data) > REF_IMAGE_MAX_BYTES:
+        return {"ok": False, "error": "imagem excede 6 MB"}, 413
+    kind = _sniff_ref_image(data)
+    if not kind:
+        return {"ok": False, "error": "formato invalido — use PNG, JPG ou WEBP"}, 400
+    ext, _mime = kind
+    try:
+        if os.path.lexists(IMAGES_DIR) and (os.path.islink(IMAGES_DIR) or not os.path.isdir(IMAGES_DIR)):
+            return {"ok": False, "error": "pasta imagens invalida"}, 500
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        name = "nexus-ref-%d-%s%s" % (int(time.time() * 1000), os.urandom(6).hex(), ext)
+        full = os.path.join(IMAGES_DIR, name)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(full, flags, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise
+        return {"ok": True, "path": "/imagens/" + name, "bytes": len(data)}, 200
+    except OSError:
+        return {"ok": False, "error": "falha ao gravar imagem"}, 500
+
 def _api_saves_read_asset(nome, subpath):
     """GET /_api/saves/<nome>/assets/<path> → devolve arquivo binário."""
     project = _save_path(nome)
@@ -560,6 +615,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path).rstrip("/")
         parts = path.split("/")
 
+        # /_api/ref-image
+        if path == "/_api/ref-image" and method == "POST":
+            if not _same_local_origin(self):
+                return self._send_json({"ok": False, "error": "origem nao permitida"}, 403)
+            try:
+                body = self._read_body()
+            except (ValueError, json.JSONDecodeError):
+                return self._send_json({"ok": False, "error": "JSON invalido"}, 400)
+            r, status = _api_ref_image(body)
+            return self._send_json(r, status)
+
         # /_api/saves
         if path == "/_api/saves" and method == "GET":
             return self._send_json(_api_saves_list())
@@ -624,7 +690,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", mime or "application/octet-stream")
                     self.send_header("Content-Length", str(len(data)))
-                    self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
                     self.end_headers()
                     self.wfile.write(data)
                 else:
@@ -801,7 +868,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", MEDIA_TYPES.get(os.path.splitext(name)[1].lower(), "application/octet-stream"))
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
         self.end_headers()
         self.wfile.write(data)
 

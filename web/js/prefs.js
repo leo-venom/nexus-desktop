@@ -16,6 +16,9 @@
     temperature: 0.7,
     maxTokens: 65535,
     autoFix: false,
+    imageMode: 'auto',
+    imageModeVersion: 2,
+    visualIterations: 0,
     themeIndex: 0,
     detailLevel: 1,
     sessionTokens: 0,
@@ -35,6 +38,12 @@
     Object.keys(DEFAULTS).forEach(function (k) {
       st[k] = (raw[k] === undefined || raw[k] === null) ? DEFAULTS[k] : raw[k];
     });
+    /* Versões antigas usavam 'local' como padrão. Migra para automático uma vez;
+       a escolha explícita feita no modal atual grava imageModeVersion = 2. */
+    if (raw.imageMode === 'local' && Number(raw.imageModeVersion) !== 2) {
+      st.imageMode = 'auto';
+      st.imageModeVersion = 2;
+    }
     return st;
   }
 
@@ -74,6 +83,17 @@
     temperature: function () { return clamp(num(state.temperature, 0.7), 0, 2); },
     maxTokens: function () { return Math.max(0, Math.floor(num(state.maxTokens, 0))); },
     autoFix: function () { return state.autoFix === true; },
+    /* 'auto' = tenta enviar a imagem original e cai para o relatório local se
+       o modelo recusar; 'local' = somente relatório, nunca envia pixels.
+       'vision' de versões antigas é tratado como 'auto'. */
+    imageMode: function () {
+      return (state.imageMode === 'local' && Number(state.imageModeVersion) === 2) ? 'local' : 'auto';
+    },
+    /* 0–2 correções visuais opcionais depois da primeira geração. */
+    visualIterations: function () {
+      var n = Math.floor(num(state.visualIterations, 0));
+      return clamp(n, 0, 2);
+    },
     themeIndex: function () { return 0; },   /* tema único — seletor removido */
     detailLevel: function () { return 2; },   /* modo game único — sem seletor */
 

@@ -101,10 +101,13 @@
       tempLabel.textContent = 'Temperatura: ' + (Number(tempBar.value) / 100).toFixed(2);
     });
 
-    var tokens = field('Max tokens (0 = sem limite)', String(prefs.maxTokens()), '0', 'number');
+    var tokens = field('Max tokens (0 = padrão do provedor)', String(prefs.maxTokens()), '0', 'number');
     tokens.input.min = '0';
     tokens.input.step = '1';
     card.appendChild(tokens.wrap);
+    card.appendChild(el('div', 'mx-note',
+      '0 não envia limite e deixa o provedor decidir. Acima do teto do modelo o app corta ' +
+      '(GPT-6 Luna: até 128.000).'));
 
     var autoFixWrap = el('label', 'mx-check', ' Correção automática contínua (anti-erro em loop)');
     autoFixWrap.style.marginTop = '12px';
@@ -113,6 +116,42 @@
     autoFixCheck.checked = prefs.autoFix();
     autoFixWrap.insertBefore(autoFixCheck, autoFixWrap.firstChild);
     card.appendChild(autoFixWrap);
+
+    /* ---------- IMAGEM DE REFERÊNCIA ---------- */
+    card.appendChild(el('div', 'mx-sec', 'IMAGEM DE REFERÊNCIA'));
+
+    var imgMode = prefs.imageMode();
+
+    var imgAutoWrap = el('label', 'mx-check', ' Automático (recomendado): envia a imagem original; se o modelo recusar, usa a análise local');
+    var imgAuto = el('input');
+    imgAuto.type = 'radio';
+    imgAuto.name = 'nx-image-mode';
+    imgAuto.value = 'auto';
+    imgAuto.checked = imgMode === 'auto';
+    imgAutoWrap.insertBefore(imgAuto, imgAutoWrap.firstChild);
+    card.appendChild(imgAutoWrap);
+
+    var imgLocalWrap = el('label', 'mx-check', ' Somente análise local (nunca envia os pixels)');
+    var imgLocal = el('input');
+    imgLocal.type = 'radio';
+    imgLocal.name = 'nx-image-mode';
+    imgLocal.value = 'local';
+    imgLocal.checked = imgMode === 'local';
+    imgLocalWrap.insertBefore(imgLocal, imgLocalWrap.firstChild);
+    card.appendChild(imgLocalWrap);
+
+    card.appendChild(el('div', 'mx-note',
+      'No automático, a imagem original é enviada ao provedor para melhor fidelidade; ' +
+      'se ele recusar, o app usa o relatório local. "Somente local" mantém a imagem no computador.'));
+
+    var imgIterate = field('Correções visuais automáticas (0–2)', String(prefs.visualIterations()), '0', 'number');
+    imgIterate.input.min = '0';
+    imgIterate.input.max = '2';
+    imgIterate.input.step = '1';
+    card.appendChild(imgIterate.wrap);
+    card.appendChild(el('div', 'mx-note',
+      'Depois de gerar, o app compara o canvas com a referência e pede até esse número de ajustes. ' +
+      'Só funciona quando a página desenha em um canvas acessível; 0 desliga.'));
 
     /* ---------- Salvar ---------- */
     var saveBtn = el('button', 'mx-btn mx-btn-primary mx-btn-block mx-save', 'Salvar configurações');
@@ -217,6 +256,10 @@
       prefs.set('maxTokens', isNaN(mt) || mt < 0 ? 0 : mt);
       prefs.set('temperature', Number(tempBar.value) / 100);
       prefs.set('autoFix', autoFixCheck.checked === true);
+      prefs.set('imageMode', imgLocal.checked ? 'local' : 'auto');
+      prefs.set('imageModeVersion', 2);
+      var vi = parseInt(imgIterate.input.value, 10);
+      prefs.set('visualIterations', isNaN(vi) ? 0 : Math.max(0, Math.min(2, vi)));
 
       toast('Configurações salvas ✓');
       close();

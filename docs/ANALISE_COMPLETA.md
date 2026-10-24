@@ -37,13 +37,13 @@ nexus-game/
 ├── serve.py (867 l.)              servidor Python (fallback)
 ├── desktop/                       Electron (main 141, server 1.039)
 ├── web/
-│   ├── index.html (58 l.) · css/app.css (750 l.)
-│   ├── js/                        12 arquivos, 6.946 linhas
+│   ├── index.html (59 l.) · css/app.css (771 l.)
+│   ├── js/                        12 arquivos, 7.057 linhas
 │   ├── vendor/                    bibliotecas locais
 │   └── test-harness.html          harness no navegador
 ├── salvos/                        7 projetos (3 não rastreados)
 ├── imagens/                       back1.jpg (124.961 B)
-├── docs/                          3.295 linhas + README (217)
+├── docs/                          3.381 linhas + README (217)
 └── fontes/                        fontes do projeto
 ```
 
@@ -71,24 +71,24 @@ prompt → LibrarySelector.selectLibraries (24 entradas)
 
 | Arquivo | Linhas | Bytes |
 |---|---:|---:|
-| `web/js/app.js` | 2.113 | 90.248 |
-| `web/js/html-builder.js` | 917 | 51.927 |
+| `web/js/app.js` | 2.138 | 91.060 |
+| `web/js/html-builder.js` | 919 | 52.104 |
 | `web/js/nx-shaders.js` | 868 | 32.497 |
 | `web/js/nx-materials.js` | 730 | 30.387 |
-| `web/js/library-selector.js` | 658 | 24.786 |
+| `web/js/library-selector.js` | 702 | 26.765 |
 | `web/js/ai-client.js` | 490 | 18.477 |
 | `web/js/store.js` | 337 | 12.337 |
 | `web/js/settings.js` | 236 | 8.211 |
 | `web/js/vu-meter.js` | 201 | 5.767 |
-| `web/js/nx-loaders.js` | 188 | 7.127 |
+| `web/js/nx-loaders.js` | 228 | 8.652 |
 | `web/js/prefs.js` | 154 | 5.263 |
 | `web/js/themes.js` | 54 | 1.902 |
 | `serve.py` | 867 | 36.295 |
 | `desktop/server.js` | 1.039 | 39.470 |
 | `desktop/main.js` | 141 | 4.211 |
-| `web/css/app.css` | 750 | 16.406 |
-| `web/index.html` | 58 | 2.634 |
-| **Total código** | **9.801** | **387.945** |
+| `web/css/app.css` | 771 | 16.949 |
+| `web/index.html` | 59 | 2.682 |
+| **Total código** | **9.934** | **393.166** |
 
 ## 6. Prompt e regras
 
@@ -128,23 +128,25 @@ prompt → LibrarySelector.selectLibraries (24 entradas)
 5. ✅ `lint.length === 1`; `BASE_PROMPT` e `detectMode` inexistentes.
 6. ✅ Contagens: NxMat 22 · NxShader 28 · chunks 7 · libs 24.
 7. ✅ Harness da skill: `verify-nx.js` **40 PASS / 0 FAIL**; `verify-antierro.js` **7 PASS / 0 FAIL**.
-8. ✅ Test harness do navegador atualizado (execução visual depende de abrir com servidor).
-9. ⚠️ **Não houve teste visual de um jogo gerado** (FPS/toque/áudio reais) nesta rodada —
-   a validação é estática/contratual.
+8. ✅ Test harness do navegador executado em Chromium headless — **11 PASS / 0 FAIL**,
+   incluindo detector `usedLibraries()`, chip `#libs` e integração ZzFX/lil-gui/NxLoad.
+9. ✅ **24/24 bibliotecas carregadas** em Chromium headless (vendor + CDN + built-ins).
+10. ⚠️ **Não houve teste visual de um jogo novo gerado pela IA** (FPS/toque/áudio reais)
+    nesta rodada; a validação é estática, de integração e por harness.
 
 ## 10. Revisão crítica pós-correção
 
 ### Pendências (por prioridade)
 
-1. **ALTA — v3 inteira sem commit.** `git status` mostra 17 arquivos modificados, 8 deletados,
-   12 módulos/vendors novos e 3 projetos salvos não rastreados. HEAD `db9f824` ainda diz
-   “v2.16.0”; tags param em `v2.13.0`. Fazer commit revisado e criar a tag `v3.0.1`.
+1. **MÉDIA — correções de integração e indicador sem commit.** A v3.0.1 está nos commits
+   `3e7d44a` e `7250fdc`; as correções das 24 bibliotecas e o chip `#libs` ainda estão no
+   working tree. A tag `v3.0.1` ainda não foi criada.
 2. **MÉDIA — `desktop/node_modules` (298 MB) dentro do Vault**, ignorado pelo git mas sujeito
    a backup/indexação do Obsidian.
 3. **MÉDIA — 14 arquivos de `salvos/*/_backups/` antigos estão rastreados**; novos backups não.
    Definir política (versionar ou ignorar `_backups/`).
-4. **MÉDIA — 3 projetos salvos não rastreados** (`cobras-10-vidas`, `luz-do-dia-com-nuvems`,
-   `tema-cyber`) — decidir se entram no git ou saem.
+4. **MÉDIA — 5 projetos salvos não rastreados** (`cobras-10-vidas`, `luz-do-dia-com-nuvems`,
+   `tema-cyber`, `tetris-3d`, `tetris22`) — decidir se entram no git ou saem.
 5. **BAIXA — 4 bibliotecas dependem de CDN** (Rapier, Recast, postprocessing, three-mesh-bvh);
    offline puro cobre o resto.
 6. **BAIXA — validação visual ausente**; Playwright não integrado.
@@ -154,6 +156,7 @@ prompt → LibrarySelector.selectLibraries (24 entradas)
 - Uma versão (3.0.1), uma diretiva, sete regras, uma REGRA 6 (tela cheia/15px).
 - NxTex eliminado do código e dos docs ativos; NxMat/NxShader/NxLoad documentados.
 - Contagens 22/28+7/24 verificadas por script.
+- **24/24 bibliotecas carregam** em Chromium headless; integrações CDN e globais corrigidas.
 - Segurança de saves/proxy implementada nos dois servidores.
 - `baseCss` sem `background`; `maxTokens` 65.535; timeouts 60/120/300 s preservados.
 
@@ -161,14 +164,14 @@ prompt → LibrarySelector.selectLibraries (24 entradas)
 
 | Item | Valor |
 |---|---|
-| Linhas de código | **9.801** |
+| Linhas de código | **9.934** |
 | `DIRECTIVE` | **13.256 chars** (13.560 bytes) |
 | `systemPrompt` (detail 1) | **14.377 chars** (14.703 bytes) |
-| `html-builder.js` | **917 linhas** |
+| `html-builder.js` | **919 linhas** |
 | Materiais / shaders / chunks | **22 / 28 / 7** |
 | Bibliotecas | **24** (20 locais/nativos + 4 CDN) |
-| Docs + README | **3.512 linhas** |
-| Peso do código | **388 KB** |
+| Docs + README | **3.598 linhas** |
+| Peso do código | **393 KB** |
 | `.git` | **4,5 MB** |
 | `desktop/node_modules` | **298 MB** |
 | Versão | **3.0.1** |

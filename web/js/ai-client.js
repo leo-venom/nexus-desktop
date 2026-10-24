@@ -380,6 +380,7 @@
     var m = String(model == null ? '' : model).toLowerCase();
     var cap;
     if (m.indexOf('gemini-2') >= 0) cap = 65535;
+    else if (m.indexOf('gpt-6') >= 0) cap = 128000;
     else if (/(^|\/)(o3|o4)/.test(m) || m.indexOf('gpt-5') >= 0) cap = 100000;
     else if (m.indexOf('gpt-4.1') >= 0) cap = 32768;
     else if (m.indexOf('gpt-4o') >= 0 || m.indexOf('4-turbo') >= 0) cap = 16384;
@@ -389,10 +390,16 @@
     return Math.min(v, cap);
   }
 
-  function chat(endpoint, apiKey, model, temperature, maxTokens, system, user, onProgress) {
+  function chat(endpoint, apiKey, model, temperature, maxTokens, system, user, onProgress, opts) {
+    var imageUrl = opts && typeof opts.image === 'string' ? opts.image : '';
+    if (imageUrl && !/^data:image\/(png|jpeg|webp);base64,/i.test(imageUrl)) imageUrl = '';
+    var userContent = imageUrl ? [
+      { type: 'text', text: String(user) },
+      { type: 'image_url', image_url: { url: imageUrl } }
+    ] : user;
     var messages = [
       { role: 'system', content: system },
-      { role: 'user', content: user }
+      { role: 'user', content: userContent }
     ];
     function body(stream) {
       var o = {
@@ -452,6 +459,13 @@
     return withProxyFallback(url, attempt);
   }
 
+  /* Um provedor pode recusar conteúdo multimodal com 4xx mesmo aceitando texto.
+     Só é consultado quando uma imagem foi realmente enviada. */
+  function isImageInputError(e) {
+    var m = String(e && e.message != null ? e.message : e || '');
+    return /^HTTP (400|413|415|422)\b/.test(m);
+  }
+
   /* Extrai a mensagem de erro mais útil possível de um erro/resposta falha. */
   function errorMessage(e) {
     var raw = (e && e.message != null ? String(e.message) : '').trim();
@@ -472,7 +486,7 @@
   }
 
   window.AiClient = {
-    VERSION: '3.0.1',
+    VERSION: '3.1.0',
     cancel: cancel,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
     CHAT_READ_TIMEOUT_MS: CHAT_READ_TIMEOUT_MS,
@@ -483,6 +497,7 @@
     chatUrl: chatUrl,
     modelsUrl: modelsUrl,
     chat: chat,
+    isImageInputError: isImageInputError,
     clampMaxTokens: clampMaxTokens,
     listModels: listModels,
     errorMessage: errorMessage
