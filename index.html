@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS GAME — Do prompt ao jogo jogável</title>
+<meta name="description" content="NEXUS GAME transforma uma frase em um jogo HTML completo, renderizado em um palco isolado no desktop. Imagem como fundo ou textura, edição cirúrgica e 24 bibliotecas.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#04070b">
+<link rel="icon" href="assets/icon.png" type="image/png">
+<link rel="canonical" href="https://leo-venom.github.io/nexus-desktop/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="NEXUS GAME">
+<meta property="og:title" content="NEXUS GAME — Do prompt ao jogo jogável">
+<meta property="og:description" content="Um estúdio de jogos dentro do seu desktop. Descreva a ideia, anexe uma imagem e jogue uma página HTML completa, gerada e isolada por sandbox.">
+<meta property="og:url" content="https://leo-venom.github.io/nexus-desktop/">
+<meta property="og:image" content="https://leo-venom.github.io/nexus-desktop/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NEXUS GAME — Do prompt ao jogo jogável">
+<meta name="twitter:description" content="Descreva a ideia. O NEXUS GAME entrega uma página HTML completa, jogável, em um palco isolado no desktop.">
+<meta name="twitter:image" content="https://leo-venom.github.io/nexus-desktop/assets/og.jpg">
+<script>document.documentElement.classList.add('js');</script>
+<style>
+:root{
+  --bg:#04070b;
+  --bg-2:#070d14;
+  --panel:rgba(9,17,25,.72);
+  --line:rgba(125,233,255,.14);
+  --line-2:rgba(125,233,255,.26);
+  --text:#eaf9fd;
+  --muted:#93aab9;
+  --cyan:#59e3ff;
+  --mint:#00ffa8;
+  --violet:#ad7bff;
+  --pink:#ff5ad9;
+  --mono:ui-monospace,"SFMono-Regular","Cascadia Code","Liberation Mono",Menlo,monospace;
+  --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,"Noto Sans",sans-serif;
+  --max:1180px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-3;background:
+  radial-gradient(900px 620px at 12% -8%,rgba(89,227,255,.16),transparent 62%),
+  radial-gradient(820px 620px at 92% 16%,rgba(173,123,255,.14),transparent 64%),
+  radial-gradient(900px 700px at 50% 112%,rgba(0,255,168,.08),transparent 62%),
+  #04070b}
+body::after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background-image:
+  linear-gradient(rgba(125,233,255,.045) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(125,233,255,.045) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(ellipse at 50% 18%,#000 0%,transparent 72%);
+  mask-image:radial-gradient(ellipse at 50% 18%,#000 0%,transparent 72%)}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font:inherit}
+::selection{background:rgba(0,255,168,.26);color:#fff}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.skip{position:absolute;left:16px;top:-80px;z-index:100;padding:12px 18px;border-radius:10px;background:var(--cyan);color:#031013;font-weight:700;transition:top .2s}
+.skip:focus{top:14px}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+
+.nav{position:sticky;top:0;z-index:50;border-bottom:1px solid transparent;background:rgba(4,7,11,.55);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);transition:background .25s,border-color .25s}
+.nav.scrolled{border-color:var(--line);background:rgba(4,7,11,.86)}
+.nav-inner{max-width:var(--max);margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:flex;align-items:center;gap:12px;font-size:.92rem;font-weight:800;letter-spacing:.14em}
+.brand small{display:block;margin-top:4px;font:9px/1 var(--mono);letter-spacing:.24em;color:var(--muted);font-weight:400}
+.mark{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;border:1px solid rgba(125,233,255,.36);background:linear-gradient(145deg,#0d1a24,#060b10);color:var(--cyan);font:800 19px/1 var(--sans);box-shadow:0 0 26px rgba(89,227,255,.16),inset 0 0 18px rgba(0,255,168,.08)}
+.nav-links{display:flex;align-items:center;gap:26px;font:10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.nav-links a{transition:color .2s}
+.nav-links a:hover{color:var(--cyan)}
+.nav-github{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:rgba(9,17,25,.65);color:var(--text);font:10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;transition:border-color .2s,transform .2s}
+.nav-github:hover{border-color:var(--line-2);transform:translateY(-1px)}
+
+.hero{max-width:var(--max);margin:0 auto;padding:clamp(64px,8vw,112px) 24px 92px;display:grid;grid-template-columns:1.02fr .98fr;gap:clamp(36px,5vw,72px);align-items:center;min-height:calc(100svh - 75px)}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(9,17,25,.55);font:9px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:#b8d6e1}
+.eyebrow .pulse{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px rgba(0,255,168,.85);animation:pulse 2.4s ease-in-out infinite}
+h1{margin:24px 0;font-size:clamp(2.9rem,6vw,5.35rem);line-height:.94;letter-spacing:-.058em;font-weight:800}
+.grad{background:linear-gradient(94deg,#7de9ff 0%,#00ffa8 50%,#b78dff 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{max-width:57ch;margin:0 0 32px;color:var(--muted);font-size:clamp(1rem,1.3vw,1.14rem);line-height:1.75}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 20px;border:1px solid transparent;border-radius:12px;font-size:.84rem;font-weight:700;letter-spacing:.01em;transition:transform .2s,box-shadow .2s,border-color .2s,background .2s}
+.btn:hover{transform:translateY(-2px)}
+.btn svg{flex:none}
+.btn.primary{background:linear-gradient(100deg,#73e9ff,#00ffa8);color:#031014;box-shadow:0 12px 42px rgba(0,255,168,.2)}
+.btn.primary:hover{box-shadow:0 16px 52px rgba(0,255,168,.3)}
+.btn.ghost{border-color:var(--line);background:rgba(9,17,25,.58);color:var(--text)}
+.btn.ghost:hover{border-color:var(--line-2);background:rgba(13,25,35,.75)}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin:30px 0 0;padding:0;list-style:none}
+.chips li{padding:9px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(8,15,22,.5);font:9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+.hero-visual{position:relative;perspective:1400px;min-width:0}
+.app{position:relative;border:1px solid rgba(125,233,255,.2);border-radius:20px;background:linear-gradient(180deg,#08111a,#050a0f);box-shadow:0 42px 110px rgba(0,0,0,.66),0 0 90px rgba(89,227,255,.07);overflow:hidden;transform:rotateY(-7deg) rotateX(2deg);transform-origin:50% 60%}
+.app::before{content:"";position:absolute;inset:0;z-index:5;border-radius:inherit;padding:1px;background:linear-gradient(140deg,rgba(125,233,255,.55),rgba(0,255,168,.18) 42%,rgba(173,123,255,.48));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.app-bar{display:flex;align-items:center;gap:9px;height:42px;padding:0 14px;border-bottom:1px solid var(--line);background:rgba(6,12,18,.94);font:9px/1 var(--mono);letter-spacing:.1em;color:var(--muted)}
+.app-dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px rgba(0,255,168,.8)}
+.app-title{color:var(--text);font-weight:700;letter-spacing:.16em}
+.app-mode{margin-left:auto;color:rgba(147,170,185,.8)}
+.app-online{color:var(--mint)}
+.app-screen{position:relative;aspect-ratio:16/10;overflow:hidden;background:#02060a}
+.app-screen img{width:100%;height:100%;object-fit:cover;filter:saturate(1.08) contrast(1.04);transform:scale(1.04);animation:drift 22s ease-in-out infinite alternate}
+.app-screen::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,10,.05),rgba(2,6,10,.52) 88%),radial-gradient(ellipse at 50% 50%,transparent 38%,rgba(2,6,10,.46))}
+.scanlines{position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 1px,transparent 1px 4px);opacity:.28;pointer-events:none}
+.hud{position:absolute;z-index:2;top:11px;left:13px;right:13px;display:flex;justify-content:space-between;gap:12px;font:9px/1 var(--mono);letter-spacing:.12em;color:#c6f8ff;text-shadow:0 0 12px rgba(89,227,255,.55)}
+.game-label{position:absolute;z-index:2;left:13px;bottom:11px;font:9px/1 var(--mono);letter-spacing:.1em;color:rgba(198,248,255,.72)}
+.app-prompt{display:flex;align-items:center;gap:10px;margin:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(8,15,22,.92);font:10px/1 var(--mono);color:#d7edf4}
+.clip{width:24px;height:24px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;color:var(--cyan);font-size:15px;line-height:1}
+.prompt-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.vu{display:flex;align-items:flex-end;gap:2px;height:18px;margin-left:auto;flex:none}
+.vu i{width:2px;height:var(--h);border-radius:1px;background:linear-gradient(180deg,var(--cyan),var(--mint));animation:vu 1.3s ease-in-out infinite alternate;animation-delay:calc(var(--i) * -.09s)}
+.send{width:24px;height:24px;flex:none;display:grid;place-items:center;border-radius:7px;background:linear-gradient(140deg,var(--cyan),var(--mint));color:#031014;font-weight:800;font-size:12px}
+.app-foot{display:flex;gap:16px;padding:0 14px 14px;font:8px/1 var(--mono);letter-spacing:.1em;color:rgba(147,170,185,.72)}
+.app-foot span:first-child{color:var(--cyan)}
+.float-chip{position:absolute;z-index:6;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(6,12,18,.86);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);font:9px/1 var(--mono);letter-spacing:.12em;color:var(--cyan);box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.chip-a{top:-18px;left:-22px;animation:float 7s ease-in-out infinite}
+.chip-b{top:54%;right:-26px;color:var(--mint);animation:float 8s ease-in-out infinite reverse}
+
+.section{max-width:var(--max);margin:0 auto;padding:clamp(72px,8vw,112px) 24px;border-top:1px solid rgba(125,233,255,.08)}
+.section-head{max-width:790px;margin-bottom:clamp(34px,5vw,52px)}
+.kicker{display:flex;align-items:center;gap:10px;margin:0 0 16px;font:9px/1 var(--mono);letter-spacing:.26em;text-transform:uppercase;color:var(--cyan)}
+.kicker::before{content:"";width:28px;height:1px;background:linear-gradient(90deg,var(--cyan),transparent)}
+h2{margin:0 0 18px;font-size:clamp(2rem,4.4vw,3.55rem);line-height:1.02;letter-spacing:-.048em;font-weight:800}
+.section-head p{max-width:66ch;margin:0;color:var(--muted);font-size:1.01rem;line-height:1.75}
+.pipeline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0;padding:0;list-style:none;counter-reset:step}
+.step{position:relative;overflow:hidden;padding:24px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,rgba(10,18,26,.78),rgba(5,10,15,.42))}
+.step::before{counter-increment:step;content:counter(step,decimal-leading-zero);position:absolute;top:13px;right:16px;font:800 2.5rem/1 var(--mono);letter-spacing:-.08em;color:rgba(125,233,255,.09)}
+.step-icon{width:34px;height:34px;display:grid;place-items:center;margin-bottom:16px;border:1px solid rgba(125,233,255,.24);border-radius:9px;background:rgba(89,227,255,.06);color:var(--cyan)}
+.step h3{margin:0 0 8px;font-size:.98rem;letter-spacing:-.01em}
+.step p{margin:0;color:var(--muted);font-size:.87rem;line-height:1.65}
+.code-panel{margin-top:22px;border:1px solid var(--line);border-radius:16px;background:#04090e;overflow:hidden}
+.code-head{display:flex;align-items:center;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line);font:8px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.code-dots{display:flex;gap:4px;margin-right:6px}
+.code-dots i{width:7px;height:7px;border-radius:50%;background:rgba(147,170,185,.32)}
+.copy-btn{margin-left:auto;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:rgba(9,17,25,.7);color:var(--cyan);font:8px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:border-color .2s,background .2s}
+.copy-btn:hover{border-color:var(--line-2);background:rgba(13,25,35,.9)}
+.code-panel pre{margin:0;padding:20px 22px;overflow:auto;font:11.5px/1.85 var(--mono);color:#cfe9f2;tab-size:2}
+.c-comment{color:#5d7887}
+.c-prompt{color:var(--mint)}
+.c-accent{color:var(--cyan)}
+.code-note{padding:0 22px 18px;font:9px/1.6 var(--mono);color:rgba(147,170,185,.72)}
+
+.image-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.mode-card{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:linear-gradient(170deg,rgba(10,18,26,.82),rgba(4,9,13,.6))}
+.mode-visual{position:relative;aspect-ratio:16/10;overflow:hidden;background:#03070a;border-bottom:1px solid var(--line)}
+.bg-mode img{width:100%;height:100%;object-fit:cover;filter:saturate(1.08)}
+.bg-mode::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,10,.12),rgba(2,6,10,.55)),radial-gradient(ellipse at 50% 50%,transparent 42%,rgba(2,6,10,.42))}
+.demo-hud{position:absolute;z-index:2;top:13px;left:14px;right:14px;display:flex;justify-content:space-between;font:9px/1 var(--mono);letter-spacing:.13em;color:#c6f8ff;text-shadow:0 0 12px rgba(89,227,255,.6)}
+.demo-game{position:absolute;z-index:2;left:50%;top:50%;width:42px;height:42px;transform:translate(-50%,-50%) rotate(45deg);border:1px solid rgba(198,248,255,.75);box-shadow:0 0 26px rgba(89,227,255,.45),inset 0 0 18px rgba(0,255,168,.22)}
+.mode-tag{position:absolute;z-index:3;right:12px;bottom:12px;padding:8px 10px;border:1px solid rgba(125,233,255,.28);border-radius:8px;background:rgba(4,9,13,.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font:8px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.tex-mode{display:grid;place-items:center;background:radial-gradient(circle at 50% 46%,rgba(89,227,255,.13),transparent 56%),linear-gradient(180deg,#04090e,#020508)}
+.tex-mode::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(125,233,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(125,233,255,.06) 1px,transparent 1px);background-size:32px 32px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000,transparent 70%);mask-image:radial-gradient(circle at 50% 50%,#000,transparent 70%)}
+.cube-stage{position:relative;z-index:2;perspective:900px}
+.cube{position:relative;width:148px;height:148px;transform-style:preserve-3d;transform:rotateX(-20deg) rotateY(32deg);animation:spin 24s linear infinite}
+.face{position:absolute;inset:0;border:1px solid rgba(125,233,255,.56);background-image:url("assets/neon-cubes.jpg");background-size:cover;background-position:center;box-shadow:inset 0 0 38px rgba(2,6,10,.62),0 0 18px rgba(89,227,255,.14);backface-visibility:hidden}
+.face.front{transform:translateZ(74px)}
+.face.back{transform:rotateY(180deg) translateZ(74px)}
+.face.right{transform:rotateY(90deg) translateZ(74px)}
+.face.left{transform:rotateY(-90deg) translateZ(74px)}
+.face.top{transform:rotateX(90deg) translateZ(74px)}
+.face.bottom{transform:rotateX(-90deg) translateZ(74px)}
+.mode-body{padding:24px;display:flex;flex:1;flex-direction:column}
+.mode-num{font:9px/1 var(--mono);letter-spacing:.2em;color:var(--cyan)}
+.mode-body h3{margin:12px 0 10px;font-size:clamp(1.25rem,2vw,1.6rem);letter-spacing:-.025em}
+.mode-body p{margin:0;color:var(--muted);font-size:.9rem;line-height:1.7}
+.mode-body code{display:block;margin-top:auto;padding:13px;border:1px solid var(--line);border-radius:9px;background:#04090e;font:10px/1.6 var(--mono);color:#9fe9ff;white-space:nowrap;overflow:auto}
+.image-flow{display:grid;grid-template-columns:.98fr 1.02fr;gap:clamp(24px,4vw,44px);margin-top:18px;padding:clamp(24px,3.4vw,38px);border:1px solid var(--line);border-radius:20px;background:linear-gradient(160deg,rgba(8,15,22,.76),rgba(4,9,13,.45))}
+.image-flow h3{margin:0 0 20px;font-size:1.06rem;letter-spacing:-.015em}
+.mini-steps{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.mini-steps li{position:relative;margin-left:9px;padding:0 0 18px 34px;border-left:1px solid rgba(125,233,255,.16);color:var(--muted);font-size:.88rem;line-height:1.65}
+.mini-steps li:last-child{padding-bottom:0;border-color:transparent}
+.mini-steps b{position:absolute;left:-10px;top:0;width:20px;height:20px;display:grid;place-items:center;border:1px solid rgba(125,233,255,.3);border-radius:50%;background:#071019;color:var(--cyan);font:8px/1 var(--mono);font-weight:400}
+.flow-side{display:flex;flex-direction:column;gap:14px}
+.mode-pill{align-self:flex-start;padding:7px 10px;border:1px solid rgba(125,233,255,.28);border-radius:999px;background:rgba(89,227,255,.07);font:8px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
+.mode-pill.local{border-color:rgba(0,255,168,.24);background:rgba(0,255,168,.06);color:var(--mint)}
+.flow-side p{margin:0;color:var(--muted);font-size:.86rem;line-height:1.7}
+.note{margin-top:4px;padding:17px;border:1px solid rgba(0,255,168,.18);border-radius:12px;background:rgba(0,255,168,.035);color:var(--muted);font-size:.84rem;line-height:1.7}
+.note strong{color:var(--mint)}
+
+.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.feature{padding:24px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,rgba(10,18,26,.75),rgba(5,10,15,.4));transition:transform .22s,border-color .22s,box-shadow .22s}
+.feature:hover{transform:translateY(-3px);border-color:rgba(125,233,255,.29);box-shadow:0 20px 48px rgba(0,0,0,.28)}
+.feature-icon{width:36px;height:36px;display:grid;place-items:center;margin-bottom:16px;border:1px solid rgba(125,233,255,.22);border-radius:10px;background:rgba(89,227,255,.05);color:var(--cyan)}
+.feature h3{margin:0 0 8px;font-size:.96rem;letter-spacing:-.01em}
+.feature p{margin:0;color:var(--muted);font-size:.86rem;line-height:1.68}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;margin-top:34px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--line)}
+.stat{padding:22px 14px;background:#060c12;text-align:center}
+.stat strong{display:block;font:800 clamp(1.45rem,2.4vw,2.1rem)/1 var(--sans);letter-spacing:-.04em;background:linear-gradient(180deg,#eafcff,#7de9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{display:block;margin-top:8px;font:8px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+.security{display:grid;grid-template-columns:1.06fr .94fr;gap:clamp(30px,5vw,64px);align-items:center}
+.checks{display:grid;gap:13px;margin:28px 0 0;padding:0;list-style:none}
+.checks li{position:relative;padding-left:29px;color:var(--muted);font-size:.9rem;line-height:1.65}
+.checks li::before{content:"";position:absolute;left:0;top:2px;width:18px;height:18px;border:1px solid rgba(0,255,168,.28);border-radius:50%;background:rgba(0,255,168,.08)}
+.checks li::after{content:"";position:absolute;left:6px;top:6px;width:5px;height:9px;border-right:2px solid var(--mint);border-bottom:2px solid var(--mint);transform:rotate(40deg)}
+.stack{position:relative;padding:26px;border:1px solid var(--line);border-radius:20px;background:radial-gradient(circle at 50% 0%,rgba(89,227,255,.11),transparent 60%),rgba(4,9,13,.62);overflow:hidden}
+.stack::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(125,233,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(125,233,255,.05) 1px,transparent 1px);background-size:28px 28px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000,transparent 76%);mask-image:radial-gradient(circle at 50% 50%,#000,transparent 76%);pointer-events:none}
+.layer{position:relative;z-index:1;display:flex;align-items:center;gap:14px;padding:17px;border:1px solid var(--line);border-radius:12px;background:rgba(7,14,21,.94);box-shadow:0 16px 38px rgba(0,0,0,.28)}
+.layer + .layer{margin-top:12px}
+.layer .icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border:1px solid currentColor;border-radius:10px;background:rgba(255,255,255,.03)}
+.layer strong{display:block;font-size:.85rem;letter-spacing:.02em}
+.layer small{display:block;margin-top:4px;font:8px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.layer.shell{margin-right:30px;color:var(--mint);border-color:rgba(0,255,168,.26)}
+.layer.sandbox{margin-left:14px;margin-right:14px;color:var(--cyan);border-color:rgba(89,227,255,.32)}
+.layer.local{margin-left:30px;color:var(--violet);border-color:rgba(173,123,255,.28)}
+.layer small{color:var(--muted)}
+
+.cta-wrap{max-width:var(--max);margin:0 auto;padding:clamp(58px,8vw,98px) 24px}
+.cta-card{position:relative;overflow:hidden;padding:clamp(34px,6vw,64px);border:1px solid rgba(125,233,255,.23);border-radius:24px;background:
+  radial-gradient(720px 330px at 84% -4%,rgba(173,123,255,.24),transparent 62%),
+  radial-gradient(700px 330px at 8% 104%,rgba(0,255,168,.13),transparent 62%),
+  linear-gradient(160deg,#08111a,#04080d);text-align:center}
+.cta-card h2{max-width:620px;margin:0 auto 18px}
+.cta-card p{max-width:60ch;margin:0 auto 30px;color:var(--muted)}
+.cta-card .cta-row{justify-content:center}
+footer{border-top:1px solid var(--line);background:rgba(3,6,9,.72)}
+.footer-inner{max-width:var(--max);margin:0 auto;padding:38px 24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px}
+.footer-brand{display:flex;align-items:center;gap:11px;font-size:.84rem;font-weight:800;letter-spacing:.12em}
+.footer-brand small{display:block;margin-top:4px;font:8px/1 var(--mono);letter-spacing:.18em;color:var(--muted);font-weight:400}
+.footer-links{display:flex;flex-wrap:wrap;gap:18px;font:9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.footer-links a:hover{color:var(--cyan)}
+.footer-note{width:100%;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding-top:20px;border-top:1px solid rgba(125,233,255,.08);font:8px/1.6 var(--mono);letter-spacing:.06em;color:rgba(147,170,185,.62)}
+
+.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.js .reveal.in{opacity:1;transform:none}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.8)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes drift{0%{transform:scale(1.04) translate3d(0,0,0)}100%{transform:scale(1.1) translate3d(-1.5%,-1%,0)}}
+@keyframes vu{0%{transform:scaleY(.35)}100%{transform:scaleY(1)}}
+@keyframes spin{0%{transform:rotateX(-20deg) rotateY(32deg)}100%{transform:rotateX(-20deg) rotateY(392deg)}}
+
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr;min-height:0;padding-top:64px}
+  .hero-visual{width:100%;max-width:650px;margin:0 auto}
+  .nav-links{display:none}
+  .pipeline,.features{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .image-modes,.image-flow,.security{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .app{transform:none}
+}
+@media (max-width:640px){
+  .wrap,.nav-inner,.hero,.section,.cta-wrap,.footer-inner{padding-left:18px;padding-right:18px}
+  h1{font-size:clamp(2.55rem,12vw,3.7rem)}
+  .nav-github span{display:none}
+  .chip-a{left:-8px;top:-14px}
+  .chip-b{display:none}
+  .pipeline,.features{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .mode-body code{white-space:normal}
+  .app-mode{display:none}
+  .app-foot{gap:10px;font-size:7px}
+  .footer-inner{align-items:flex-start;flex-direction:column}
+  .footer-note{flex-direction:column}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .js .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+
+<header class="nav" id="top">
+  <div class="nav-inner">
+    <a class="brand" href="#top" aria-label="NEXUS GAME, início">
+      <span class="mark" aria-hidden="true">N</span>
+      <span>NEXUS GAME<small>BLACK CYBER STUDIO</small></span>
+    </a>
+    <nav class="nav-links" aria-label="Seções">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#imagens">Imagens</a>
+      <a href="#recursos">Recursos</a>
+      <a href="#seguranca">Segurança</a>
+    </nav>
+    <a class="nav-github" href="https://github.com/leo-venom/nexus-desktop" target="_blank" rel="noopener noreferrer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.97 3.22 9.18 7.69 10.67.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.71-1.5-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.61 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.33-2.64 5.29-5.15 5.56.4.35.76 1.03.76 2.08v3.09c0 .3.2.65.78.54a11.26 11.26 0 0 0 7.68-10.67C23.25 5.48 18.27.5 12 .5Z"/></svg>
+      <span>GitHub</span>
+    </a>
+  </div>
+</header>
+
+<main id="conteudo">
+  <section class="hero">
+    <div class="hero-copy reveal">
+      <div class="eyebrow"><span class="pulse" aria-hidden="true"></span> v3.1.0 · diretiva única · 7 regras</div>
+      <h1>Do prompt ao<br><span class="grad">jogo jogável</span>.</h1>
+      <p class="lede">Um estúdio de jogos dentro do seu desktop. Descreva a ideia, anexe uma referência se quiser — e o NEXUS GAME entrega uma página HTML completa, aberta em um palco isolado, pronta para jogar. Sem build, sem menu, sem projeto intermediário.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="https://github.com/leo-venom/nexus-desktop" target="_blank" rel="noopener noreferrer">
+          Explorar o projeto
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn ghost" href="https://github.com/leo-venom/nexus-desktop/releases/tag/v3.1.0" target="_blank" rel="noopener noreferrer">Release v3.1.0</a>
+      </div>
+      <ul class="chips" aria-label="Tecnologias">
+        <li>Electron + Chromium</li>
+        <li>API OpenAI-compatible</li>
+        <li>iframe sandbox</li>
+        <li>Shell local</li>
+      </ul>
+    </div>
+
+    <div class="hero-visual reveal">
+      <div class="app" aria-label="Mockup da interface do NEXUS GAME com um jogo de cubos neon">
+        <div class="app-bar">
+          <span class="app-dot" aria-hidden="true"></span>
+          <span class="app-title">NEXUS GAME</span>
+          <span class="app-mode">PADRÃO · BLACK CYBER</span>
+          <span class="app-online">online</span>
+        </div>
+        <div class="app-screen">
+          <img src="assets/neon-cubes.jpg" alt="Cena neon de cubos 3D usada como exemplo visual de um jogo gerado" width="1800" height="1013">
+          <span class="scanlines" aria-hidden="true"></span>
+          <div class="hud"><span>SCORE 04.820</span><span>LV 07</span><span>ENERGY 100</span></div>
+          <span class="game-label">// jogo gerado · 3d · 60 fps</span>
+        </div>
+        <div class="app-prompt">
+          <span class="clip" aria-hidden="true">+</span>
+          <span class="prompt-text">crie um jogo de nave com estética neon…</span>
+          <span class="vu" aria-hidden="true">
+            <i style="--h:8px;--i:1"></i><i style="--h:14px;--i:2"></i><i style="--h:10px;--i:3"></i><i style="--h:17px;--i:4"></i><i style="--h:12px;--i:5"></i><i style="--h:6px;--i:6"></i><i style="--h:15px;--i:7"></i><i style="--h:9px;--i:8"></i><i style="--h:16px;--i:9"></i><i style="--h:11px;--i:10"></i>
+          </span>
+          <span class="send" aria-hidden="true">↵</span>
+        </div>
+        <div class="app-foot"><span>LIBS · Three.js</span><span>STREAM · SSE</span><span>SESSÃO · 1M</span><span>SANDBOX</span></div>
+      </div>
+      <span class="float-chip chip-a">prompt / jogo</span>
+      <span class="float-chip chip-b">render isolado</span>
+    </div>
+  </section>
+
+  <section class="section" id="como-funciona">
+    <div class="section-head reveal">
+      <p class="kicker">Como funciona</p>
+      <h2>Uma frase entra.<br>Um jogo sai.</h2>
+      <p>O NEXUS GAME não monta um projeto: ele escreve a página final. O shell cuida do contexto, da segurança e do ciclo de vida para o modelo entregar algo jogável no primeiro frame.</p>
+    </div>
+    <ol class="pipeline reveal">
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m17 15 3 3-3 3"/></svg></span>
+        <h3>Você descreve</h3>
+        <p>Prompt curto e, se quiser, uma imagem. Não existem modos separados: o pedido define o que a página é.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v10H3z"/><path d="M7 12h4M9 10v4M16 11h.01M18.5 13h.01"/></svg></span>
+        <h3>O contexto é montado</h3>
+        <p>DIRECTIVE com 7 regras, tema BLACK CYBER, catálogo de 24 bibliotecas e o bloco da imagem quando existe.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17V7l8-4 8 4v10l-8 4z"/><path d="m4 7 8 4 8-4M12 11v10"/></svg></span>
+        <h3>O modelo responde em SSE</h3>
+        <p>O endpoint OpenAI-compatible recebe o pedido pelo proxy local. A resposta chega em streaming, com prévia ao vivo.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg></span>
+        <h3>O HTML é validado</h3>
+        <p>Extração do documento, injeção das libs, polyfill de storage, checagem de sintaxe e reparos automáticos.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span>
+        <h3>O jogo abre no palco</h3>
+        <p>iframe sandbox, origem opaca, tela cheia já no primeiro frame, som futurista e HUD de 15px.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v3h16v-3"/></svg></span>
+        <h3>Você refina e salva</h3>
+        <p>Edição cirúrgica devolve só os trechos alterados. Projetos ficam em <code>salvos/&lt;nome&gt;/</code>, com backup a cada save.</p>
+      </li>
+    </ol>
+    <div class="code-panel reveal">
+      <div class="code-head">
+        <span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        rode localmente
+        <button class="copy-btn" type="button" data-copy="git clone https://github.com/leo-venom/nexus-desktop.git
+cd nexus-desktop
+npm --prefix desktop install
+./desktop/start.sh">copiar</button>
+      </div>
+      <pre><span class="c-comment"># 1. clone o repositório</span>
+<span class="c-prompt">$</span> git clone <span class="c-accent">https://github.com/leo-venom/nexus-desktop.git</span>
+<span class="c-prompt">$</span> cd nexus-desktop
+
+<span class="c-comment"># 2. instale o Electron (uma vez)</span>
+<span class="c-prompt">$</span> npm --prefix desktop install
+
+<span class="c-comment"># 3. abra o app</span>
+<span class="c-prompt">$</span> ./desktop/start.sh</pre>
+      <p class="code-note">Fallback sem Electron: python3 serve.py e abra http://127.0.0.1:8790/.</p>
+    </div>
+  </section>
+
+  <section class="section" id="imagens">
+    <div class="section-head reveal">
+      <p class="kicker">Imagens</p>
+      <h2>A imagem entra no jogo.<br>Não no lugar dele.</h2>
+      <p>Anexe pelo clipe dentro do prompt. Com um jogo aberto, o NEXUS GAME trata a imagem como asset real: fundo por padrão, textura quando você pede. Sem jogo aberto, ela vira referência para uma página nova.</p>
+    </div>
+
+    <div class="image-modes">
+      <article class="mode-card reveal">
+        <div class="mode-visual bg-mode">
+          <img src="assets/neon-cubes.jpg" alt="Imagem neon aplicada como fundo de um jogo, com HUD sobreposto" width="1800" height="1013">
+          <div class="demo-hud"><span>SCORE 01820</span><span>LV 03</span><span>ENERGY 100</span></div>
+          <span class="demo-game" aria-hidden="true"></span>
+          <span class="mode-tag">background</span>
+        </div>
+        <div class="mode-body">
+          <span class="mode-num">01 / SEM TEXTO</span>
+          <h3>Fundo por padrão</h3>
+          <p>Só anexar já basta. A imagem vira o cenário atrás do gameplay, do HUD e dos controles. O jogo, a jogabilidade e a barra de 15px continuam exatamente como estavam.</p>
+          <code>background: url("/imagens/nexus-ref-…") center / cover</code>
+        </div>
+      </article>
+
+      <article class="mode-card reveal">
+        <div class="mode-visual tex-mode">
+          <div class="cube-stage" aria-hidden="true">
+            <div class="cube">
+              <span class="face front"></span><span class="face back"></span><span class="face right"></span><span class="face left"></span><span class="face top"></span><span class="face bottom"></span>
+            </div>
+          </div>
+          <span class="mode-tag">material.map</span>
+        </div>
+        <div class="mode-body">
+          <span class="mode-num">02 / TEXTURA PEDIDA</span>
+          <h3>Textura do objeto</h3>
+          <p>Nomeie o componente — cubo, peça, nave, parede, chão. Em 2D o app usa <code>createPattern</code>/<code>drawImage</code>; em 3D, <code>TextureLoader</code> + <code>material.map</code>. A imagem não troca o fundo por engano.</p>
+          <code>material.map = new THREE.TextureLoader().load(path)</code>
+        </div>
+      </article>
+    </div>
+
+    <div class="image-flow reveal">
+      <div>
+        <h3>O caminho da imagem</h3>
+        <ol class="mini-steps">
+          <li><b>01</b> Validação local por magic bytes: PNG, JPEG ou WEBP, até 12 MB, 40 MP e 10.000 px por lado.</li>
+          <li><b>02</b> Upload local <code>POST /_api/ref-image</code> gera <code>imagens/nexus-ref-*</code> com nome único, limite de 6 MB e modo 0600.</li>
+          <li><b>03</b> O prompt recebe o caminho exato e a regra de uso: fundo ou textura do componente nomeado.</li>
+          <li><b>04</b> Depois da geração, o app confere caminho + pista de uso. Se faltar, faz uma rodada de correção.</li>
+          <li><b>05</b> Ao salvar, o asset é copiado para <code>assets/images/</code> e o projeto reabre offline.</li>
+        </ol>
+      </div>
+      <div class="flow-side">
+        <span class="mode-pill">Automático · padrão</span>
+        <p>Os pixels originais vão ao endpoint para máxima fidelidade. Se o provedor recusar imagem, o app cai uma vez para o relatório técnico local, sem perder a geração.</p>
+        <span class="mode-pill local">Somente local</span>
+        <p>O modelo recebe apenas dimensões, paleta e relatório de análise. Os pixels nunca saem do navegador.</p>
+        <div class="note"><strong>Sem jogo aberto:</strong> a imagem volta ao fluxo de recriação — vira referência para uma página nova. Para recriar com um jogo aberto, reinicie a sessão (↺).</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="recursos">
+    <div class="section-head reveal">
+      <p class="kicker">O que já está dentro</p>
+      <h2>Ferramentas de estúdio,<br>sem a fricção de um estúdio.</h2>
+      <p>Um shell completo ao redor do modelo: seleção de bibliotecas, edição, salvamento, som, desempenho e proteção. Você foca na ideia; o NEXUS cuida da engenharia.</p>
+    </div>
+    <div class="features">
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 5v14l11-7z"/></svg></span>
+        <h3>Jogo no primeiro frame</h3>
+        <p>Sem splash, menu ou botão iniciar. O objeto controlável já responde, com render síncrono antes do loop e controles de teclado/mouse.</p>
+      </article>
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 20 10-10M14 6l4 4M6 4l14 14"/></svg></span>
+        <h3>Edição cirúrgica</h3>
+        <p>Um novo comando devolve só os trechos alterados em JSON find/replace. O resto da página fica intacto, com fallback seguro para documento completo.</p>
+      </article>
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg></span>
+        <h3>24 bibliotecas</h3>
+        <p>Three.js r160 local, Babylon, Phaser, PixiJS, Matter, GSAP, Howler, Tone, ZzFX e mais. Loaders sob demanda para Rapier, Recast, postprocessing e BVH.</p>
+      </article>
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg></span>
+        <h3>22 materiais + 28 shaders</h3>
+        <p>Materiais PBR procedurais com normal map, roughness e metalness. Shaders GLSL para fogo, água, aurora, plasma, CRT, holograma e escudo.</p>
+      </article>
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+        <h3>Sessão com orçamento</h3>
+        <p>1M de tokens por sessão, VU meter de 20 barras, KB ao vivo e tokens estimados durante a geração, exatos ao final.</p>
+      </article>
+      <article class="feature reveal">
+        <span class="feature-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11l3 3v13H5z"/><path d="M9 4v6h6V4M9 15h6v5H9z"/></svg></span>
+        <h3>Salvar, abrir, voltar</h3>
+        <p>API REST local em <code>salvos/&lt;nome&gt;/</code>, assets copiados junto, backup automático a cada save e restauração pela interface.</p>
+      </article>
+    </div>
+    <div class="stats reveal" aria-label="Números do projeto">
+      <div class="stat"><strong>7</strong><span>regras no DIRECTIVE</span></div>
+      <div class="stat"><strong>24</strong><span>bibliotecas</span></div>
+      <div class="stat"><strong>22</strong><span>materiais PBR</span></div>
+      <div class="stat"><strong>28</strong><span>shaders GLSL</span></div>
+      <div class="stat"><strong>1M</strong><span>tokens por sessão</span></div>
+      <div class="stat"><strong>3.1.0</strong><span>versão atual</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="seguranca">
+    <div class="security">
+      <div class="reveal">
+        <p class="kicker">Segurança</p>
+        <h2>O jogo roda isolado.<br>O shell fica protegido.</h2>
+        <p class="section-head" style="margin-bottom:0">Cada página gerada executa em um iframe com origem opaca. Ela não alcança o DOM do app, o localStorage nem a sua API key. A ponte com o shell é um postMessage com whitelist.</p>
+        <ul class="checks">
+          <li><code>iframe sandbox="allow-scripts"</code> sem <code>allow-same-origin</code>: a página gerada não tem a origem do app.</li>
+          <li>Electron carrega apenas 127.0.0.1, com <code>contextIsolation</code>, <code>sandbox</code> e sem <code>nodeIntegration</code>.</li>
+          <li>Proxy <code>/_proxy</code> bloqueia redes privadas, link-local e metadata de nuvem, fixa DNS validado e revalida redirecionamentos.</li>
+          <li>Imagem validada por magic bytes, 6 MB, nome único e modo 0600. Nada do arquivo é executado.</li>
+          <li>Links externos abrem em janela isolada; protocolos desconhecidos são bloqueados.</li>
+        </ul>
+      </div>
+      <div class="stack reveal" aria-label="Camadas de isolamento">
+        <div class="layer shell">
+          <span class="icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h4M7 12h7M7 16h5"/></svg></span>
+          <div><strong>SHELL · ELECTRON</strong><small>api key · projetos · interface</small></div>
+        </div>
+        <div class="layer sandbox">
+          <span class="icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+          <div><strong>SANDBOX · IFRAME</strong><small>origem opaca · allow-scripts</small></div>
+        </div>
+        <div class="layer local">
+          <span class="icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v10H4z"/><path d="M8 7V5h8v2M8 12h8"/></svg></span>
+          <div><strong>LOCAL API · NODE / PYTHON</strong><small>proxy · saves · upload de imagem</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-wrap">
+    <div class="cta-card reveal">
+      <p class="kicker" style="justify-content:center">Pronto para criar</p>
+      <h2>Seu próximo jogo começa com uma frase.</h2>
+      <p>Clone o repositório, configure um endpoint OpenAI-compatible e abra o NEXUS GAME. O palco, o sandbox e o ciclo de salvamento já estão prontos.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="https://github.com/leo-venom/nexus-desktop" target="_blank" rel="noopener noreferrer">
+          Ver no GitHub
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn ghost" href="https://github.com/leo-venom/nexus-desktop/blob/v3.1.0/docs/DOCUMENTACAO.md" target="_blank" rel="noopener noreferrer">Ler a documentação</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="mark" aria-hidden="true">N</span>
+      <span>NEXUS GAME<small>v3.1.0 · 2026-10-24</small></span>
+    </div>
+    <nav class="footer-links" aria-label="Links">
+      <a href="https://github.com/leo-venom/nexus-desktop" target="_blank" rel="noopener noreferrer">Repositório</a>
+      <a href="https://github.com/leo-venom/nexus-desktop/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+      <a href="https://github.com/leo-venom/nexus-desktop/blob/v3.1.0/README.md" target="_blank" rel="noopener noreferrer">README</a>
+      <a href="https://github.com/leo-venom/nexus-desktop/blob/v3.1.0/docs/DOCUMENTACAO.md" target="_blank" rel="noopener noreferrer">Documentação</a>
+    </nav>
+    <div class="footer-note">
+      <span>Shell local. Modelo remoto ou local — você escolhe o endpoint.</span>
+      <span>BLACK CYBER · feito para desktop</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var nav = document.querySelector('.nav');
+  function onScroll() {
+    if (!nav) return;
+    nav.classList.toggle('scrolled', window.scrollY > 12);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  var copy = document.querySelector('.copy-btn');
+  if (copy) {
+    copy.addEventListener('click', function () {
+      var text = copy.getAttribute('data-copy') || '';
+      function done() {
+        var old = copy.textContent;
+        copy.textContent = 'copiado';
+        setTimeout(function () { copy.textContent = old; }, 1600);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var area = document.createElement('textarea');
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(area);
+      }
+    });
+  }
+
+  var items = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  if (!('IntersectionObserver' in window)) {
+    items.forEach(function (el) { el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' });
+  items.forEach(function (el) { io.observe(el); });
+})();
+</script>
+</body>
+</html>
